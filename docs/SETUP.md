@@ -23,7 +23,7 @@ If you don't see that menu item, try step 3 first; the greyed-out switch will te
 
 ### 3. Work down the Setup tab
 
-Open the app → **Setup**. Each row has a **Fix** button that jumps to the right Settings screen. Go top to bottom until it says 8/8.
+Open the app → **More** (bottom right). Each row has a **Fix** button that jumps to the right Settings screen. Go top to bottom until it says 8/8.
 
 | # | What | What to tap |
 |---|---|---|
@@ -37,6 +37,7 @@ Open the app → **Setup**. Each row has a **Fix** button that jumps to the righ
 | 8 | Battery: unrestricted | Allow |
 
 **Then the Samsung step the app can't check (row 9):**
+(If Not a Fraud doesn't appear in the Never sleeping list, that's expected once battery is set to Unrestricted — the app's watchdog will tell you if it ever gets stopped.)
 Settings → **Battery** → **Background usage limits**:
 - Remove Not a Fraud from **Sleeping apps** and **Deep sleeping apps**.
 - Add it to **Never sleeping apps**.
@@ -48,16 +49,25 @@ post a "Guard was stopped" notification if that happens.
 **And make Samsung Health write to Health Connect:**
 Samsung Health → ⋮ → **Settings → Health Connect** → allow it to write **Sleep**, **Exercise** and **Steps**.
 
-### 4. Pick your apps
+### 4. Google Calendar
+
+1. On a computer, open **calendar.google.com** → left side **Other calendars → + → Create new calendar** → name it **Not a Fraud** → Create.
+2. On the phone wait a minute for it to sync, then **More → Google Calendar** → tap **Not a Fraud** under "Tap to write plan here".
+3. Under "Read as events", untick any calendar the app should ignore (your old routine calendars, holidays). Everything left ticked is treated as fixed events.
+
+From then on the day's plan (tasks, blocks, routine reminders) appears in the Not a Fraud calendar and updates as the plan changes. Don't edit those events in Google Calendar; change things in the app.
+
+### 5. Pick your apps
 
 Setup → **Blocking**:
 - **Blocked apps** — starts with Instagram, TikTok, X, Reddit, YouTube, Snapchat, Facebook. Untick anything you don't have or want.
 - **Focus apps that earn credits** — starts with Kindle, Play Books, Anki, Libby, Acrobat, Samsung Notes. Add whatever you read or study in.
+- **Blocked websites** — instagram.com, tiktok.com, x.com, twitter.com, reddit.com, youtube.com, facebook.com. Works in Chrome, Samsung Internet, Brave, Edge, Firefox, Opera and DuckDuckGo.
 - **Mirrored into Inbox** — Snapchat. Its messages show up in the Inbox tab, with reply when Snapchat offers it.
 
 You start with 15 credit minutes.
 
-### 5. Check it works (2 minutes)
+### 6. Check it works (2 minutes)
 
 1. Open Instagram → the block screen should appear.
 2. Tap **10m** → Instagram opens. After 3 minutes you get the first nudge.

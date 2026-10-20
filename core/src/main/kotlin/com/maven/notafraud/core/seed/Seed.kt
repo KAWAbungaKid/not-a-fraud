@@ -189,6 +189,7 @@ object Seed {
             schema = Migration.CURRENT,
             goals = goals(), areas = areas(), projects = projects, tasks = tasks, events = events,
             anchors = anchors(), routine = routine(), seeded = true,
+            settings = com.maven.notafraud.core.model.Settings(routineSince = now),
         )
     }
 }
@@ -229,7 +230,7 @@ object Migration {
             tasks = tasks,
             anchors = Seed.anchors(),
             routine = d.routine.ifEmpty { Seed.routine() },
-            settings = d.settings.copy(dayStartMin = 7 * 60, dayEndMin = 21 * 60 + 30),
+            settings = d.settings.copy(dayStartMin = 7 * 60, dayEndMin = 21 * 60 + 30, routineSince = now),
             todayPlan = null,
         )
     }

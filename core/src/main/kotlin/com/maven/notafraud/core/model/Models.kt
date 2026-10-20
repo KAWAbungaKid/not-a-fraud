@@ -285,6 +285,8 @@ data class Settings(
     /** PC: minimize a distraction window after the second nudge. */
     val desktopMinimize: Boolean = false,
     val routineNagsEnabled: Boolean = true,
+    /** When routine tracking started. Items already past due at that moment don't nag (no burst on install). */
+    val routineSince: Long? = null,
     /** Phone calendar id the app writes its plan into ("Not a Fraud" calendar created in Google Calendar). */
     val outputCalendarId: Long? = null,
     /** Phone calendar ids never read as events (old routine calendars, holidays...). */

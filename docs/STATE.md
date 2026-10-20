@@ -5,26 +5,23 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-20)
+## 0. Where things stand (2026-10-20, v0.2.0)
 
-v0.1.0 was built overnight in one Claude session: phone app + Windows tray app, all from one repo,
-CI-built and released on GitHub. **Installed on the S26 Ultra 2026-10-20; Maven reports it works well.** Section 10 has his first-day feedback and the conversations queued before the next build.
+v0.1.0 installed 2026-10-20 and working. **v0.2.0** built the same day from the design conversation in section 10:
 
 | | Capability | Status |
 |---|---|---|
-| 1 | App blocking + earn-to-unlock | Built (accessibility guard, block screen, credit ledger, emergency unlock) |
-| 2 | Notification-bar "do this now" + escalating nags | Built (event-driven + exact alarm per block boundary) |
-| 3 | Day-plan generator | Built in `:core`, tested (anchors, calendar, tasks, rough-day softening, craft-block rule) |
-| 4 | To-do / project store | Built (JSON store, seeded from the web app's real tasks) |
-| 5 | Phone + PC screen time | Built (UsageStatsManager; JNA tracker on Windows) |
-| 6 | Stats, XP, levels, decay | Designed only — next design conversation |
-| — | Snapchat mirror | Built (NotificationListenerService + inline reply when Snap offers it) |
-| — | Health Connect sleep / workouts / steps | Built; unverified against Samsung Health |
-| — | Phone ↔ PC sync | Not built. Needs a Firebase project on Maven's Google account |
+| 1 | App + **website** blocking with earn-to-unlock | Built. Sites: guard reads browser address bar (Chrome, Samsung Internet, Brave, Edge, Firefox, Opera, DDG) only while a browser is in front |
+| 2 | "Do this now" notification + escalating nags | Built; now also shows the most pressing routine item |
+| 3 | Day planner | Built: block modes (hard / habit / container), hot-deadline override, pick 3, routine time reserved, trading weekdays + ME 3411 make-up tasks |
+| 4 | Hierarchy: goals → areas → projects → tasks | Built: **Map** (Tasks → Map) with editing; list view with search |
+| 5 | Routine tab with escalating "anger" | Built: windows, late/angry nudges every 30 min, bedtime trigger (charging / screen off after 9pm), 6/week workout target, Health Connect autofill |
+| 6 | Google Calendar | Built: reads all calendars as fixed events (except excluded + own); writes today's plan into a user-created "Not a Fraud" calendar |
+| 7 | Phone + PC screen time | Built (v0.1) |
+| 8 | Stats, XP, auto-assign, hourly re-plan with dropping | Not built — section 10 "Future vision" |
+| — | Phone ↔ PC sync | Not built (needs Firebase project) |
 
-**Unverified until the real phone answers:** whether One UI kills the guard (watchdog notification
-will say so), what Samsung Health actually writes into Health Connect, whether Snapchat's
-notifications carry a reply action, and how the earn rates / nag ladder feel.
+**Still unverified on the real phone:** site blocking address-bar ids on his browser version, calendar write syncing up to Google, bedtime trigger feel, routine nag volume.
 
 ### How work happens
 Claude writes all code and pushes to `main`; GitHub Actions is the compiler (the Claude sandbox
@@ -59,7 +56,7 @@ Blocking and notifications come first because they're what actually changes beha
 **Not a Fraud v0.1.0** (repo above). Three Gradle modules:
 
 - `core/` — pure Kotlin, zero Android imports. Models, scoring engine (verbatim port), day planner, now-resolver, credit ledger, guard policy, nag policy, desktop distraction policy, ICS parser, JSON store, web-app importer, seed data. ~30 unit tests.
-- `android/` — Kotlin + Compose. `GuardService` (accessibility), `BlockActivity`, `Notifier` + `ActionReceiver` + `Alarms`, `MirrorService`, `HourlyWorker`, sensors (UsageStats, Health Connect, phone calendar via `CalendarContract`). Tabs: Now / Plan / Tasks / Inbox / Setup.
+- `android/` — Kotlin + Compose. `GuardService` (accessibility), `BlockActivity`, `Notifier` + `ActionReceiver` + `Alarms`, `MirrorService`, `HourlyWorker`, sensors (UsageStats, Health Connect, phone calendar via `CalendarContract`). Tabs (v0.2): Now / Plan / Routine / Tasks (Map + List) / More (Setup, Inbox).
 - `desktop/` — Compose Desktop tray app for Windows. JNA foreground window + idle; usage per program; distraction nudges by process name or window title (catches YouTube in Chrome); optional minimize; start-with-Windows via the Run registry key. Ships as an MSI.
 
 **Web app** (`https://claude.ai/artifact/Wgupx2fdTNfnNwV82Tgcei`) — the prototype. Its projects and tasks were read on 2026-10-20 and baked into the Android seed, so the phone starts with the same list. The Setup tab can also import a JSON export of it.

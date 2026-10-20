@@ -34,6 +34,13 @@ class V2Test {
     private fun at(d: LocalDate, h: Int, m: Int = 0) = Time.at(d, h * 60 + m, zone)
     private fun data() = Seed.data(at(tue, 5))
 
+    @Test
+    fun `installing mid-afternoon doesn't fire a burst`() {
+        val d = Seed.data(at(tue, 16))
+        assertTrue(RoutinePolicy.alertsDue(d, at(tue, 16, 1)).none { it.item.id == "r-lunch" })
+        assertTrue(RoutinePolicy.alertsDue(Seed.data(at(tue, 5)), at(tue, 16)).size <= RoutinePolicy.MAX_AT_ONCE)
+    }
+
     // ---- Migration ----
 
     @Test
@@ -83,6 +90,7 @@ class V2Test {
     @Test
     fun `angry nags repeat every 30 minutes, late nags once`() {
         var d = data()
+        for (id in listOf("r-wake", "r-fluids", "r-cardio", "r-shower", "r-vitamins", "r-meal1")) d = Actions.checkRoutine(d, id, at(tue, 7))
         val fourPm = at(tue, 16)
         val first = RoutinePolicy.alertsDue(d, fourPm).map { it.item.id }
         assertTrue("r-lunch" in first)

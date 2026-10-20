@@ -87,15 +87,22 @@ object RoutinePolicy {
      * Nudges due right now. LATE nags once; ANGRY nags every [ANGRY_REPEAT_MIN].
      * [bedtimeSignal]: the phone looks like it's going to bed — BEDTIME items past their window start go angry now.
      */
-    fun alertsDue(d: AppData, now: Long, bedtimeSignal: Boolean = false): List<RoutineAlert> {
+    fun alertsDue(d: AppData, now: Long, bedtimeSignal: Boolean = false): List<RoutineAlert> =
+        allDue(d, now, bedtimeSignal).sortedByDescending { it.mood.ordinal }.take(MAX_AT_ONCE)
+
+    private fun allDue(d: AppData, now: Long, bedtimeSignal: Boolean): List<RoutineAlert> {
         if (!d.settings.routineNagsEnabled) return emptyList()
         val zone = Time.zone(d.settings.zoneId)
         val m = Time.minuteOfDay(now, zone)
         if (m >= QUIET_AFTER_MIN) return emptyList()
-        val today = day(d, Time.dateOf(now, zone))
+        val date = Time.dateOf(now, zone)
+        val today = day(d, date)
+        val since = d.settings.routineSince
         val out = mutableListOf<RoutineAlert>()
         for (st in statuses(d, now)) {
             val item = st.item
+            // Already overdue when tracking began (e.g. installed mid-afternoon): show it, don't nag.
+            if (since != null && Time.dateOf(since, zone) == date && Time.at(date, item.dueMin, zone) < since) continue
             val last = today.alerted[item.id]
             var mood = st.mood
             if (bedtimeSignal && item.trigger == RoutineTrigger.BEDTIME && (mood == Mood.DUE || mood == Mood.LATE)) mood = Mood.ANGRY
@@ -113,6 +120,9 @@ object RoutinePolicy {
         return out
     }
 
+    /** Never a wall of notifications: at most this many at once, the most pressing first. */
+    const val MAX_AT_ONCE = 2
+
     /** Next instant at which [alertsDue] could return something new, for the alarm. */
     fun nextAlertAt(d: AppData, now: Long): Long? {
         if (!d.settings.routineNagsEnabled) return null
@@ -128,6 +138,8 @@ object RoutinePolicy {
             candidates += Time.at(date, i.angryMin, zone)
             today.alerted[i.id]?.let { candidates += it + ANGRY_REPEAT_MIN * Time.MIN }
         }
+        // More due than we post at once: come back in a few minutes for the rest.
+        if (allDue(d, now, false).size > MAX_AT_ONCE) candidates += now + 5 * Time.MIN
         val quiet = Time.at(date, QUIET_AFTER_MIN, zone)
         return candidates.filter { it > now + 30_000 && it < quiet }.minOrNull()
     }

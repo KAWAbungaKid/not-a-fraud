@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         resumes++
-        lifecycleScope.launch { runCatching { Workers.syncSensors(this@MainActivity) } }
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { Workers.syncSensors(this@MainActivity) } }
     }
 
     @Composable

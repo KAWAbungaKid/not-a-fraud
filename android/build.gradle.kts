@@ -32,10 +32,12 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "NaF dev"
             versionNameSuffix = "-dev"
             signingConfig = signingConfigs.getByName("naf")
         }
         release {
+            manifestPlaceholders["appLabel"] = "Not a Fraud"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("naf")
         }
@@ -77,5 +79,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.compose.ui.test.junit4)
 }

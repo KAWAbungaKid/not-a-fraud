@@ -1,7 +1,9 @@
 package com.maven.notafraud
 
 import android.content.Intent
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -54,7 +56,7 @@ class FlowTest {
             rule.waitForIdle()
             rule.onNodeWithContentDescription("Add task").performClick()
             rule.waitForIdle()
-            rule.onAllNodes(hasSetTextAction())[0].performTextInput("Emulator test task")
+            rule.onAllNodes(hasSetTextAction() and hasAnyAncestor(isDialog()))[0].performTextInput("Emulator test task")
             rule.onNodeWithText("Save").performClick()
             rule.waitForIdle()
             // The list is long and lazily composed, so check the store rather than scrolling.
@@ -83,7 +85,7 @@ class FlowTest {
             rule.waitForIdle()
             rule.onNodeWithText("Routine").performClick()
             rule.waitForIdle()
-            assertTrue(rule.onAllNodesWithText("Brush teeth").fetchSemanticsNodes().isNotEmpty())
+            assertTrue(rule.onAllNodesWithText("Wake up").fetchSemanticsNodes().isNotEmpty())
         }
     }
 }

@@ -33,7 +33,12 @@ object Workers {
         val snapshot = runCatching { UsageReader.snapshot(ctx) }.getOrNull()
         if (snapshot != null && snapshot.minutesByApp.isNotEmpty()) Graph.update { Actions.recordUsage(it, snapshot) }
 
-        PhoneCalendar.read(ctx)?.let { events -> Graph.update { Actions.replaceEvents(it, PhoneCalendar.SOURCE, events) } }
+        PhoneCalendar.read(ctx)?.let { events ->
+            val before = Graph.data.events.filter { it.source == PhoneCalendar.SOURCE }.toSet()
+            Graph.update { Actions.replaceEvents(it, PhoneCalendar.SOURCE, events) }
+            // Something moved in Google Calendar: re-plan around it.
+            if (events.toSet() != before) Graph.replan()
+        }
 
         val wasRough = Graph.data.todayPlan?.roughDay == true
         val health = runCatching { Health.read(ctx) }.getOrNull()

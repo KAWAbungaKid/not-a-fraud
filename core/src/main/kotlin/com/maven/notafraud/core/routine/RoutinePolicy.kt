@@ -88,7 +88,9 @@ object RoutinePolicy {
      * [bedtimeSignal]: the phone looks like it's going to bed — BEDTIME items past their window start go angry now.
      */
     fun alertsDue(d: AppData, now: Long, bedtimeSignal: Boolean = false): List<RoutineAlert> =
-        allDue(d, now, bedtimeSignal).sortedByDescending { it.mood.ordinal }.take(MAX_AT_ONCE)
+        allDue(d, now, bedtimeSignal)
+            .sortedByDescending { if (bedtimeSignal && it.item.trigger == RoutineTrigger.BEDTIME) 100 else it.mood.ordinal }
+            .take(MAX_AT_ONCE)
 
     private fun allDue(d: AppData, now: Long, bedtimeSignal: Boolean): List<RoutineAlert> {
         if (!d.settings.routineNagsEnabled) return emptyList()

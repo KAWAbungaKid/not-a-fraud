@@ -241,3 +241,13 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 - Writing back to Google Calendar (plan blocks visible there) — not requested yet.
 
 **Editing gaps found while explaining the app:** no renaming projects or choosing a project's kind (new projects are always "project"); anchors can be toggled but not retimed, added or deleted; no way to edit research session dates.
+
+### Decisions from the 2026-10-20 design conversation
+
+- **Current priorities:** exams (they live in Google Calendar) and biosensor research ("very hot"). Not currently working. Day-trades every morning at market open, 15–60 min.
+- **Hierarchy accepted** (goals → areas → projects → tasks, plus fixed time, routine, stats) and becomes a **visual map** — mind-map style: open a goal, see the areas that affect it, the projects under them, the tasks under each project. Stats are later.
+- **Routine gets its own tab** (sleep, meals, hygiene) with **escalating "anger"** when procrastinated: e.g. lunch not eaten by 4pm is bad; going to bed without brushing teeth is bad.
+- **Google Calendar model:**
+  - Anything Maven puts in Google Calendar is always a fixed **event** to work around (he'll give it accurate times). Calendar entries never become tasks.
+  - The app **writes its plan into Google Calendar** (its own calendar) so the day is visible there. No separate "tasks" input calendar.
+  - Routine moves into the app; Maven will delete his Google routine calendars, and the app writes routine into Google Calendar the same way.

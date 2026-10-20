@@ -1,6 +1,6 @@
 # Not a Fraud (formerly Project Max) — state of the build
 
-Living doc. Read this first in any new chat about the app. Last updated 2026-10-20.
+Living doc. Read this first in any new chat about the app. Last updated 2026-10-20 (after first install).
 Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notafraud`.
 
 ---
@@ -8,8 +8,7 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 ## 0. Where things stand (2026-10-20)
 
 v0.1.0 was built overnight in one Claude session: phone app + Windows tray app, all from one repo,
-CI-built and released on GitHub. **Nothing has run on the real S26 Ultra yet.** The next step is
-Maven installing it and working through `docs/SETUP.md`, then a week of living with it.
+CI-built and released on GitHub. **Installed on the S26 Ultra 2026-10-20; Maven reports it works well.** Section 10 has his first-day feedback and the conversations queued before the next build.
 
 | | Capability | Status |
 |---|---|---|
@@ -179,14 +178,14 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 ## 7. His schedule anchors (seeded; editable in Setup → Weekly anchors)
 
 - **Daily 6:00–7:00** cardio + shower.
-- **Classes** (Aug 24 – Dec 11, skipped Thanksgiving week Nov 23–27 — *assumed*, confirm): ME 3411 T/Th 8:00–9:15 · ME 3521 T/Th 9:30–10:45 · ME 3525 T/Th 11:00–12:15 · BIO SCI 3333 M/W/F 11:00–11:50 · ME 4840 lab M/W 2:00–2:50 and T 3:00–4:50.
+- **Classes** (Aug 24 – Dec 11, skipped Thanksgiving week Nov 23–27 — confirmed 2026-10-20): ME 3411 T/Th 8:00–9:15 · ME 3521 T/Th 9:30–10:45 · ME 3525 T/Th 11:00–12:15 · BIO SCI 3333 M/W/F 11:00–11:50 · ME 4840 lab M/W 2:00–2:50 and T 3:00–4:50.
 - **Market open 8:30–9:30 Mon/Wed/Fri only.** Tue/Thu protected for ME 3411 (third attempt).
 - **Lift** Mon/Tue/Wed 5:00–6:00. **Lunch** 12:15–12:45 daily and **dinner** 6:15–6:45 Mon–Thu, Sat were *added by Claude* so the planner doesn't fill mealtimes — toggle off if wrong.
 - **Friday** craft block 4:00–6:00 (filled with project tasks and ideas), **date night 6:00 on, protected**.
 - **Saturday** craft 8:00–12:00 on non-session days. **Session days** (biosensor): load 1h/4h/8h groups 8:00, test at 9:00, 12:00, 16:00. Dates: Oct 24, Oct 31, Nov 7, Nov 21, Nov 22, Dec 5 (Oct 17/18 past). *Oct 18 and Nov 22 are Sundays* — seeded as given; confirm whether those are two-day sessions.
 - **Sunday** reset: weekly review 9:00, CSWE practice 10:00–11:30, scout manual section 1:00–1:45, **off from 5:00, protected**.
 
-**Remaining Fall 2026 exams:** A&P Oct 21, Nov 13, Dec 11 · ME 3411 Nov 17 and Dec 16 (12:30–2:30) · Heat Transfer Nov 17 and Dec 15. Thermo and Instrumentation dates still unknown (task "Email thermo and instrumentation professors" is in the list). Nov 17 carries two exams, four days after an A&P test. *Note: the web app has "Study for Heat Transfer Final" marked done (Oct 14) — likely a mis-tap; check.*
+**Remaining Fall 2026 exams:** A&P Oct 21, Nov 13, Dec 11 · ME 3411 Nov 17 and Dec 16 (12:30–2:30) · Heat Transfer Nov 17 and Dec 15. Thermo and Instrumentation dates still unknown (task "Email thermo and instrumentation professors" is in the list). Nov 17 carries two exams, four days after an A&P test. *"Study for Heat Transfer Final" was ticked in the web app on Oct 14 by mistake (confirmed) and came across as done; untick it in Tasks → Done.*
 
 **Craft-block rule (built):** ideas captured midweek can be promoted to a task, but the planner won't place it before Friday 4pm.
 
@@ -214,3 +213,31 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 - Earn rate (1:1), 120-min cap, 15-min starting balance, 3 emergency unlocks/day — all guesses to tune.
 - PC and phone keep separate credit ledgers until sync exists.
 - Thanksgiving-week class skip, the two Sunday session dates, and the added meal anchors (section 7) need confirming.
+
+---
+
+## 10. First-install feedback and queued conversations (2026-10-20)
+
+**Works:** install, permissions, blocking, notification, plan — "everything seems to work really well."
+
+**Samsung "never sleeping" step:** Not a Fraud does not appear in Settings → Battery → Background usage limits → Never sleeping apps (it appears in every other list). Likely because battery is already set to Unrestricted, which One UI treats as exempt. Unconfirmed — the real test is whether the hourly watchdog ever posts "Guard was stopped". Setup row 9 text should be softened once confirmed.
+
+**Fresh start on tasks and priorities.** The seeded tasks come from the web app, built weeks ago at the start of the Claude Project, and are stale. Before tuning anything else: go through every imported task and project together — priority, estimate, due date, whether it still matters — and rebuild the list as current. The two Sunday research dates (Oct 18, Nov 22) are part of that review, not separate fixes.
+
+**Hierarchy / tiering — needs a design conversation.** What the app tracks and how it nests: long-term goals (the "Prime Maven" tree), areas, projects, tasks, fixed time (anchors, calendar), daily routine, stats. How tiers relate to scoring and the planner is undecided.
+
+**Daily routine as its own track, probably its own tab.** Sleep, meals, hygiene and similar daily habits are a different kind of thing from tasks. Maven has a real problem with not eating, and similar daily habits slip. Wants:
+- Meal times adjustable (today anchors can only be toggled on/off, not retimed).
+- A checkbox per meal / habit ("ate lunch"), i.e. the one-tap streaks from section 3.
+- Likely a separate Routine tab covering sleep, eating, hygiene. Keep meals and routine separate from the task scorer.
+
+**Web blocking (Brick-style).** Maven doesn't have the Instagram app; he uses it in a browser, so v0.1 blocks nothing for him there. Needs site blocking: Instagram etc. in Chrome / Samsung Internet. Options: (a) the accessibility guard reads the browser's address bar and blocks matching domains — fits the existing service, but must widen events to content changes inside browsers only, and the guard's description ("only reads app names") must be rewritten honestly; (b) a local VPN DNS filter — covers every browser and app, but takes the VPN slot and is more work. Leaning (a), plus optionally blocking browsers that aren't covered.
+
+**Contrast.** Some dim text colours don't contrast well. Quick fix: raise the dim/secondary text colour. Later: theme / colour customization.
+
+**Google Calendar, two-way-ish.** v0.1 already reads the phone's calendar (Google Calendar syncs into it): events become busy blocks, re-read on app open and hourly as a full replace, so no duplicates and deleted events disappear. Not yet decided:
+- **Adding tasks from Google Calendar** — e.g. a dedicated calendar whose events become tasks (stable mapping by event id so edits update and deletions remove), vs. Google Tasks (needs OAuth / API, not in the phone's calendar provider).
+- **Ignoring routine events** Maven put in Google Calendar as a visual of his day (wake up, etc.). The routine should live in the app as anchors and the app should ignore those calendar entries — by choosing which calendars to read, or a keyword/tag rule. Depends on how his calendars are organised.
+- Writing back to Google Calendar (plan blocks visible there) — not requested yet.
+
+**Editing gaps found while explaining the app:** no renaming projects or choosing a project's kind (new projects are always "project"); anchors can be toggled but not retimed, added or deleted; no way to edit research session dates.

@@ -69,13 +69,16 @@ object NowResolver {
         }
     }
 
-    /** When blocks overlap, the more specific one wins: event > anchor > task > break. */
-    private fun pickCurrent(blocks: List<PlanBlock>, now: Long): PlanBlock? =
+    /**
+     * When blocks overlap, the more specific one wins: protected > event > task > anchor > break.
+     * Tasks only overlap anchors inside craft blocks, where the task is the useful answer.
+     */
+    fun pickCurrent(blocks: List<PlanBlock>, now: Long): PlanBlock? =
         blocks.filter { it.contains(now) }.minByOrNull {
             when (it.kind) {
+                BlockKind.ANCHOR -> if (it.protected) -1 else 2
                 BlockKind.EVENT -> 0
-                BlockKind.ANCHOR -> if (it.protected) -1 else 1
-                BlockKind.TASK -> 2
+                BlockKind.TASK -> 1
                 BlockKind.BREAK -> 3
             }
         }

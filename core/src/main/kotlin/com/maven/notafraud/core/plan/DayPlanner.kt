@@ -169,6 +169,30 @@ class DayPlanner(
             }
         }
 
+        // Craft blocks are containers: fill them with project-kind tasks (side projects, PT device, ideas).
+        val craftProjects = data.projects.filter { it.kind == com.maven.notafraud.core.model.ProjectKind.PROJECT }.map { it.id }.toSet()
+        for (craft in fixed.filter { it.anchorKind == AnchorKind.CRAFT && it.end > from }) {
+            var t = max(craft.start, from)
+            while ((craft.end - t) / Time.MIN >= minWindowMin) {
+                val w = ((craft.end - t) / Time.MIN).toInt()
+                val pick = open.asSequence()
+                    .filter { it.projectId in craftProjects }
+                    .filter { it.notBefore == null || it.notBefore <= t }
+                    .map { it to need(it, allotted) }
+                    .filter { (_, n) -> n >= 5 }
+                    .map { (task, n) ->
+                        val virtual = task.copy(loggedMin = task.loggedMin + (allotted[task.id] ?: 0))
+                        Triple(task, n, Scorer.score(virtual, t, w, Energy.HIGH))
+                    }
+                    .maxByOrNull { it.third } ?: break
+                val (task, n, _) = pick
+                val len = roundDown5(minOf(n, w)).coerceAtLeast(5)
+                taskBlocks += PlanBlock(t, t + len * Time.MIN, BlockKind.TASK, task.title, task.id, task.projectId)
+                t += len * Time.MIN
+                allotted[task.id] = (allotted[task.id] ?: 0) + len
+            }
+        }
+
         val note = buildString {
             if (rough) {
                 append("Rough day")

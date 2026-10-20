@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Not a Fraud</string>
+    <string name="guard_label">Not a Fraud guard</string>
+    <string name="guard_description">Watches which app is in front so Not a Fraud can block time-sink apps, earn credits from focus apps, and keep the notification bar current. It only reads app names, never screen content or text you type.</string>
+    <string name="mirror_label">Not a Fraud message mirror</string>
+</resources>

@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.model
 
+import com.maven.notafraud.core.plan.DayPlan
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -242,4 +243,6 @@ data class AppData(
     val usage: List<UsageDay> = emptyList(),
     val messages: List<MirroredMessage> = emptyList(),
     val seeded: Boolean = false,
+    /** Today's generated plan; regenerated on a new day or on Replan. */
+    val todayPlan: DayPlan? = null,
 )

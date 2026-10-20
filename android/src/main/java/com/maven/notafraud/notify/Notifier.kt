@@ -1,0 +1,123 @@
+package com.maven.notafraud.notify
+
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.maven.notafraud.R
+import com.maven.notafraud.core.guard.Nag
+import com.maven.notafraud.core.guard.NagAction
+import com.maven.notafraud.core.plan.NowState
+import com.maven.notafraud.ui.MainActivity
+
+object Notifier {
+    const val CH_NOW = "now"
+    const val CH_NAG = "nag"
+    const val CH_ALERT = "alert"
+    const val ID_NOW = 1
+    const val ID_NAG = 2
+    const val ID_ALERT = 3
+
+    @Volatile private var lastPosted: String? = null
+
+    fun createChannels(ctx: Context) {
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(NotificationChannel(CH_NOW, "Do this now", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "The always-on line telling you what this block is for."
+            setShowBadge(false)
+        })
+        nm.createNotificationChannel(NotificationChannel(CH_NAG, "Nudges", NotificationManager.IMPORTANCE_HIGH).apply {
+            description = "Escalating nudges while a time-sink app is open."
+        })
+        nm.createNotificationChannel(NotificationChannel(CH_ALERT, "Setup problems", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Tells you when the guard has been switched off or killed."
+        })
+    }
+
+    fun canPost(ctx: Context) =
+        ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+    private fun openApp(ctx: Context, tab: String? = null, req: Int = 0): PendingIntent =
+        PendingIntent.getActivity(
+            ctx, req,
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                .apply { tab?.let { putExtra(MainActivity.EXTRA_TAB, it) } },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+    fun postNow(ctx: Context, s: NowState, force: Boolean = false) {
+        if (!canPost(ctx)) return
+        val key = s.headline + "|" + s.detail + "|" + s.working
+        if (!force && key == lastPosted) return
+        lastPosted = key
+
+        val b = NotificationCompat.Builder(ctx, CH_NOW)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(s.headline)
+            .setContentText(s.detail)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(s.detail))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setShowWhen(false)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(openApp(ctx))
+            .setDeleteIntent(ActionReceiver.pending(ctx, ActionReceiver.REPOST))
+
+        if (s.working) {
+            b.addAction(0, "Stop", ActionReceiver.pending(ctx, ActionReceiver.STOP))
+            com.maven.notafraud.Graph.data.active?.taskId?.let { b.addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.DONE, it)) }
+        } else {
+            val task = s.suggested
+            if (task != null && !s.protected) {
+                b.addAction(0, "Start", ActionReceiver.pending(ctx, ActionReceiver.START, task.id))
+                b.addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.DONE, task.id))
+            }
+            b.addAction(0, "Replan", ActionReceiver.pending(ctx, ActionReceiver.REPLAN))
+        }
+        runCatching { NotificationManagerCompat.from(ctx).notify(ID_NOW, b.build()) }
+    }
+
+    fun forgetLast() { lastPosted = null }
+
+    fun postNag(ctx: Context, nag: Nag, taskId: String?) {
+        if (!canPost(ctx)) return
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(nag.title)
+            .setContentText(nag.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(nag.text))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(openApp(ctx, req = 7))
+        when (nag.action) {
+            NagAction.START_TASK -> if (taskId != null) b.addAction(0, "Start it now", ActionReceiver.pending(ctx, ActionReceiver.START, taskId))
+            NagAction.WALK -> b.addAction(0, "Walk 5 min", ActionReceiver.pending(ctx, ActionReceiver.WALK))
+        }
+        if (nag.action == NagAction.START_TASK) b.addAction(0, "Walk instead", ActionReceiver.pending(ctx, ActionReceiver.WALK))
+        runCatching { NotificationManagerCompat.from(ctx).notify(ID_NAG, b.build()) }
+    }
+
+    fun cancelNag(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_NAG)
+
+    fun postAlert(ctx: Context, title: String, text: String) {
+        if (!canPost(ctx)) return
+        val b = NotificationCompat.Builder(ctx, CH_ALERT)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(openApp(ctx, MainActivity.TAB_SETUP, req = 9))
+        runCatching { NotificationManagerCompat.from(ctx).notify(ID_ALERT, b.build()) }
+    }
+
+    fun cancelAlert(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_ALERT)
+}

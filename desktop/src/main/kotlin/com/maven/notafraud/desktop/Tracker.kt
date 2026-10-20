@@ -28,8 +28,6 @@ class Tracker(private val store: DataStore, private val notify: (String, String)
     private val _live = MutableStateFlow(Live())
     val live = _live.asStateFlow()
 
-    @Volatile var minimizeDistractions = false
-
     private val pendingSeconds = HashMap<String, Long>()
     private var distractionSince = 0L
     private var nagLevel = 0
@@ -64,7 +62,7 @@ class Tracker(private val store: DataStore, private val notify: (String, String)
                 if (!state.protected) {
                     val nag = NagPolicy.nag(nagLevel, DesktopPolicy.label(fg.process), minutesIn, state.suggested?.title, d.settings.creed, plan.roughDay)
                     notify(nag.title, nag.text)
-                    if (minimizeDistractions && nagLevel >= 1) Win32.minimize(fg.hwnd)
+                    if (d.settings.desktopMinimize && nagLevel >= 1) Win32.minimize(fg.hwnd)
                 }
                 nagLevel++
             }

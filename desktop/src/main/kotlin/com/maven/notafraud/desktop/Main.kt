@@ -265,7 +265,6 @@ private fun UsageTab(data: AppData) {
 private fun SettingsTab(store: DataStore, tracker: Tracker, data: AppData) {
     var titles by remember { mutableStateOf(data.rules.desktopBlockedTitles.joinToString(", ")) }
     var procs by remember { mutableStateOf(data.rules.desktopBlockedProcesses.joinToString(", ")) }
-    var minimize by remember { mutableStateOf(tracker.minimizeDistractions) }
     var autostart by remember { mutableStateOf(Win32.autostartEnabled()) }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
@@ -283,7 +282,7 @@ private fun SettingsTab(store: DataStore, tracker: Tracker, data: AppData) {
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Minimize distractions after the second nudge", Modifier.weight(1f))
-                    Switch(minimize, { minimize = it; tracker.minimizeDistractions = it })
+                    Switch(data.settings.desktopMinimize, { on -> store.update { it.copy(settings = it.settings.copy(desktopMinimize = on)) } })
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Start with Windows (in the tray)", Modifier.weight(1f))

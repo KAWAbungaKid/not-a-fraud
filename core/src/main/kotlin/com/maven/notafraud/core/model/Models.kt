@@ -192,6 +192,8 @@ data class Settings(
     val emergencyPhrase: String = "I am choosing this on purpose",
     val nagsEnabled: Boolean = true,
     val syncEnabled: Boolean = false,
+    /** PC: minimize a distraction window after the second nudge. */
+    val desktopMinimize: Boolean = false,
 )
 
 /** Per-day context: how the day started. Drives the bad-day softening. */

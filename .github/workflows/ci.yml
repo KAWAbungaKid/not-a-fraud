@@ -64,7 +64,7 @@ jobs:
 
   emulator:
     needs: android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +83,7 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
+          emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash -c 'set -o pipefail; gradle :android:connectedDebugAndroidTest --console=plain 2>&1 | tee emu.log; st=$?; adb logcat -d AndroidRuntime:E TestRunner:I *:S >> emu.log; exit $st'
       - if: always()

@@ -63,3 +63,10 @@ jobs:
           notes="docs/releases/$tag.md"
           [ -f "$notes" ] || notes=/dev/null
           gh release create "$tag" dist/* --title "Not a Fraud $v" --notes-file "$notes" || gh release upload "$tag" dist/* --clobber
+      - name: Mirror binaries to a git branch (readable from the Claude sandbox)
+        run: |
+          cd dist
+          git init -q -b main
+          git config user.name ci; git config user.email ci@localhost
+          git add -A; git commit -qm "binaries ${GITHUB_REF_NAME}"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/dist

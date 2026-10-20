@@ -14,11 +14,26 @@ data class NowState(
     val protected: Boolean,
     val working: Boolean,
     val minutesLeftInBlock: Int?,
+    /** The most pressing routine item, e.g. "Lunch · 40 min late". */
+    val routine: String? = null,
+    val routineId: String? = null,
 )
 
 object NowResolver {
 
     fun resolve(plan: DayPlan, data: AppData, now: Long): NowState {
+        val base = resolveBlocks(plan, data, now)
+        val pressing = com.maven.notafraud.core.routine.RoutinePolicy.statuses(data, now)
+            .filter { it.mood == com.maven.notafraud.core.routine.Mood.ANGRY || it.mood == com.maven.notafraud.core.routine.Mood.LATE || it.mood == com.maven.notafraud.core.routine.Mood.DUE }
+            .maxWithOrNull(compareBy({ it.mood.ordinal }, { it.minutesLate })) ?: return base
+        val text = when (pressing.mood) {
+            com.maven.notafraud.core.routine.Mood.DUE -> "${pressing.item.title} · now"
+            else -> "${pressing.item.title} · ${Time.durationText(pressing.minutesLate)} late"
+        }
+        return base.copy(routine = text, routineId = pressing.item.id)
+    }
+
+    private fun resolveBlocks(plan: DayPlan, data: AppData, now: Long): NowState {
         val zone = Time.zone(data.settings.zoneId)
         val current = pickCurrent(plan.blocks, now)
         val next = plan.blocks.filter { it.start > now }.minByOrNull { it.start }
@@ -76,10 +91,15 @@ object NowResolver {
     fun pickCurrent(blocks: List<PlanBlock>, now: Long): PlanBlock? =
         blocks.filter { it.contains(now) }.minByOrNull {
             when (it.kind) {
-                BlockKind.ANCHOR -> if (it.protected) -1 else 2
-                BlockKind.EVENT -> 0
-                BlockKind.TASK -> 1
-                BlockKind.BREAK -> 3
+                BlockKind.ANCHOR -> when {
+                    it.protected -> -1.0
+                    it.anchorKind == com.maven.notafraud.core.model.AnchorKind.MARKET -> 0.5
+                    it.mode == com.maven.notafraud.core.model.AnchorMode.HARD -> 0.8
+                    else -> 2.0
+                }
+                BlockKind.EVENT -> 0.0
+                BlockKind.TASK -> 1.0
+                BlockKind.BREAK -> 3.0
             }
         }
 }

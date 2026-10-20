@@ -1,6 +1,7 @@
 package com.maven.notafraud.core.store
 
 import com.maven.notafraud.core.model.AppData
+import com.maven.notafraud.core.seed.Migration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +15,9 @@ import java.io.File
  */
 class DataStore(private val file: File, seed: () -> AppData) {
 
-    private val _state = MutableStateFlow(load() ?: seed().also { write(it) })
+    private val _state = MutableStateFlow(
+        load()?.let { old -> Migration.apply(old).also { if (it != old) write(it) } } ?: seed().also { write(it) }
+    )
     val state: StateFlow<AppData> = _state.asStateFlow()
     val current: AppData get() = _state.value
 
@@ -34,7 +37,7 @@ class DataStore(private val file: File, seed: () -> AppData) {
     /** Replaces everything. Caller confirms with the user first. */
     fun importJson(text: String): Result<AppData> = runCatching {
         val data = JSON.decodeFromString(AppData.serializer(), text)
-        update { data }
+        update { Migration.apply(data) }
     }
 
     private fun load(): AppData? {

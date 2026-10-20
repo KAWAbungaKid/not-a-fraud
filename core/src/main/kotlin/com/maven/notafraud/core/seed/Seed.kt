@@ -2,26 +2,33 @@ package com.maven.notafraud.core.seed
 
 import com.maven.notafraud.core.model.Anchor
 import com.maven.notafraud.core.model.AnchorKind
+import com.maven.notafraud.core.model.AnchorMode
 import com.maven.notafraud.core.model.AppData
+import com.maven.notafraud.core.model.Area
 import com.maven.notafraud.core.model.CalEvent
 import com.maven.notafraud.core.model.Energy
+import com.maven.notafraud.core.model.Goal
 import com.maven.notafraud.core.model.Priority
 import com.maven.notafraud.core.model.Project
 import com.maven.notafraud.core.model.ProjectKind
+import com.maven.notafraud.core.model.RoutineCategory
+import com.maven.notafraud.core.model.RoutineItem
+import com.maven.notafraud.core.model.RoutineTrigger
 import com.maven.notafraud.core.model.Task
+import com.maven.notafraud.core.model.TaskStatus
 import com.maven.notafraud.core.plan.Time
 import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Starting data: Maven's weekly anchors, courses and remaining Fall 2026 exams (STATE.md section 7).
- * Everything here is editable in the app; this only runs on first launch.
+ * Starting data (STATE.md sections 7 and 10). Everything is editable in the app.
+ * [data] runs on a fresh install; [Migration] upgrades an existing install.
  */
 object Seed {
     private const val SEM_START = "2026-08-24"
     private const val SEM_END = "2026-12-11"
 
-    /** Thanksgiving week: classes skipped. Adjust in Setup if the break differs. */
+    /** Thanksgiving week: no classes (confirmed). */
     private val THANKSGIVING = setOf("2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27")
 
     private val RESEARCH_DATES = listOf(
@@ -32,13 +39,61 @@ object Seed {
     private const val MON = 1; private const val TUE = 2; private const val WED = 3
     private const val THU = 4; private const val FRI = 5; private const val SAT = 6; private const val SUN = 7
     private val ALL = setOf(MON, TUE, WED, THU, FRI, SAT, SUN)
+    private val WEEKDAYS = setOf(MON, TUE, WED, THU, FRI)
 
     private fun t(h: Int, m: Int = 0) = h * 60 + m
+
+    // ---- Hierarchy -------------------------------------------------------------------------
+
+    fun goals(): List<Goal> = listOf(
+        Goal("g-prosthetics", "Develop prosthetics and physical therapy devices", 0),
+        Goal("g-strong", "Be a mentally and physically strong person", 1),
+        Goal("g-god", "Be a man of God", 2),
+        Goal("g-people", "Be a good friend, boyfriend and relative", 3),
+        Goal("g-community", "Give back to community and church", 4),
+        Goal("g-mold", "Break the mold: efficient, financially free, able to drop anything for anyone", 5),
+    )
+
+    fun areas(): List<Area> = listOf(
+        Area("a-school", "School", setOf("g-prosthetics"), 0),
+        Area("a-research", "Research", setOf("g-prosthetics"), 1),
+        Area("a-pt", "PT device", setOf("g-prosthetics", "g-mold"), 2),
+        Area("a-career", "Career", setOf("g-prosthetics", "g-mold"), 3),
+        Area("a-making", "Making and building", setOf("g-prosthetics"), 4),
+        Area("a-fitness", "Fitness", setOf("g-strong"), 5),
+        Area("a-health", "Health and routine", setOf("g-strong"), 6),
+        Area("a-mind", "Mind", setOf("g-strong"), 7),
+        Area("a-faith", "Faith", setOf("g-god"), 8),
+        Area("a-church", "Church service", setOf("g-community", "g-god"), 9),
+        Area("a-scouts", "Scouts STEM program", setOf("g-community"), 10),
+        Area("a-people", "Relationships", setOf("g-people"), 11),
+        Area("a-trading", "Trading", setOf("g-mold"), 12),
+        Area("a-systems", "Efficiency and systems", setOf("g-mold", "g-strong"), 13),
+    )
+
+    /** Best-guess area for a project by its name. */
+    fun areaFor(projectName: String): String? {
+        val n = projectName.lowercase()
+        return when {
+            n.startsWith("me 3") || n.startsWith("me 4") || n.startsWith("bio sci") -> "a-school"
+            "biosensor" in n || "research" in n -> "a-research"
+            "career" in n || "internship" in n -> "a-career"
+            "not a fraud" in n || "project max" in n -> "a-systems"
+            "pt device" in n || "rehab" in n -> "a-pt"
+            "scout" in n -> "a-scouts"
+            "side project" in n -> "a-making"
+            "trading" in n -> "a-trading"
+            n == "life" -> "a-health"
+            else -> null
+        }
+    }
+
+    // ---- Fixed time ------------------------------------------------------------------------
 
     fun anchors(): List<Anchor> {
         fun cls(title: String, days: Set<Int>, s: Int, e: Int) = Anchor(
             title = title, kind = AnchorKind.CLASS, startMin = s, endMin = e, days = days,
-            fromDate = SEM_START, untilDate = SEM_END, skipDates = THANKSGIVING,
+            fromDate = SEM_START, untilDate = SEM_END, skipDates = THANKSGIVING, mode = AnchorMode.HARD,
         )
         val research = RESEARCH_DATES.flatMap { d ->
             listOf(
@@ -48,27 +103,56 @@ object Seed {
                 Anchor(title = "Biosensor: test 8h group", kind = AnchorKind.RESEARCH, startMin = t(16), endMin = t(16, 45), dates = setOf(d)),
             )
         }
+        val craftAreas = setOf("a-pt", "a-making", "a-systems")
         return listOf(
-            Anchor(title = "Cardio + shower", kind = AnchorKind.FITNESS, startMin = t(6), endMin = t(7), days = ALL),
+            Anchor(title = "Trading: market open", kind = AnchorKind.MARKET, startMin = t(8, 30), endMin = t(9, 30), days = WEEKDAYS, mode = AnchorMode.HARD),
             cls("ME 3411 Dynamic Systems", setOf(TUE, THU), t(8), t(9, 15)),
             cls("ME 3521 Applied Thermo", setOf(TUE, THU), t(9, 30), t(10, 45)),
             cls("ME 3525 Heat Transfer", setOf(TUE, THU), t(11), t(12, 15)),
             cls("BIO SCI 3333 A&P", setOf(MON, WED, FRI), t(11), t(11, 50)),
             cls("ME 4840 Lab", setOf(MON, WED), t(14), t(14, 50)),
             cls("ME 4840 Lab", setOf(TUE), t(15), t(16, 50)),
-            Anchor(title = "Market open", kind = AnchorKind.MARKET, startMin = t(8, 30), endMin = t(9, 30), days = setOf(MON, WED, FRI)),
-            Anchor(title = "Lunch", kind = AnchorKind.ROUTINE, startMin = t(12, 15), endMin = t(12, 45), days = ALL),
-            Anchor(title = "Lift", kind = AnchorKind.FITNESS, startMin = t(17), endMin = t(18), days = setOf(MON, TUE, WED)),
-            Anchor(title = "Dinner", kind = AnchorKind.ROUTINE, startMin = t(18, 15), endMin = t(18, 45), days = setOf(MON, TUE, WED, THU, SAT)),
-            Anchor(title = "Craft block: build", kind = AnchorKind.CRAFT, startMin = t(16), endMin = t(18), days = setOf(FRI)),
-            Anchor(title = "Date night", kind = AnchorKind.PROTECTED, startMin = t(18), endMin = t(23, 59), days = setOf(FRI), protected = true),
-            Anchor(title = "Craft block: build", kind = AnchorKind.CRAFT, startMin = t(8), endMin = t(12), days = setOf(SAT), yieldsToDated = true),
-            Anchor(title = "Weekly review", kind = AnchorKind.REVIEW, startMin = t(9), endMin = t(10), days = setOf(SUN), yieldsToDated = true),
-            Anchor(title = "CSWE practice", kind = AnchorKind.ROUTINE, startMin = t(10), endMin = t(11, 30), days = setOf(SUN), yieldsToDated = true),
-            Anchor(title = "Scout manual: one section", kind = AnchorKind.ROUTINE, startMin = t(13), endMin = t(13, 45), days = setOf(SUN), yieldsToDated = true),
-            Anchor(title = "Off: work stops", kind = AnchorKind.PROTECTED, startMin = t(17), endMin = t(23, 59), days = setOf(SUN), protected = true),
-        ) + research
+            Anchor(
+                title = "Craft block: build", kind = AnchorKind.CRAFT, startMin = t(14), endMin = t(17), days = setOf(FRI),
+                mode = AnchorMode.CONTAINER, yieldsToHot = true, fillAreaIds = craftAreas,
+            ),
+            Anchor(title = "Date night", kind = AnchorKind.PROTECTED, startMin = t(18), endMin = t(23, 59), days = setOf(FRI), protected = true, mode = AnchorMode.HARD),
+            Anchor(
+                title = "Craft block: build", kind = AnchorKind.CRAFT, startMin = t(8), endMin = t(12), days = setOf(SAT), yieldsToDated = true,
+                mode = AnchorMode.CONTAINER, yieldsToHot = true, fillAreaIds = craftAreas,
+            ),
+            Anchor(title = "Weekly review + pick the week", kind = AnchorKind.REVIEW, startMin = t(9), endMin = t(10), days = setOf(SUN), yieldsToDated = true, mode = AnchorMode.HABIT),
+            Anchor(title = "CSWE practice", kind = AnchorKind.ROUTINE, startMin = t(10), endMin = t(11, 30), days = setOf(SUN), yieldsToDated = true, mode = AnchorMode.HABIT, yieldsToHot = true),
+            Anchor(title = "Scout manual: one section", kind = AnchorKind.ROUTINE, startMin = t(13), endMin = t(13, 45), days = setOf(SUN), yieldsToDated = true, mode = AnchorMode.HABIT, yieldsToHot = true),
+            Anchor(title = "Off: work stops", kind = AnchorKind.PROTECTED, startMin = t(17), endMin = t(23, 59), days = setOf(SUN), protected = true, mode = AnchorMode.HARD),
+        ) + research.map { it.copy(mode = AnchorMode.HARD) }
     }
+
+    // ---- Routine ---------------------------------------------------------------------------
+
+    fun routine(): List<RoutineItem> {
+        var o = 0
+        fun r(
+            id: String, title: String, cat: RoutineCategory, s: Int, due: Int, angry: Int,
+            reserve: Int = 0, days: Set<Int> = ALL, trigger: RoutineTrigger = RoutineTrigger.TIME, weekly: Int? = null,
+        ) = RoutineItem(id, title, cat, trigger, s, due, angry, days, reserve, true, weekly, o++)
+        return listOf(
+            r("r-wake", "Wake up", RoutineCategory.SLEEP, t(5, 30), t(6), t(6, 30)),
+            r("r-fluids", "Drink fluids right away", RoutineCategory.BODY, t(5, 30), t(6, 15), t(7)),
+            r("r-cardio", "Cardio", RoutineCategory.BODY, t(6), t(7), t(9), reserve = 45),
+            r("r-shower", "Shower", RoutineCategory.HYGIENE, t(6, 45), t(7, 30), t(9), reserve = 15),
+            r("r-vitamins", "Vitamins + creatine", RoutineCategory.BODY, t(6, 30), t(9), t(12)),
+            r("r-meal1", "Pre-workout meal", RoutineCategory.MEAL, t(7), t(8, 30), t(10, 30), reserve = 20),
+            r("r-lunch", "Lunch", RoutineCategory.MEAL, t(12, 15), t(13, 30), t(15), reserve = 30),
+            r("r-workout", "Workout (lift, climb...)", RoutineCategory.BODY, t(17), t(18), t(19, 30), reserve = 60, days = setOf(MON, TUE, WED, THU, FRI, SAT), weekly = 6),
+            r("r-supper", "Supper", RoutineCategory.MEAL, t(18, 15), t(19, 30), t(20, 30), reserve = 30),
+            r("r-pick3", "Pick tomorrow's 3", RoutineCategory.OTHER, t(19, 30), t(21), t(21, 30)),
+            r("r-teeth", "Brush teeth", RoutineCategory.HYGIENE, t(21), t(22), t(22, 15), trigger = RoutineTrigger.BEDTIME),
+            r("r-bed", "In bed, phone down", RoutineCategory.SLEEP, t(21, 45), t(22), t(22, 15)),
+        )
+    }
+
+    // ---- Fresh install ---------------------------------------------------------------------
 
     fun data(now: Long, zoneId: String = "America/Chicago"): AppData {
         val zone = ZoneId.of(zoneId)
@@ -78,25 +162,22 @@ object Seed {
         }
         val projectIds = HashMap<String, String>()
         val projects = WebAppSeed.projects.map { p ->
-            Project(name = p.name, kind = kind(p.kind)).also { projectIds[p.key] = it.id }
+            Project(name = p.name, kind = kind(p.kind), areaId = areaFor(p.name)).also { projectIds[p.key] = it.id }
         } + listOf(
-            Project(name = "Side projects", kind = ProjectKind.PROJECT),
-            Project(name = "Life", kind = ProjectKind.LIFE),
+            Project(name = "Side projects", kind = ProjectKind.PROJECT, areaId = "a-making"),
+            Project(name = "Life", kind = ProjectKind.LIFE, areaId = "a-health"),
         )
         fun iso(s: String?) = s?.let { java.time.Instant.parse(it).toEpochMilli() }
         fun prio(s: String) = when (s) { "high" -> Priority.HIGH; "low" -> Priority.LOW; else -> Priority.NORMAL }
         fun energy(s: String) = when (s) { "high" -> Energy.HIGH; "low" -> Energy.LOW; else -> Energy.MED }
 
-        val tasks = WebAppSeed.tasks.map { t ->
-            val base = Task(
+        val tasks = WebAppSeed.tasks.filterNot { it.key == "t-android-hello" }.map { t ->
+            Task(
                 title = t.title, projectId = projectIds[t.project], estMin = t.estMin, dueAt = iso(t.dueIso),
                 priority = prio(t.priority), energy = energy(t.energy), minBlockMin = t.minBlockMin,
-                status = if (t.done) com.maven.notafraud.core.model.TaskStatus.DONE else com.maven.notafraud.core.model.TaskStatus.TODO,
-                doneAt = iso(t.doneIso), createdAt = now,
+                status = if (t.done && t.key != "t-ex-3525-3") TaskStatus.DONE else TaskStatus.TODO,
+                doneAt = if (t.key == "t-ex-3525-3") null else iso(t.doneIso), createdAt = now,
             )
-            // The hello-world step is superseded by this app existing; what's left is installing it.
-            if (t.key == "t-android-hello") base.copy(title = "Install Not a Fraud + grant permissions (Setup tab)", estMin = 45, energy = Energy.LOW, minBlockMin = 30, priority = Priority.HIGH)
-            else base
         }
 
         fun at(date: String, h: Int, m: Int = 0) = Time.at(LocalDate.parse(date), h * 60 + m, zone)
@@ -104,6 +185,52 @@ object Seed {
             CalEvent(uid = "seed-me3411-final", title = "ME 3411 final", start = at("2026-12-16", 12, 30), end = at("2026-12-16", 14, 30), source = "seed"),
         )
 
-        return AppData(projects = projects, tasks = tasks, events = events, anchors = anchors(), seeded = true)
+        return AppData(
+            schema = Migration.CURRENT,
+            goals = goals(), areas = areas(), projects = projects, tasks = tasks, events = events,
+            anchors = anchors(), routine = routine(), seeded = true,
+        )
+    }
+}
+
+/** Upgrades data written by older versions. Runs on every load; no-op when current. */
+object Migration {
+    const val CURRENT = 2
+
+    fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
+        var x = d
+        if (x.schema < 2) x = toV2(x, now)
+        return x
+    }
+
+    /**
+     * v0.1 -> v0.2: adds goals and areas (projects linked by name), moves meals / cardio / lifting
+     * out of the weekly blocks into the routine, re-seeds the weekly blocks with modes
+     * (trading every weekday, craft blocks as containers), fixes the Heat Transfer final mis-tap.
+     */
+    private fun toV2(d: AppData, now: Long): AppData {
+        val goals = d.goals.ifEmpty { Seed.goals() }
+        val areas = d.areas.ifEmpty { Seed.areas() }
+        val projects = d.projects.map { p -> if (p.areaId == null) p.copy(areaId = Seed.areaFor(p.name)) else p }
+        val tasks = d.tasks.map { t ->
+            when {
+                t.title.startsWith("Study for Heat Transfer Final") && t.status == TaskStatus.DONE && t.loggedMin == 0 ->
+                    t.copy(status = TaskStatus.TODO, doneAt = null)
+                t.title.startsWith("Install Not a Fraud") && t.status == TaskStatus.TODO ->
+                    t.copy(status = TaskStatus.DONE, doneAt = now)
+                else -> t
+            }
+        }
+        return d.copy(
+            schema = 2,
+            goals = goals,
+            areas = areas,
+            projects = projects,
+            tasks = tasks,
+            anchors = Seed.anchors(),
+            routine = d.routine.ifEmpty { Seed.routine() },
+            settings = d.settings.copy(dayStartMin = 7 * 60, dayEndMin = 21 * 60 + 30),
+            todayPlan = null,
+        )
     }
 }

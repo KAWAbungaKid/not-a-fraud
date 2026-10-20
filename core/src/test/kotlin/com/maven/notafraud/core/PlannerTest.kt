@@ -38,8 +38,7 @@ class PlannerTest {
         assertTrue("ME 3521 Applied Thermo" in titles)
         assertTrue("ME 3525 Heat Transfer" in titles)
         assertTrue("ME 4840 Lab" in titles)
-        assertTrue("Lift" in titles)
-        assertFalse("Market open" in titles, "Tue/Thu are protected for ME 3411")
+        assertTrue("Trading: market open" in titles, "trading every weekday")
     }
 
     @Test
@@ -91,7 +90,7 @@ class PlannerTest {
         val friPlan = DayPlanner().plan(fri, d2, at(fri, 5))
         val ideaBlocks = friPlan.blocks.filter { it.kind == BlockKind.TASK }
         assertTrue(ideaBlocks.isNotEmpty(), "idea should be schedulable on Friday")
-        assertTrue(ideaBlocks.all { it.start >= at(fri, 16) })
+        assertTrue(ideaBlocks.all { it.start >= at(fri, 14) })
     }
 
     @Test

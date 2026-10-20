@@ -24,12 +24,34 @@ enum class Energy { LOW, MED, HIGH }
 @Serializable
 enum class TaskStatus { TODO, DONE }
 
+/** Top of the hierarchy: what a life well spent looks like, in Maven's words. Never scheduled. */
+@Serializable
+data class Goal(
+    val id: String = newId(),
+    val name: String,
+    val order: Int = 0,
+)
+
+/**
+ * A part of life kept up forever, with no finish line (School, Fitness, Faith...).
+ * Feeds one or more goals. Projects live under exactly one area.
+ */
+@Serializable
+data class Area(
+    val id: String = newId(),
+    val name: String,
+    val goalIds: Set<String> = emptySet(),
+    val order: Int = 0,
+    val archived: Boolean = false,
+)
+
 @Serializable
 data class Project(
     val id: String = newId(),
     val name: String,
     val kind: ProjectKind,
     val archived: Boolean = false,
+    val areaId: String? = null,
 )
 
 @Serializable
@@ -51,6 +73,10 @@ data class Task(
     val notBefore: Long? = null,
     val icsUid: String? = null,
     val notes: String = "",
+    /** Pinned hot by hand: boosted in the planner. Deadline heat is computed, not stored. */
+    val hot: Boolean = false,
+    /** Set when the app generated this task (e.g. "makeup:<class>:<date>", "exam:<uid>"), so it is created once. */
+    val sourceKey: String? = null,
 )
 
 @Serializable
@@ -95,6 +121,15 @@ data class Idea(
 enum class AnchorKind { CLASS, FITNESS, MARKET, RESEARCH, REVIEW, CRAFT, PROTECTED, ROUTINE }
 
 /**
+ * How firmly a block holds its time.
+ * HARD: never moves (classes, trading, date night, calendar events).
+ * HABIT: keeps its slot so the rhythm sticks; can give way to a hot deadline if [Anchor.yieldsToHot].
+ * CONTAINER: a slot filled with the hottest task from its areas (craft blocks).
+ */
+@Serializable
+enum class AnchorMode { HARD, HABIT, CONTAINER }
+
+/**
  * A fixed block the planner places before anything else.
  * Either recurs on [days] (1 = Monday … 7 = Sunday) between [fromDate] and [untilDate],
  * or happens only on the explicit [dates].
@@ -117,6 +152,55 @@ data class Anchor(
     /** If true and a dated anchor overlaps it, this recurring anchor is dropped that day. */
     val yieldsToDated: Boolean = false,
     val enabled: Boolean = true,
+    val mode: AnchorMode = AnchorMode.HARD,
+    /** HABIT/CONTAINER only: a task with a deadline closing in can take this slot. */
+    val yieldsToHot: Boolean = false,
+    /** CONTAINER only: fill with tasks from these areas. Empty = project-kind tasks. */
+    val fillAreaIds: Set<String> = emptySet(),
+)
+
+@Serializable
+enum class RoutineCategory { MEAL, HYGIENE, BODY, SLEEP, OTHER }
+
+@Serializable
+enum class RoutineTrigger {
+    /** Escalates by clock: window start, due, angry. */
+    TIME,
+    /** Escalates by clock, and immediately when the phone looks like it's going to bed (charging / screen off late). */
+    BEDTIME,
+}
+
+/**
+ * A daily habit with a window that gets angrier the longer it's put off.
+ * Before [startMin]: calm. Until [dueMin]: due. Until [angryMin]: late (one nudge). After: angry (every 30 min).
+ * If [reserveMin] > 0 the planner also blocks that much time at [startMin] (cardio, workout, meals).
+ */
+@Serializable
+data class RoutineItem(
+    val id: String = newId(),
+    val title: String,
+    val category: RoutineCategory = RoutineCategory.OTHER,
+    val trigger: RoutineTrigger = RoutineTrigger.TIME,
+    val startMin: Int,
+    val dueMin: Int,
+    val angryMin: Int,
+    val days: Set<Int> = setOf(1, 2, 3, 4, 5, 6, 7),
+    val reserveMin: Int = 0,
+    val enabled: Boolean = true,
+    /** Times per week this should happen (workouts: 6). Null = every listed day. */
+    val weeklyTarget: Int? = null,
+    val order: Int = 0,
+)
+
+/** What got done on one day. Times are epoch ms. */
+@Serializable
+data class RoutineDay(
+    val date: String,
+    val done: Map<String, Long> = emptyMap(),
+    /** Free-text note per item, e.g. "climbing" on a workout. */
+    val notes: Map<String, String> = emptyMap(),
+    /** Last nudge per item, so alarms firing late or twice don't double-nag. */
+    val alerted: Map<String, Long> = emptyMap(),
 )
 
 @Serializable
@@ -134,6 +218,8 @@ data class AppRules(
     /** Window-title keywords treated as distractions on the PC (catches YouTube in Chrome). */
     val desktopBlockedTitles: Set<String> = setOf("youtube", "instagram", "reddit", "tiktok", "twitter", " / x"),
     val blockingEnabled: Boolean = true,
+    /** Websites blocked inside browsers (matched against the address bar host and its parents). */
+    val blockedSites: Set<String> = DEFAULT_SITES,
 ) {
     companion object {
         val DEFAULT_BLOCKED = setOf(
@@ -145,6 +231,9 @@ data class AppRules(
             "com.google.android.youtube",
             "com.snapchat.android",
             "com.facebook.katana",
+        )
+        val DEFAULT_SITES = setOf(
+            "instagram.com", "tiktok.com", "x.com", "twitter.com", "reddit.com", "youtube.com", "facebook.com",
         )
         val DEFAULT_FOCUS = setOf(
             "com.amazon.kindle",
@@ -175,8 +264,9 @@ data class Ledger(
 
 @Serializable
 data class Settings(
-    val dayStartMin: Int = 6 * 60,
-    val dayEndMin: Int = 22 * 60 + 30,
+    /** Planner fills tasks between these. Bedtime routine items live after [dayEndMin]. */
+    val dayStartMin: Int = 7 * 60,
+    val dayEndMin: Int = 21 * 60 + 30,
     val maxChunkMin: Int = 90,
     val breakMin: Int = 10,
     val badSleepHours: Double = 6.0,
@@ -194,6 +284,11 @@ data class Settings(
     val syncEnabled: Boolean = false,
     /** PC: minimize a distraction window after the second nudge. */
     val desktopMinimize: Boolean = false,
+    val routineNagsEnabled: Boolean = true,
+    /** Phone calendar id the app writes its plan into ("Not a Fraud" calendar created in Google Calendar). */
+    val outputCalendarId: Long? = null,
+    /** Phone calendar ids never read as events (old routine calendars, holidays...). */
+    val excludedCalendarIds: Set<Long> = emptySet(),
 )
 
 /** Per-day context: how the day started. Drives the bad-day softening. */
@@ -231,6 +326,14 @@ data class MirroredMessage(
 @Serializable
 data class AppData(
     val schema: Int = 1,
+    val goals: List<Goal> = emptyList(),
+    val areas: List<Area> = emptyList(),
+    val routine: List<RoutineItem> = emptyList(),
+    val routineDays: List<RoutineDay> = emptyList(),
+    /** date ("2026-10-21") -> up to 3 task ids picked the evening before. */
+    val picks: Map<String, List<String>> = emptyMap(),
+    /** Calendar event uids the user said aren't exams worth a study task. */
+    val ignoredExamUids: Set<String> = emptySet(),
     val projects: List<Project> = emptyList(),
     val tasks: List<Task> = emptyList(),
     val events: List<CalEvent> = emptyList(),

@@ -69,7 +69,7 @@ object Actions {
             title = idea.text,
             estMin = 60,
             projectId = d.projects.firstOrNull { it.name == "Side projects" }?.id,
-            notBefore = nextCraftBlock(now, zone),
+            notBefore = nextCraftBlock(now, zone, d.anchors),
             minBlockMin = 30,
         )
         return d.copy(
@@ -80,10 +80,11 @@ object Actions {
 
     fun deleteIdea(d: AppData, ideaId: String) = d.copy(ideas = d.ideas.filterNot { it.id == ideaId })
 
-    fun nextCraftBlock(now: Long, zone: java.time.ZoneId): Long {
+    fun nextCraftBlock(now: Long, zone: java.time.ZoneId, anchors: List<com.maven.notafraud.core.model.Anchor> = emptyList()): Long {
         val today = Time.dateOf(now, zone)
         val friday = if (today.dayOfWeek == DayOfWeek.FRIDAY) today else today.with(TemporalAdjusters.next(DayOfWeek.FRIDAY))
-        val craftStart = Time.at(friday, 16 * 60, zone)
+        val startMin = anchors.firstOrNull { it.kind == com.maven.notafraud.core.model.AnchorKind.CRAFT && 5 in it.days && it.enabled }?.startMin ?: (16 * 60)
+        val craftStart = Time.at(friday, startMin, zone)
         // Saturday and Sunday are already "after Friday": allow right away.
         return if (today.dayOfWeek == DayOfWeek.SATURDAY || today.dayOfWeek == DayOfWeek.SUNDAY) now else craftStart
     }
@@ -124,4 +125,99 @@ object Actions {
 
     fun markMessagesRead(d: AppData, pkg: String?) =
         d.copy(messages = d.messages.map { if (pkg == null || it.pkg == pkg) it.copy(read = true) else it })
+
+    // ---- Routine ---------------------------------------------------------------------------
+
+    private fun editDay(d: AppData, date: String, fn: (com.maven.notafraud.core.model.RoutineDay) -> com.maven.notafraud.core.model.RoutineDay): AppData {
+        val existing = d.routineDays.firstOrNull { it.date == date } ?: com.maven.notafraud.core.model.RoutineDay(date)
+        return d.copy(routineDays = (d.routineDays.filterNot { it.date == date } + fn(existing)).sortedBy { it.date }.takeLast(400))
+    }
+
+    fun checkRoutine(d: AppData, itemId: String, at: Long, note: String? = null): AppData {
+        val date = Time.dateOf(at, Time.zone(d.settings.zoneId)).toString()
+        return editDay(d, date) { day ->
+            day.copy(done = day.done + (itemId to at), notes = if (note.isNullOrBlank()) day.notes - itemId else day.notes + (itemId to note))
+        }
+    }
+
+    fun uncheckRoutine(d: AppData, itemId: String, date: LocalDate) =
+        editDay(d, date.toString()) { it.copy(done = it.done - itemId, notes = it.notes - itemId) }
+
+    fun markAlerted(d: AppData, itemIds: Collection<String>, at: Long): AppData {
+        if (itemIds.isEmpty()) return d
+        val date = Time.dateOf(at, Time.zone(d.settings.zoneId)).toString()
+        return editDay(d, date) { day -> day.copy(alerted = day.alerted + itemIds.associateWith { at }) }
+    }
+
+    fun upsertRoutine(d: AppData, item: com.maven.notafraud.core.model.RoutineItem) =
+        d.copy(routine = if (d.routine.any { it.id == item.id }) d.routine.map { if (it.id == item.id) item else it }
+        else d.routine + item.copy(order = (d.routine.maxOfOrNull { it.order } ?: 0) + 1))
+
+    fun deleteRoutine(d: AppData, id: String) = d.copy(routine = d.routine.filterNot { it.id == id })
+
+    /** Health Connect fills in wake-up (sleep end) and workouts so they don't need a tap. */
+    fun autoFromHealth(d: AppData, date: LocalDate): AppData {
+        val ctx = d.days.firstOrNull { it.date == date.toString() } ?: return d
+        val day = d.routineDays.firstOrNull { it.date == date.toString() }
+        var x = d
+        val wake = d.routine.firstOrNull { it.id == "r-wake" }
+        if (wake != null && ctx.sleepEnd != null && day?.done?.containsKey(wake.id) != true) {
+            x = checkRoutine(x, wake.id, ctx.sleepEnd, "from Samsung Health")
+        }
+        val workout = d.routine.firstOrNull { it.id == "r-workout" }
+        if (workout != null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
+            val zone = Time.zone(d.settings.zoneId)
+            x = checkRoutine(x, workout.id, Time.at(date, 12 * 60, zone).coerceAtMost(System.currentTimeMillis()), "from Samsung Health")
+        }
+        return x
+    }
+
+    // ---- Pick 3 ----------------------------------------------------------------------------
+
+    fun setPicks(d: AppData, date: LocalDate, taskIds: List<String>, now: Long): AppData {
+        val withPicks = d.copy(picks = (d.picks + (date.toString() to taskIds.distinct().take(3))).filterKeys { it >= date.minusDays(14).toString() })
+        return if (taskIds.isNotEmpty() && d.routine.any { it.id == "r-pick3" }) checkRoutine(withPicks, "r-pick3", now) else withPicks
+    }
+
+    // ---- Hierarchy -------------------------------------------------------------------------
+
+    fun upsertGoal(d: AppData, g: com.maven.notafraud.core.model.Goal) =
+        d.copy(goals = if (d.goals.any { it.id == g.id }) d.goals.map { if (it.id == g.id) g else it }
+        else d.goals + g.copy(order = (d.goals.maxOfOrNull { it.order } ?: 0) + 1))
+
+    fun deleteGoal(d: AppData, id: String) = d.copy(
+        goals = d.goals.filterNot { it.id == id },
+        areas = d.areas.map { it.copy(goalIds = it.goalIds - id) },
+    )
+
+    fun upsertArea(d: AppData, a: com.maven.notafraud.core.model.Area) =
+        d.copy(areas = if (d.areas.any { it.id == a.id }) d.areas.map { if (it.id == a.id) a else it }
+        else d.areas + a.copy(order = (d.areas.maxOfOrNull { it.order } ?: 0) + 1))
+
+    fun deleteArea(d: AppData, id: String) = d.copy(
+        areas = d.areas.filterNot { it.id == id },
+        projects = d.projects.map { if (it.areaId == id) it.copy(areaId = null) else it },
+    )
+
+    fun upsertProject(d: AppData, p: com.maven.notafraud.core.model.Project) =
+        d.copy(projects = if (d.projects.any { it.id == p.id }) d.projects.map { if (it.id == p.id) p else it } else d.projects + p)
+
+    // ---- Weekly blocks ---------------------------------------------------------------------
+
+    fun upsertAnchor(d: AppData, a: com.maven.notafraud.core.model.Anchor) =
+        d.copy(anchors = if (d.anchors.any { it.id == a.id }) d.anchors.map { if (it.id == a.id) a else it } else d.anchors + a)
+
+    fun deleteAnchor(d: AppData, id: String) = d.copy(anchors = d.anchors.filterNot { it.id == id })
+
+    /** Replace the set of dated research-session days, keeping the session's four blocks per day. */
+    fun setResearchDates(d: AppData, dates: List<String>): AppData {
+        val template = d.anchors.filter { it.kind == com.maven.notafraud.core.model.AnchorKind.RESEARCH && it.dates.isNotEmpty() }
+            .groupBy { it.title }.map { (_, list) -> list.first() }
+        if (template.isEmpty()) return d
+        val others = d.anchors.filterNot { it.kind == com.maven.notafraud.core.model.AnchorKind.RESEARCH && it.dates.isNotEmpty() }
+        val fresh = dates.distinct().sorted().flatMap { date -> template.map { it.copy(id = com.maven.notafraud.core.model.newId(), dates = setOf(date)) } }
+        return d.copy(anchors = others + fresh)
+    }
+
+    fun ignoreExam(d: AppData, uid: String) = d.copy(ignoredExamUids = d.ignoredExamUids + uid)
 }

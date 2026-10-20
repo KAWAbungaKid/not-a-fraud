@@ -27,6 +27,12 @@ data class PlanBlock(
     val projectId: String? = null,
     val anchorKind: AnchorKind? = null,
     val protected: Boolean = false,
+    val mode: com.maven.notafraud.core.model.AnchorMode? = null,
+    /** One of the day's "pick 3". */
+    val picked: Boolean = false,
+    /** Deadline closing in (or pinned hot). */
+    val hot: Boolean = false,
+    val routineId: String? = null,
 ) {
     val minutes: Int get() = ((end - start) / Time.MIN).toInt()
     fun contains(t: Long) = t in start until end
@@ -92,8 +98,17 @@ class DayPlanner(
         val dayStart = Time.at(date, s.dayStartMin, zone)
         val dayEnd = Time.at(date, s.dayEndMin, zone)
 
+        val open = data.tasks.filter { it.status == TaskStatus.TODO }
+        val hotTasks = open.filter { Heat.deadlineHot(it, now) }
+        val picks = data.picks[date.toString()].orEmpty().toSet()
+
         val fixed = mutableListOf<PlanBlock>()
+        val gaveWay = mutableListOf<String>()
         for (a in Anchors.on(date, data.anchors)) {
+            if (hotTasks.isNotEmpty() && a.yieldsToHot && a.mode != com.maven.notafraud.core.model.AnchorMode.HARD) {
+                gaveWay += a.title
+                continue
+            }
             fixed += PlanBlock(
                 start = Time.at(date, a.startMin, zone),
                 end = Time.at(date, a.endMin, zone),
@@ -101,6 +116,20 @@ class DayPlanner(
                 title = a.title,
                 anchorKind = a.kind,
                 protected = a.protected,
+                mode = a.mode,
+            )
+        }
+        for (r in data.routine) {
+            if (r.reserveMin <= 0 || !r.enabled || date.dayOfWeek.value !in r.days) continue
+            if (rough && r.weeklyTarget != null) continue
+            fixed += PlanBlock(
+                start = Time.at(date, r.startMin, zone),
+                end = Time.at(date, r.startMin + r.reserveMin, zone),
+                kind = BlockKind.ANCHOR,
+                title = r.title,
+                anchorKind = AnchorKind.ROUTINE,
+                mode = com.maven.notafraud.core.model.AnchorMode.HABIT,
+                routineId = r.id,
             )
         }
         val dayStartMidnight = Time.at(date, 0, zone)
@@ -117,15 +146,28 @@ class DayPlanner(
         }
         fixed.sortBy { it.start }
 
-        // Busy intervals (merged) inside the planning window.
+        // Busy intervals (merged) inside the planning window. Containers are filled separately.
         val from = max(dayStart, Time.roundUp(now, 5))
+        val isContainer = { b: PlanBlock -> b.mode == com.maven.notafraud.core.model.AnchorMode.CONTAINER }
         val busy = merge(fixed.map { it.start to it.end })
         val windows = freeWindows(from, dayEnd, busy).filter { (a, b) -> (b - a) / Time.MIN >= minWindowMin }
 
         val taskBlocks = mutableListOf<PlanBlock>()
         val allotted = HashMap<String, Int>()
         var focusUsed = 0
-        val open = data.tasks.filter { it.status == TaskStatus.TODO }
+
+        fun effective(task: Task, t: Long, w: Int, e: Energy): Double {
+            val virtual = task.copy(loggedMin = task.loggedMin + (allotted[task.id] ?: 0))
+            var sc = Scorer.score(virtual, t, w, e)
+            if (task.id in picks) sc = sc * 2 + 40
+            if (task.hot) sc *= 1.5
+            if (Heat.deadlineHot(task, t)) sc *= 1.3
+            return sc
+        }
+        fun block(t: Long, len: Int, task: Task) = PlanBlock(
+            start = t, end = t + len * Time.MIN, kind = BlockKind.TASK, title = task.title,
+            taskId = task.id, projectId = task.projectId, picked = task.id in picks, hot = task.hot || Heat.deadlineHot(task, t),
+        )
 
         windowLoop@ for ((wStart, wEnd) in windows) {
             var t = wStart
@@ -139,10 +181,7 @@ class DayPlanner(
                     .map { it to need(it, allotted) }
                     .filter { (_, n) -> n >= 5 }
                     .filter { (task, n) -> w >= min(task.minBlockMin, n) }
-                    .map { (task, n) ->
-                        val virtual = task.copy(loggedMin = task.loggedMin + (allotted[task.id] ?: 0))
-                        Triple(task, n, Scorer.score(virtual, t, w, energy))
-                    }
+                    .map { (task, n) -> Triple(task, n, effective(task, t, w, energy)) }
                     .maxByOrNull { it.third } ?: break
 
                 val (task, n, _) = pick
@@ -150,14 +189,7 @@ class DayPlanner(
                 len = roundDown5(len).coerceAtLeast(min(5, len))
                 if (len < minWindowMin && len < n) break
 
-                taskBlocks += PlanBlock(
-                    start = t,
-                    end = t + len * Time.MIN,
-                    kind = BlockKind.TASK,
-                    title = task.title,
-                    taskId = task.id,
-                    projectId = task.projectId,
-                )
+                taskBlocks += block(t, len, task)
                 t += len * Time.MIN
                 allotted[task.id] = (allotted[task.id] ?: 0) + len
                 focusUsed += len
@@ -169,37 +201,40 @@ class DayPlanner(
             }
         }
 
-        // Craft blocks are containers: fill them with project-kind tasks (side projects, PT device, ideas).
-        val craftProjects = data.projects.filter { it.kind == com.maven.notafraud.core.model.ProjectKind.PROJECT }.map { it.id }.toSet()
-        for (craft in fixed.filter { it.anchorKind == AnchorKind.CRAFT && it.end > from }) {
+        // Containers (craft blocks) are filled with the hottest task from their areas,
+        // falling back to project-kind tasks when no area is set.
+        val areaOf = data.projects.associate { it.id to it.areaId }
+        val projectKind = data.projects.filter { it.kind == com.maven.notafraud.core.model.ProjectKind.PROJECT }.map { it.id }.toSet()
+        for (craft in fixed.filter { isContainer(it) && it.end > from }) {
+            val anchor = data.anchors.firstOrNull { it.title == craft.title && it.mode == com.maven.notafraud.core.model.AnchorMode.CONTAINER }
+            val fill = anchor?.fillAreaIds.orEmpty()
+            val eligible = { task: Task -> if (fill.isEmpty()) task.projectId in projectKind else areaOf[task.projectId] in fill }
             var t = max(craft.start, from)
             while ((craft.end - t) / Time.MIN >= minWindowMin) {
                 val w = ((craft.end - t) / Time.MIN).toInt()
                 val pick = open.asSequence()
-                    .filter { it.projectId in craftProjects }
+                    .filter(eligible)
                     .filter { it.notBefore == null || it.notBefore <= t }
                     .map { it to need(it, allotted) }
                     .filter { (_, n) -> n >= 5 }
-                    .map { (task, n) ->
-                        val virtual = task.copy(loggedMin = task.loggedMin + (allotted[task.id] ?: 0))
-                        Triple(task, n, Scorer.score(virtual, t, w, Energy.HIGH))
-                    }
+                    .map { (task, n) -> Triple(task, n, effective(task, t, w, Energy.HIGH)) }
                     .maxByOrNull { it.third } ?: break
                 val (task, n, _) = pick
                 val len = roundDown5(minOf(n, w)).coerceAtLeast(5)
-                taskBlocks += PlanBlock(t, t + len * Time.MIN, BlockKind.TASK, task.title, task.id, task.projectId)
+                taskBlocks += block(t, len, task)
                 t += len * Time.MIN
                 allotted[task.id] = (allotted[task.id] ?: 0) + len
             }
         }
 
-        val note = buildString {
-            if (rough) {
+        val note = listOfNotNull(
+            if (rough) buildString {
                 append("Rough day")
                 ctx?.sleepHours?.let { append(" (%.1fh sleep)".format(it)) }
-                append(": lighter plan, ${Time.durationText(roughFocusCapMin)} focus cap, low-energy tasks first.")
-            }
-        }
+                append(": lighter plan, ${Time.durationText(roughFocusCapMin)} focus cap, workout optional.")
+            } else null,
+            if (gaveWay.isNotEmpty()) "${gaveWay.distinct().joinToString()} gave way: ${hotTasks.first().title} is due soon." else null,
+        ).joinToString(" ")
 
         return DayPlan(
             date = date.toString(),
@@ -242,5 +277,21 @@ class DayPlanner(
             if (cursor < to) out += cursor to to
             return out
         }
+    }
+}
+
+/** What counts as "hot": a high-priority deadline closing in. Pinned-hot tasks are boosted but don't bump habits. */
+object Heat {
+    /** Hot when the work left would leave less than this much slack before the deadline. */
+    const val SLACK_HOURS = 24.0
+
+    fun slackHours(task: Task, now: Long): Double? = task.dueAt?.let { (it - now) / 3_600_000.0 - Scorer.minutesLeft(task) / 60.0 }
+
+    fun deadlineHot(task: Task, now: Long): Boolean {
+        if (task.status != TaskStatus.TODO || task.priority != com.maven.notafraud.core.model.Priority.HIGH) return false
+        val due = task.dueAt ?: return false
+        if (due < now - 36 * 3_600_000L) return false
+        val slack = slackHours(task, now) ?: return false
+        return slack < SLACK_HOURS
     }
 }

@@ -9,6 +9,9 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
 env:
   GRADLE_VERSION: "9.8.2"
 jobs:

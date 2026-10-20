@@ -13,4 +13,6 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "not-a-fraud"
-include(":core", ":android", ":desktop")
+include(":core")
+if (file("android/build.gradle.kts").exists()) include(":android")
+if (file("desktop/build.gradle.kts").exists()) include(":desktop")

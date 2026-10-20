@@ -84,7 +84,7 @@ jobs:
           arch: x86_64
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash -c "set -o pipefail; gradle :android:connectedDebugAndroidTest --console=plain 2>&1 | tee emu.log; status=$?; adb logcat -d -s AndroidRuntime:E TestRunner:* > crash.log; cat crash.log >> emu.log; exit $status"
+          script: bash -c 'set -o pipefail; gradle :android:connectedDebugAndroidTest --console=plain 2>&1 | tee emu.log; st=$?; adb logcat -d AndroidRuntime:E TestRunner:I *:S >> emu.log; exit $st'
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: emulator, file: emu.log }

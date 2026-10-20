@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
 import com.maven.notafraud.ui.MainActivity
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -14,7 +15,10 @@ import org.junit.runner.RunWith
 /** Launches the app and walks every tab. Catches crashes on real Android in CI. */
 @RunWith(AndroidJUnit4::class)
 class SmokeTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val permissions: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
+
+    @get:Rule(order = 1)
     val rule = createAndroidComposeRule<MainActivity>()
 
     @Test

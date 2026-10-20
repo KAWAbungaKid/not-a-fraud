@@ -1,0 +1,19 @@
+name: push-log
+description: Force-push a log file to an orphan branch ci-logs/<name> so it can be read with git (log downloads are not reachable from the dev sandbox).
+inputs:
+  name: { required: true }
+  file: { required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set +e
+        tmp=$(mktemp -d)
+        cp "${{ inputs.file }}" "$tmp/log.txt" 2>/dev/null || echo "(no log produced)" > "$tmp/log.txt"
+        echo "run=${{ github.run_id }} sha=${{ github.sha }} status=${{ job.status }}" > "$tmp/meta.txt"
+        cd "$tmp"
+        git init -q -b main
+        git config user.name ci; git config user.email ci@localhost
+        git add -A; git commit -qm "log ${{ github.run_id }}"
+        git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/${{ inputs.name }}

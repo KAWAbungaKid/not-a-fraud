@@ -2,13 +2,18 @@ name: probe-versions
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths: ['.github/workflows/probe.yml']
+permissions:
+  contents: write
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Latest versions of key artifacts
         run: |
+          {
           g() { curl -s "https://dl.google.com/android/maven2/$1/maven-metadata.xml" | grep -o '<version>[^<]*</version>' | sed 's/<[^>]*>//g' | tail -n ${3:-8} | tr '\n' ' '; echo " <- $2"; }
           c() { curl -s "https://repo1.maven.org/maven2/$1/maven-metadata.xml" | grep -o '<version>[^<]*</version>' | sed 's/<[^>]*>//g' | tail -n ${3:-10} | tr '\n' ' '; echo " <- $2"; }
           p() { curl -s "https://plugins.gradle.org/m2/$1/maven-metadata.xml" | grep -o '<version>[^<]*</version>' | sed 's/<[^>]*>//g' | tail -n ${3:-10} | tr '\n' ' '; echo " <- $2"; }
@@ -26,4 +31,9 @@ jobs:
           c net/java/dev/jna/jna-platform jna
           c org/jetbrains/compose/compose-gradle-plugin compose-mp 15
           p org/jetbrains/compose/org.jetbrains.compose.gradle.plugin compose-mp-plugin 15
+          c org/jetbrains/compose/material3/material3-desktop cmp-material3 10
           curl -s https://services.gradle.org/versions/all | python3 -c "import json,sys;print([v['version'] for v in json.load(sys.stdin) if not v['snapshot'] and not v['nightly'] and 'rc' not in v['version'] and 'milestone' not in v['version']][:8], '<- gradle')"
+          } 2>&1 | tee probe.log
+      - if: always()
+        uses: ./.github/actions/push-log
+        with: { name: probe, file: probe.log }

@@ -27,7 +27,6 @@ jobs:
         with: { name: core, file: build.log }
 
   android:
-    if: ${{ hashFiles('android/build.gradle.kts') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +45,6 @@ jobs:
           path: android/build/outputs/apk/debug/*.apk
 
   desktop:
-    if: ${{ hashFiles('desktop/build.gradle.kts') != '' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4

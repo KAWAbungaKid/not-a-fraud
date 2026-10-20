@@ -23,6 +23,15 @@ class ActionReceiver : BroadcastReceiver() {
             WALK -> Graph.update { Actions.startSession(it, null, "Walk", now) }
             REPLAN -> Graph.replan()
             REPOST -> Notifier.forgetLast()
+            ROUTINE_DONE -> if (id != null) {
+                Graph.update { Actions.checkRoutine(it, id, now) }
+                Notifier.cancelRoutine(ctx, id)
+            }
+            ROUTINE_SNOOZE -> if (id != null) {
+                // Next angry nag in ~15 min instead of 30.
+                Graph.update { Actions.markAlerted(it, listOf(id), now - 15 * Time.MIN) }
+                Notifier.cancelRoutine(ctx, id)
+            }
             TICK -> Unit
         }
         if (intent.action == START || intent.action == WALK) Notifier.cancelNag(ctx)
@@ -37,6 +46,8 @@ class ActionReceiver : BroadcastReceiver() {
         const val REPLAN = "naf.REPLAN"
         const val REPOST = "naf.REPOST"
         const val TICK = "naf.TICK"
+        const val ROUTINE_DONE = "naf.ROUTINE_DONE"
+        const val ROUTINE_SNOOZE = "naf.ROUTINE_SNOOZE"
         const val EXTRA_ID = "id"
 
         fun pending(ctx: Context, action: String, id: String? = null): PendingIntent {
@@ -67,12 +78,28 @@ object Alarms {
         val am = ctx.getSystemService(AlarmManager::class.java)
         val now = Graph.now()
         val plan = Graph.data.todayPlan
-        val next = plan?.boundaries?.firstOrNull { it > now + 30_000 }
-            ?: Time.at(Graph.today().plusDays(1), Graph.data.settings.dayStartMin - 30, Graph.zone)
+        val tomorrow = Time.at(Graph.today().plusDays(1), 5 * 60, Graph.zone)
+        val next = listOfNotNull(
+            plan?.boundaries?.firstOrNull { it > now + 30_000 },
+            com.maven.notafraud.core.routine.RoutinePolicy.nextAlertAt(Graph.data, now),
+            tomorrow,
+        ).min()
         val pi = ActionReceiver.pending(ctx, ActionReceiver.TICK)
         runCatching {
             if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
         }
+    }
+}
+
+
+/** Turns due routine alerts into notifications, once each (see RoutinePolicy.alertsDue). */
+object RoutineAlerts {
+    fun check(ctx: Context, bedtime: Boolean = false) {
+        val now = Graph.now()
+        val alerts = com.maven.notafraud.core.routine.RoutinePolicy.alertsDue(Graph.data, now, bedtime)
+        if (alerts.isEmpty()) return
+        alerts.forEach { Notifier.postRoutine(ctx, it) }
+        Graph.update { Actions.markAlerted(it, alerts.map { a -> a.item.id }, now) }
     }
 }

@@ -50,6 +50,8 @@ class FlowTest {
             rule.waitForIdle()
             rule.onNodeWithText("Tasks").performClick()
             rule.waitForIdle()
+            rule.onNodeWithText("List").performClick()
+            rule.waitForIdle()
             rule.onNodeWithContentDescription("Add task").performClick()
             rule.waitForIdle()
             rule.onAllNodes(hasSetTextAction())[0].performTextInput("Emulator test task")
@@ -61,6 +63,27 @@ class FlowTest {
             rule.waitForIdle()
             rule.onNodeWithText("Replan").performClick()
             rule.waitForIdle()
+        }
+    }
+
+    @Test
+    fun mapAndRoutineRender() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            rule.waitForIdle()
+            rule.onNodeWithText("Tasks").performClick()
+            rule.waitForIdle()
+            rule.onNodeWithText("Map").performClick()
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Be a man of God").fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithText("Be a man of God").performClick()
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Faith", substring = true).fetchSemanticsNodes().isNotEmpty())
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            rule.waitForIdle()
+            rule.onNodeWithText("Routine").performClick()
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Brush teeth").fetchSemanticsNodes().isNotEmpty())
         }
     }
 }

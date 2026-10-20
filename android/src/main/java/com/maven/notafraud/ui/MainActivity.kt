@@ -11,8 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewTimeline
@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -84,16 +85,22 @@ class MainActivity : ComponentActivity() {
                 NavigationBar {
                     tabItem(TAB_NOW, "Now", Icons.Filled.PlayArrow)
                     tabItem(TAB_PLAN, "Plan", Icons.Filled.ViewTimeline)
-                    tabItem(TAB_TASKS, "Tasks", Icons.Filled.Checklist)
+                    val angry = remember(data, now / 60_000) {
+                        com.maven.notafraud.core.routine.RoutinePolicy.statuses(data, now).count { it.mood == com.maven.notafraud.core.routine.Mood.ANGRY }
+                    }
                     NavigationBarItem(
-                        selected = tab == TAB_INBOX,
-                        onClick = { tab = TAB_INBOX },
-                        icon = {
-                            BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) { Icon(Icons.Filled.Inbox, null) }
-                        },
-                        label = { Text("Inbox") },
+                        selected = tab == TAB_ROUTINE,
+                        onClick = { tab = TAB_ROUTINE },
+                        icon = { BadgedBox(badge = { if (angry > 0) Badge { Text("$angry") } }) { Icon(Icons.Filled.Restaurant, null) } },
+                        label = { Text("Routine") },
                     )
-                    tabItem(TAB_SETUP, "Setup", Icons.Filled.Settings)
+                    tabItem(TAB_TASKS, "Tasks", Icons.Filled.AccountTree)
+                    NavigationBarItem(
+                        selected = tab == TAB_SETUP || tab == TAB_INBOX,
+                        onClick = { tab = TAB_SETUP },
+                        icon = { BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) { Icon(Icons.Filled.Settings, null) } },
+                        label = { Text("More") },
+                    )
                 }
             },
         ) { pad ->
@@ -101,9 +108,10 @@ class MainActivity : ComponentActivity() {
                 when (tab) {
                     TAB_NOW -> NowScreen(data, now, onOpenTab = { tab = it })
                     TAB_PLAN -> PlanScreen(data, now)
+                    TAB_ROUTINE -> RoutineScreen(data, now)
                     TAB_TASKS -> TasksScreen(data, now)
                     TAB_INBOX -> InboxScreen(data)
-                    TAB_SETUP -> SetupScreen(data, resumes)
+                    TAB_SETUP -> SetupScreen(data, resumes, onOpenInbox = { tab = TAB_INBOX })
                 }
             }
         }
@@ -124,6 +132,7 @@ class MainActivity : ComponentActivity() {
         const val TAB_NOW = "now"
         const val TAB_PLAN = "plan"
         const val TAB_TASKS = "tasks"
+        const val TAB_ROUTINE = "routine"
         const val TAB_INBOX = "inbox"
         const val TAB_SETUP = "setup"
     }

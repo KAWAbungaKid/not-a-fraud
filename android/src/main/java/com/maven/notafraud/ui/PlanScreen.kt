@@ -87,6 +87,7 @@ fun PlanScreen(data: AppData, now: Long) {
 
 fun blockColor(b: PlanBlock): Color = when {
     b.protected -> Palette.amber
+    b.hot -> Palette.red
     b.kind == BlockKind.TASK -> Palette.green
     b.kind == BlockKind.BREAK -> Palette.textDim
     b.kind == BlockKind.EVENT -> Color(0xFF6EC8FF)
@@ -115,7 +116,16 @@ private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, i
                 "${Time.clock(b.start, zone)}–${Time.clock(b.end, zone)}  ·  ${Time.durationText(b.minutes)}",
                 style = MaterialTheme.typography.labelSmall, color = Palette.textDim.copy(alpha = alpha),
             )
-            Text(b.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+            Text((if (b.picked) "★ " else "") + b.title, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+            val tag = listOfNotNull(
+                if (b.hot) "hot" else null,
+                when (b.mode) {
+                    com.maven.notafraud.core.model.AnchorMode.HABIT -> if (b.routineId != null) "routine" else "habit"
+                    com.maven.notafraud.core.model.AnchorMode.CONTAINER -> "container"
+                    else -> null
+                },
+            )
+            if (tag.isNotEmpty()) Text(tag.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = if (b.hot) Palette.red else Palette.textDim.copy(alpha = alpha))
         }
         if (onStart != null && !isPast) TextButton(onClick = onStart) { Text("Start") }
     }

@@ -27,11 +27,11 @@ object Palette {
     val surface = Color(0xFF151B15)
     val surfaceHigh = Color(0xFF1E261E)
     val green = Color(0xFF8CFF6E)
-    val greenDim = Color(0xFF4F8F40)
+    val greenDim = Color(0xFF6FB85E)
     val amber = Color(0xFFFFC857)
     val red = Color(0xFFFF6B6B)
     val text = Color(0xFFE4EDE1)
-    val textDim = Color(0xFF9AA897)
+    val textDim = Color(0xFFBCC8B8)
 }
 
 private val scheme = darkColorScheme(
@@ -50,7 +50,7 @@ private val scheme = darkColorScheme(
     surfaceContainer = Palette.surface,
     surfaceContainerHigh = Palette.surfaceHigh,
     surfaceContainerHighest = Color(0xFF263026),
-    outline = Color(0xFF3A4A38),
+    outline = Color(0xFF5A6E57),
     error = Palette.red,
 )
 

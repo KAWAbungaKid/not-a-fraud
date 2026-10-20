@@ -52,15 +52,16 @@ object Notifier {
 
     fun postNow(ctx: Context, s: NowState, force: Boolean = false) {
         if (!canPost(ctx)) return
-        val key = s.headline + "|" + s.detail + "|" + s.working
+        val detail = listOfNotNull(s.detail.ifBlank { null }, s.routine?.let { "Routine: $it" }).joinToString("\n")
+        val key = s.headline + "|" + detail + "|" + s.working
         if (!force && key == lastPosted) return
         lastPosted = key
 
         val b = NotificationCompat.Builder(ctx, CH_NOW)
             .setSmallIcon(R.drawable.ic_stat_naf)
             .setContentTitle(s.headline)
-            .setContentText(s.detail)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(s.detail))
+            .setContentText(detail)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
@@ -79,7 +80,8 @@ object Notifier {
                 b.addAction(0, "Start", ActionReceiver.pending(ctx, ActionReceiver.START, task.id))
                 b.addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.DONE, task.id))
             }
-            b.addAction(0, "Replan", ActionReceiver.pending(ctx, ActionReceiver.REPLAN))
+            if (s.routineId != null) b.addAction(0, "Routine done", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_DONE, s.routineId))
+            else b.addAction(0, "Replan", ActionReceiver.pending(ctx, ActionReceiver.REPLAN))
         }
         runCatching { NotificationManagerCompat.from(ctx).notify(ID_NOW, b.build()) }
     }
@@ -106,6 +108,28 @@ object Notifier {
     }
 
     fun cancelNag(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_NAG)
+
+    fun routineNotificationId(itemId: String) = 200 + (itemId.hashCode() and 0x7fffffff) % 500
+
+    fun postRoutine(ctx: Context, a: com.maven.notafraud.core.routine.RoutineAlert) {
+        if (!canPost(ctx)) return
+        val angry = a.mood == com.maven.notafraud.core.routine.Mood.ANGRY
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(a.title)
+            .setContentText(a.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(a.text))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(if (angry) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
+            .setColor(if (angry) 0xFFFF6B6B.toInt() else 0xFFFFC857.toInt())
+            .setContentIntent(openApp(ctx, MainActivity.TAB_ROUTINE, req = 11))
+            .addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_DONE, a.item.id))
+            .addAction(0, "15 more min", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_SNOOZE, a.item.id))
+        runCatching { NotificationManagerCompat.from(ctx).notify(routineNotificationId(a.item.id), b.build()) }
+    }
+
+    fun cancelRoutine(ctx: Context, itemId: String) = NotificationManagerCompat.from(ctx).cancel(routineNotificationId(itemId))
 
     fun postAlert(ctx: Context, title: String, text: String) {
         if (!canPost(ctx)) return

@@ -68,15 +68,31 @@ import java.util.Locale
 fun TasksScreen(data: AppData, now: Long) {
     val ctx = LocalContext.current
     val zone = Time.zone(data.settings.zoneId)
+    var mapMode by rememberSaveable { mutableStateOf(true) }
     var showDone by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     var editing by remember { mutableStateOf<Task?>(null) }
+    val q = query.trim().lowercase()
+    val projectName = data.projects.associate { it.id to it.name }
     val tasks = data.tasks.filter { (it.status == TaskStatus.DONE) == showDone }
+        .filter { q.isEmpty() || it.title.lowercase().contains(q) || projectName[it.projectId]?.lowercase()?.contains(q) == true || it.notes.lowercase().contains(q) }
     val byProject = tasks.groupBy { it.projectId }
     val projectOrder = data.projects.map { it.id } + listOf(null)
 
-    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = mapMode, onClick = { mapMode = true }, label = { Text("Map") })
+            FilterChip(selected = !mapMode, onClick = { mapMode = false }, label = { Text("List") })
+        }
+        if (mapMode) {
+            MapView(data, now, onEditTask = { editing = it }, onNewTask = { pid -> editing = Task(title = "", projectId = pid, createdAt = Graph.now()) })
+        } else Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             item {
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true, placeholder = { Text("Search tasks and projects") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = !showDone, onClick = { showDone = false }, label = { Text("Open (${data.tasks.count { it.status == TaskStatus.TODO }})") })
                     FilterChip(selected = showDone, onClick = { showDone = true }, label = { Text("Done") })
@@ -84,7 +100,7 @@ fun TasksScreen(data: AppData, now: Long) {
             }
 
             val ideas = data.ideas.filter { it.promotedTaskId == null }
-            if (!showDone && ideas.isNotEmpty()) {
+            if (!showDone && q.isEmpty() && ideas.isNotEmpty()) {
                 item { SectionLabel("Ideas waiting for Friday") }
                 items(ideas, key = { "idea-" + it.id }) { idea ->
                     Panel {
@@ -99,19 +115,20 @@ fun TasksScreen(data: AppData, now: Long) {
 
             for (pid in projectOrder) {
                 val list = byProject[pid] ?: continue
-                val name = data.projects.firstOrNull { it.id == pid }?.name ?: "No project"
+                val name = projectName[pid] ?: "No project"
                 item(key = "h-$pid") { SectionLabel(name) }
                 items(list.sortedWith(compareBy<Task> { it.dueAt ?: Long.MAX_VALUE }.thenBy { it.title }), key = { it.id }) { t ->
                     TaskRow(t, now, zone, onToggle = { done -> Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, done, Graph.now()) } }, onClick = { editing = t })
                 }
             }
-            if (tasks.isEmpty()) item { Text(if (showDone) "Nothing done yet." else "No open tasks.", color = Palette.textDim) }
+            if (tasks.isEmpty()) item { Text(if (q.isNotEmpty()) "Nothing matches." else if (showDone) "Nothing done yet." else "No open tasks.", color = Palette.textDim) }
             item { Spacer(Modifier.height(88.dp)) }
         }
         FloatingActionButton(
             onClick = { editing = Task(title = "", createdAt = Graph.now()) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         ) { Icon(Icons.Filled.Add, "Add task") }
+        }
     }
 
     editing?.let { t ->
@@ -141,6 +158,7 @@ private fun TaskRow(t: Task, now: Long, zone: java.time.ZoneId, onToggle: (Boole
                     "${t.loggedMin}/${t.estMin}m",
                     t.dueAt?.let { "due " + dueText(it, now, zone) },
                     t.priority.takeIf { it != Priority.NORMAL }?.name?.lowercase(),
+                    if (t.hot) "hot" else null,
                     t.notBefore?.takeIf { it > now }?.let { "from " + Time.dateOf(it, zone).format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)) },
                 )
                 Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
@@ -150,7 +168,7 @@ private fun TaskRow(t: Task, now: Long, zone: java.time.ZoneId, onToggle: (Boole
 }
 
 @Composable
-private fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Unit, onSave: (Task) -> Unit, onDelete: () -> Unit) {
+fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Unit, onSave: (Task) -> Unit, onDelete: () -> Unit) {
     val zone = Time.zone(data.settings.zoneId)
     var t by remember { mutableStateOf(initial) }
     var est by remember { mutableStateOf(initial.estMin.toString()) }
@@ -210,6 +228,10 @@ private fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: 
                 SectionLabel("Priority")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (p in Priority.entries) FilterChip(t.priority == p, { t = t.copy(priority = p) }, { Text(p.name.lowercase()) })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Pin as hot (planner pushes it up)", Modifier.weight(1f))
+                    androidx.compose.material3.Switch(checked = t.hot, onCheckedChange = { t = t.copy(hot = it) })
                 }
                 SectionLabel("Energy it takes")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

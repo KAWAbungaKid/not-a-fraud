@@ -58,7 +58,9 @@ object Graph {
     /** Re-post the notification and re-arm the next block-boundary alarm. Cheap; call after any change. */
     fun refresh(ctx: Context) {
         Notifier.postNow(ctx, nowState())
+        com.maven.notafraud.notify.RoutineAlerts.check(ctx)
         Alarms.scheduleNext(ctx)
+        com.maven.notafraud.sense.CalendarWriter.syncAsync(ctx)
     }
 
     /** Apply a change that affects the plan, then re-plan and refresh. */

@@ -1,10 +1,12 @@
 package com.maven.notafraud.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.maven.notafraud.Graph
 import com.maven.notafraud.core.model.AppData
+import com.maven.notafraud.core.plan.Generated
 import com.maven.notafraud.core.plan.NowResolver
 import com.maven.notafraud.core.plan.Planning
 import com.maven.notafraud.core.plan.Time
@@ -89,8 +92,39 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                         if (t != null) OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) } }) { Text("Done") }
                     }
                 }
+                state.routine?.let { r ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Routine: $r", color = Palette.amber, modifier = Modifier.weight(1f))
+                        state.routineId?.let { id ->
+                            TextButton(onClick = { act { Actions.checkRoutine(it, id, Graph.now()) } }) { Text("Done") }
+                        }
+                    }
+                }
             }
         }
+
+        val unread = data.messages.count { !it.read }
+        if (unread > 0) item {
+            Panel(Modifier.clickable { onOpenTab(MainActivity.TAB_INBOX) }) {
+                Text("$unread new message${if (unread == 1) "" else "s"} in Inbox", color = Palette.green)
+            }
+        }
+
+        val exams = Generated.examCandidates(data, now)
+        if (exams.isNotEmpty()) item {
+            val e = exams.first()
+            Panel {
+                SectionLabel("Exam on your calendar")
+                Text(e.title, style = MaterialTheme.typography.titleMedium)
+                Text(Time.dateOf(e.start, zone).format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)) + " · " + Time.clockAmPm(e.start, zone) + " · no study task yet", color = Palette.textDim)
+                Row {
+                    TextButton(onClick = { Graph.changeAndReplan(ctx) { Actions.addTask(it, Generated.studyTaskFor(it, e, Graph.now())) } }) { Text("Add 6h study task") }
+                    TextButton(onClick = { Graph.update { Actions.ignoreExam(it, e.uid) } }) { Text("Not an exam", color = Palette.textDim) }
+                }
+            }
+        }
+
+        item { PickThree(data, now) }
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -175,3 +209,64 @@ fun dueText(due: Long, now: Long, zone: java.time.ZoneId): String {
         else -> Time.dateOf(due, zone).format(DateTimeFormatter.ofPattern("MMM d", Locale.US))
     }
 }
+
+
+/**
+ * Evening (from 5pm): pick tomorrow's 3. Daytime: show today's 3.
+ * Picked tasks are planned first and starred.
+ */
+@Composable
+fun PickThree(data: AppData, now: Long) {
+    val ctx = LocalContext.current
+    val zone = Time.zone(data.settings.zoneId)
+    val today = Time.dateOf(now, zone)
+    val evening = Time.minuteOfDay(now, zone) >= 17 * 60
+    val target = if (evening) today.plusDays(1) else today
+    val picked = data.picks[target.toString()].orEmpty()
+    var choosing by remember { mutableStateOf(false) }
+    val titles = picked.mapNotNull { id -> data.tasks.firstOrNull { it.id == id } }
+
+    if (!evening && titles.isEmpty()) return
+    Panel(highlight = evening && titles.isEmpty()) {
+        SectionLabel(if (evening) "Tomorrow's 3" else "Today's 3")
+        if (titles.isEmpty()) Text("Pick the three things that matter most tomorrow. The plan protects them.", color = Palette.textDim)
+        titles.forEach { t ->
+            Text("★ " + t.title, textDecoration = if (t.status == com.maven.notafraud.core.model.TaskStatus.DONE) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+        }
+        TextButton(onClick = { choosing = true }) { Text(if (titles.isEmpty()) "Pick 3" else "Change") }
+    }
+
+    if (choosing) {
+        var chosen by remember { mutableStateOf(picked) }
+        val options = Scorer.rank(data.tasks, Time.at(target, 8 * 60, zone), 120, data.settings.energy).map { it.first }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Pick 3 for ${target.format(DateTimeFormatter.ofPattern("EEEE", Locale.US))}") },
+            confirmButton = {
+                TextButton(onClick = {
+                    Graph.update { Actions.setPicks(it, target, chosen, Graph.now()) }
+                    if (target == today) Graph.replan()
+                    Graph.refresh(ctx); choosing = false
+                }) { Text("Save (${chosen.size}/3)") }
+            },
+            dismissButton = { TextButton(onClick = { choosing = false }) { Text("Cancel") } },
+            text = {
+                LazyColumn(Modifier.androidx_heightMax()) {
+                    items(options, key = { it.id }) { t ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                chosen = if (t.id in chosen) chosen - t.id else if (chosen.size < 3) chosen + t.id else chosen
+                            },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.Checkbox(checked = t.id in chosen, onCheckedChange = null)
+                            Text(t.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            },
+        )
+    }
+}
+
+private fun Modifier.androidx_heightMax() = this.then(Modifier.heightIn(max = 420.dp))

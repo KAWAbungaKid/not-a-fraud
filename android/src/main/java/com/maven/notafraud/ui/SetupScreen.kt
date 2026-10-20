@@ -64,7 +64,7 @@ import java.io.File
 private enum class Picker { BLOCKED, FOCUS, MIRRORED }
 
 @Composable
-fun SetupScreen(data: AppData, resumes: Long) {
+fun SetupScreen(data: AppData, resumes: Long, onOpenInbox: () -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var picker by remember { mutableStateOf<Picker?>(null) }
@@ -75,7 +75,10 @@ fun SetupScreen(data: AppData, resumes: Long) {
     val healthStatus = remember(resumes) { HealthConnectClient.getSdkStatus(ctx) }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { Graph.refresh(ctx) }
-    val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+    var editingAnchor by remember { mutableStateOf<Anchor?>(null) }
+    var editingSites by remember { mutableStateOf(false) }
+    var editingResearch by remember { mutableStateOf(false) }
+    val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         scope.launch { Workers.syncSensors(ctx); Graph.replan(); Graph.refresh(ctx) }
     }
     val healthLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
@@ -105,6 +108,13 @@ fun SetupScreen(data: AppData, resumes: Long) {
 
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Spacer(Modifier.height(8.dp)) }
+        item {
+            val unread = data.messages.count { !it.read }
+            Panel(Modifier.clickable(onClick = onOpenInbox)) {
+                Text("Inbox" + if (unread > 0) " · $unread new" else "", style = MaterialTheme.typography.titleMedium, color = if (unread > 0) Palette.green else MaterialTheme.colorScheme.onSurface)
+                Text("Mirrored Snapchat messages", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+        }
         item {
             val done = listOf(p.notifications, p.accessibility, p.usage, p.listener, healthGranted, p.calendar, p.exact, p.battery).count { it }
             Text("Setup · $done/8 done", style = MaterialTheme.typography.titleLarge)
@@ -145,8 +155,8 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
         item {
-            PermRow("6. Calendar", p.calendar, "Reads your phone calendar (Google Calendar syncs into it) so events block time in the plan.") {
-                calLauncher.launch(Manifest.permission.READ_CALENDAR)
+            PermRow("6. Calendar", p.calendar && Perms.calendarWrite(ctx), "Reads your Google Calendar (through the phone) so events block time, and writes your plan into a \"Not a Fraud\" calendar.") {
+                calLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
             }
         }
         item {
@@ -175,7 +185,9 @@ fun SetupScreen(data: AppData, resumes: Long) {
             Panel {
                 SwitchRow("Blocking on", data.rules.blockingEnabled) { on -> Graph.update { it.copy(rules = it.rules.copy(blockingEnabled = on)) } }
                 SwitchRow("Nudges on", data.settings.nagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(nagsEnabled = on)) } }
+                SwitchRow("Routine nudges on", data.settings.routineNagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(routineNagsEnabled = on)) } }
                 TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.size})") }
+                TextButton(onClick = { editingSites = true }) { Text("Blocked websites (${data.rules.blockedSites.size})") }
                 TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.size})") }
                 TextButton(onClick = { picker = Picker.MIRRORED }) { Text("Mirrored into Inbox (${data.rules.mirrored.size})") }
             }
@@ -206,15 +218,29 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
-        item { SectionLabel("Weekly anchors") }
-        val recurring = data.anchors.filter { it.dates.isEmpty() }
-        items(recurring, key = { it.id }) { a -> AnchorRow(a) }
+        item { SectionLabel("Google Calendar") }
+        item { CalendarPanel(data, resumes) }
+
+        item { SectionLabel("Weekly blocks") }
+        item {
+            Text("Hard never moves. Habit keeps its slot unless a deadline is hot (if allowed). Container gets filled with your hottest project work. Meals, cardio and workouts are in Routine.",
+                color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        }
+        val recurring = data.anchors.filter { it.dates.isEmpty() }.sortedWith(compareBy({ it.days.minOrNull() ?: 8 }, { it.startMin }))
+        items(recurring, key = { it.id }) { a -> AnchorRow(a) { editingAnchor = a } }
+        item {
+            TextButton(onClick = {
+                editingAnchor = Anchor(title = "", kind = com.maven.notafraud.core.model.AnchorKind.ROUTINE, startMin = 9 * 60, endMin = 10 * 60, days = setOf(1),
+                    mode = com.maven.notafraud.core.model.AnchorMode.HABIT)
+            }) { Text("Add weekly block") }
+        }
         item {
             val dated = data.anchors.filter { it.dates.isNotEmpty() }
             val days = dated.flatMap { it.dates }.distinct().sorted()
-            Panel {
+            Panel(Modifier.clickable { editingResearch = true }) {
                 Text("Research session days", style = MaterialTheme.typography.titleSmall)
-                Text(days.joinToString(", ") { it.substring(5) }, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                Text(days.filter { it >= Graph.today().toString() }.joinToString(", ") { it.substring(5) }.ifBlank { "none upcoming" }, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                Text("Tap to edit", color = Palette.textDim, style = MaterialTheme.typography.labelSmall)
             }
         }
 
@@ -243,6 +269,27 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
         item { Spacer(Modifier.height(32.dp)) }
+    }
+
+    editingAnchor?.let { a ->
+        AnchorEditor(a, data, isNew = data.anchors.none { it.id == a.id }, onDismiss = { editingAnchor = null },
+            onSave = { Graph.changeAndReplan(ctx) { d -> com.maven.notafraud.core.store.Actions.upsertAnchor(d, it) }; editingAnchor = null },
+            onDelete = { Graph.changeAndReplan(ctx) { d -> com.maven.notafraud.core.store.Actions.deleteAnchor(d, a.id) }; editingAnchor = null })
+    }
+    if (editingSites) {
+        ListDialog("Blocked websites", "One per line, e.g. instagram.com. Subdomains are included.", data.rules.blockedSites.sorted(), onDismiss = { editingSites = false }) { list ->
+            val clean = list.map { it.trim().lowercase().removePrefix("https://").removePrefix("http://").removePrefix("www.").substringBefore('/') }.filter { it.contains('.') }.toSet()
+            Graph.update { it.copy(rules = it.rules.copy(blockedSites = clean)) }
+            editingSites = false
+        }
+    }
+    if (editingResearch) {
+        val days = data.anchors.filter { it.dates.isNotEmpty() }.flatMap { it.dates }.distinct().sorted()
+        ListDialog("Research session days", "One date per line, YYYY-MM-DD.", days, onDismiss = { editingResearch = false }) { list ->
+            val clean = list.map { it.trim() }.filter { runCatching { java.time.LocalDate.parse(it) }.isSuccess }
+            Graph.changeAndReplan(ctx) { com.maven.notafraud.core.store.Actions.setResearchDates(it, clean) }
+            editingResearch = false
+        }
     }
 
     picker?.let { which ->
@@ -308,21 +355,138 @@ private fun SwitchRow(label: String, value: Boolean, onChange: (Boolean) -> Unit
 private val DAY_NAMES = listOf("", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 @Composable
-private fun AnchorRow(a: Anchor) {
+private fun AnchorRow(a: Anchor, onEdit: () -> Unit) {
     val ctx = LocalContext.current
-    fun hm(m: Int) = "%d:%02d".format(((m / 60) + 11) % 12 + 1, m % 60) + if (m < 12 * 60) "a" else "p"
-    Panel {
+    Panel(Modifier.clickable(onClick = onEdit)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(a.title)
                 Text(
-                    a.days.sorted().joinToString(" ") { DAY_NAMES[it] } + " · " + hm(a.startMin) + "–" + hm(a.endMin) + if (a.protected) " · protected" else "",
+                    a.days.sorted().joinToString(" ") { DAY_NAMES[it] } + " · " + hm(a.startMin) + "–" + hm(a.endMin) + " · " + a.mode.name.lowercase() +
+                        (if (a.protected) " · protected" else "") + (if (a.yieldsToHot) " · gives way when hot" else ""),
                     style = MaterialTheme.typography.bodySmall, color = Palette.textDim,
                 )
             }
             Switch(checked = a.enabled, onCheckedChange = { on ->
                 Graph.changeAndReplan(ctx) { d -> d.copy(anchors = d.anchors.map { if (it.id == a.id) it.copy(enabled = on) else it }) }
             })
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun AnchorEditor(initial: Anchor, data: AppData, isNew: Boolean, onDismiss: () -> Unit, onSave: (Anchor) -> Unit, onDelete: () -> Unit) {
+    var a by remember { mutableStateOf(initial) }
+    var picking by remember { mutableStateOf<String?>(null) }
+    val names = listOf("", "M", "T", "W", "T", "F", "S", "S")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isNew) "New weekly block" else "Edit weekly block") },
+        confirmButton = { TextButton(onClick = { onSave(a.copy(title = a.title.trim())) }, enabled = a.title.isNotBlank() && a.endMin > a.startMin && a.days.isNotEmpty()) { Text("Save") } },
+        dismissButton = {
+            Row {
+                if (!isNew) TextButton(onClick = onDelete) { Text("Delete", color = Palette.red) }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(a.title, { a = a.copy(title = it) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Row {
+                    TextButton(onClick = { picking = "start" }) { Text("From ${hm(a.startMin)}") }
+                    TextButton(onClick = { picking = "end" }) { Text("To ${hm(a.endMin)}") }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (dow in 1..7) androidx.compose.material3.FilterChip(dow in a.days, { a = a.copy(days = if (dow in a.days) a.days - dow else a.days + dow) }, { Text(names[dow]) })
+                }
+                SectionLabel("How firm")
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.maven.notafraud.core.model.AnchorMode.entries.forEach { m ->
+                        androidx.compose.material3.FilterChip(a.mode == m, { a = a.copy(mode = m) }, { Text(m.name.lowercase()) })
+                    }
+                }
+                if (a.mode != com.maven.notafraud.core.model.AnchorMode.HARD) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Gives way when a deadline is hot", Modifier.weight(1f))
+                    Switch(a.yieldsToHot, { a = a.copy(yieldsToHot = it) })
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Protected (no tasks, no nudges)", Modifier.weight(1f))
+                    Switch(a.protected, { a = a.copy(protected = it) })
+                }
+                if (a.mode == com.maven.notafraud.core.model.AnchorMode.CONTAINER) {
+                    SectionLabel("Fill with work from")
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        data.areas.filterNot { it.archived }.forEach { ar ->
+                            androidx.compose.material3.FilterChip(ar.id in a.fillAreaIds, {
+                                a = a.copy(fillAreaIds = if (ar.id in a.fillAreaIds) a.fillAreaIds - ar.id else a.fillAreaIds + ar.id)
+                            }, { Text(ar.name) })
+                        }
+                    }
+                }
+            }
+        },
+    )
+    picking?.let { which ->
+        TimeDialog(if (which == "start") a.startMin else a.endMin, onDismiss = { picking = null }) { m ->
+            a = if (which == "start") a.copy(startMin = m) else a.copy(endMin = m)
+            picking = null
+        }
+    }
+}
+
+@Composable
+private fun ListDialog(title: String, hint: String, initial: List<String>, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
+    var text by remember { mutableStateOf(initial.joinToString("\n")) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(hint, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(text, { text = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp))
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(text.lines().filter { it.isNotBlank() }) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Choose which calendars to read and which one the app writes its plan into. */
+@Composable
+private fun CalendarPanel(data: AppData, resumes: Long) {
+    val ctx = LocalContext.current
+    val cals = remember(resumes, data.settings.outputCalendarId) { com.maven.notafraud.sense.PhoneCalendar.calendars(ctx) }
+    Panel {
+        if (cals.isEmpty()) {
+            Text("Grant Calendar (row 6) to see your calendars.", color = Palette.textDim)
+            return@Panel
+        }
+        val out = cals.firstOrNull { it.id == data.settings.outputCalendarId }
+        Text("Writes plan to: " + (out?.name ?: "nothing yet"), style = MaterialTheme.typography.titleSmall, color = if (out == null) Palette.amber else Palette.green)
+        if (out == null) Text(
+            "On a computer, open calendar.google.com → Other calendars → + → Create new calendar, name it \"Not a Fraud\". Give the phone a minute to sync, then pick it below.",
+            color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+        )
+        SectionLabel("Tap to write plan here")
+        cals.filter { it.writable }.forEach { c ->
+            Row(Modifier.fillMaxWidth().clickable {
+                Graph.update { it.copy(settings = it.settings.copy(outputCalendarId = if (it.settings.outputCalendarId == c.id) null else c.id, excludedCalendarIds = it.settings.excludedCalendarIds - c.id)) }
+                Graph.replan(); Graph.refresh(ctx)
+            }, verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.RadioButton(selected = c.id == data.settings.outputCalendarId, onClick = null)
+                Text(c.name + (c.account?.let { " · $it" } ?: ""), maxLines = 1)
+            }
+        }
+        SectionLabel("Read as events (untick to ignore)")
+        cals.filter { it.id != data.settings.outputCalendarId }.forEach { c ->
+            val on = c.id !in data.settings.excludedCalendarIds
+            Row(Modifier.fillMaxWidth().clickable {
+                Graph.update { it.copy(settings = it.settings.copy(excludedCalendarIds = if (on) it.settings.excludedCalendarIds + c.id else it.settings.excludedCalendarIds - c.id)) }
+            }, verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = on, onCheckedChange = null)
+                Text(c.name, maxLines = 1)
+            }
         }
     }
 }

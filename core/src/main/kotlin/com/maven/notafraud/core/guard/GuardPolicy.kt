@@ -41,6 +41,11 @@ object GuardPolicy {
 
     fun decide(pkg: String, data: AppData, now: Long, ownPackagePrefix: String = "com.maven.notafraud"): GuardDecision {
         val rules = data.rules
+        if (pkg.startsWith(Sites.PREFIX)) {
+            if (!rules.blockingEnabled || Sites.label(pkg) !in rules.blockedSites) return GuardDecision(GuardAction.IGNORE)
+            return if (Credits.isUnlocked(data.ledger, pkg, now)) GuardDecision(GuardAction.UNLOCKED, Credits.unlockedUntil(data.ledger, pkg))
+            else GuardDecision(GuardAction.BLOCK)
+        }
         if (pkg.startsWith(ownPackagePrefix) || pkg in SAFE || pkg in rules.alwaysAllowed) return GuardDecision(GuardAction.IGNORE)
         if (pkg in rules.focus) return GuardDecision(GuardAction.EARN)
         if (!rules.blockingEnabled || pkg !in rules.blocked) return GuardDecision(GuardAction.IGNORE)

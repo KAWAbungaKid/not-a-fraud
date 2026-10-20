@@ -38,7 +38,7 @@ object Workers {
         val wasRough = Graph.data.todayPlan?.roughDay == true
         val health = runCatching { Health.read(ctx) }.getOrNull()
         if (health != null) {
-            Graph.update { Actions.upsertDay(it, health.ctx) }
+            Graph.update { Actions.autoFromHealth(Actions.upsertDay(it, health.ctx), Graph.today()) }
             val todayCtx = Graph.data.days.firstOrNull { it.date == Graph.today().toString() }
             val nowRough = RoughDay.isRough(todayCtx, Graph.data.settings.badSleepHours)
             // Bad sleep came in after the plan was made: soften the rest of the day.

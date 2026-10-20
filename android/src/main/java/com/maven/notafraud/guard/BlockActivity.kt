@@ -53,11 +53,13 @@ import kotlinx.coroutines.delay
 class BlockActivity : ComponentActivity() {
 
     private var pkg by mutableStateOf("")
+    private var returnTo: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Graph.init(this)
         pkg = intent.getStringExtra(EXTRA_PKG).orEmpty()
+        returnTo = intent.getStringExtra(EXTRA_RETURN_TO)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goHome()
         })
@@ -67,6 +69,7 @@ class BlockActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         pkg = intent.getStringExtra(EXTRA_PKG).orEmpty()
+        returnTo = intent.getStringExtra(EXTRA_RETURN_TO)
     }
 
     private fun goHome() {
@@ -75,7 +78,8 @@ class BlockActivity : ComponentActivity() {
     }
 
     private fun openTarget() {
-        packageManager.getLaunchIntentForPackage(pkg)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        val target = if (pkg.startsWith(com.maven.notafraud.core.guard.Sites.PREFIX)) returnTo else pkg
+        target?.let(packageManager::getLaunchIntentForPackage)?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         finish()
         GuardService.instance?.reevaluate()
     }
@@ -192,5 +196,6 @@ class BlockActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PKG = "pkg"
+        const val EXTRA_RETURN_TO = "returnTo"
     }
 }

@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 object AppLabels {
     private val cache = ConcurrentHashMap<String, String>()
 
-    fun label(ctx: Context, pkg: String): String = cache.getOrPut(pkg) {
+    fun label(ctx: Context, pkg: String): String = if (pkg.startsWith(com.maven.notafraud.core.guard.Sites.PREFIX)) com.maven.notafraud.core.guard.Sites.label(pkg) else cache.getOrPut(pkg) {
         runCatching {
             val pm = ctx.packageManager
             pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
@@ -86,8 +86,41 @@ object UsageReader {
 object PhoneCalendar {
     const val SOURCE = "phone"
 
-    fun read(ctx: Context, daysBack: Int = 1, daysAhead: Int = 21): List<CalEvent>? {
+    data class Cal(val id: Long, val name: String, val account: String?, val writable: Boolean)
+
+    fun calendars(ctx: Context): List<Cal> {
+        if (!Perms.calendar(ctx)) return emptyList()
+        val proj = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Calendars.VISIBLE,
+        )
+        val out = mutableListOf<Cal>()
+        runCatching {
+            ctx.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, proj, null, null, null)?.use { c ->
+                while (c.moveToNext()) {
+                    out += Cal(
+                        id = c.getLong(0),
+                        name = c.getString(1) ?: "(calendar)",
+                        account = c.getString(2),
+                        writable = c.getInt(3) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                    )
+                }
+            }
+        }
+        return out.sortedWith(compareBy({ !it.name.contains("fraud", ignoreCase = true) }, { it.name.lowercase() }))
+    }
+
+    /**
+     * Events from every visible calendar except the app's own output calendar and any the user unticked.
+     * Everything read here is a fixed event the planner works around.
+     */
+    fun read(ctx: Context, daysBack: Int = 1, daysAhead: Int = 35): List<CalEvent>? {
         if (!Perms.calendar(ctx)) return null
+        val settings = Graph.data.settings
+        val skip = settings.excludedCalendarIds + listOfNotNull(settings.outputCalendarId)
         val zone = Graph.zone
         val from = Time.at(Graph.today().minusDays(daysBack.toLong()), 0, zone)
         val to = Time.at(Graph.today().plusDays(daysAhead.toLong()), 0, zone)
@@ -103,11 +136,15 @@ object PhoneCalendar {
             CalendarContract.Instances.ALL_DAY,
             CalendarContract.Instances.SELF_ATTENDEE_STATUS,
             CalendarContract.Instances.AVAILABILITY,
+            CalendarContract.Instances.CALENDAR_ID,
+            CalendarContract.Instances.DESCRIPTION,
         )
         val out = mutableListOf<CalEvent>()
         runCatching {
             ctx.contentResolver.query(uri, proj, "${CalendarContract.Instances.VISIBLE} = 1", null, null)?.use { c ->
                 while (c.moveToNext()) {
+                    if (c.getLong(7) in skip) continue
+                    if ((c.getString(8) ?: "").contains(CalendarWriter.MARKER)) continue
                     val status = c.getInt(5)
                     if (status == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                     if (c.getInt(6) == CalendarContract.Instances.AVAILABILITY_FREE) continue
@@ -151,6 +188,9 @@ object Perms {
 
     fun calendar(ctx: Context) =
         ctx.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+    fun calendarWrite(ctx: Context) =
+        ctx.checkSelfPermission(Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
 
     fun exactAlarms(ctx: Context) = ctx.getSystemService(android.app.AlarmManager::class.java).canScheduleExactAlarms()
 

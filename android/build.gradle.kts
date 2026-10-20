@@ -4,12 +4,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-val appVersionName: String by project
-val appVersionCode: String by project
+val appVersionName = project.property("appVersionName") as String
+val appVersionCode = project.property("appVersionCode") as String
 
 android {
     namespace = "com.maven.notafraud"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.maven.notafraud"

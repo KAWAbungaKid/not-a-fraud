@@ -80,6 +80,8 @@ jobs:
       - name: Boot emulator and run instrumented tests
         run: |
           set +e
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY" /usr/share/swift || true
+          df -h "$HOME" | tail -1 > emu-df.txt
           sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 libgl1 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 >/dev/null
           export ANDROID_AVD_HOME="$HOME/.android/avd"; mkdir -p "$ANDROID_AVD_HOME"
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
@@ -88,10 +90,12 @@ jobs:
             yes | sdkmanager --licenses >/dev/null
             sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" 2>&1 | grep -v '^\[' | tail -3
             echo no | avdmanager create avd -n ci -p "$ANDROID_AVD_HOME/ci.avd" -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force
+            echo "disk.dataPartition.size=2048M" >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
+            echo "== disk"; cat emu-df.txt
             echo "== avds"; emulator -list-avds
             echo "== emulator version"; emulator -version | head -1
           } > emu.log 2>&1
-          nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none -accel on > boot.log 2>&1 &
+          nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -partition-size 2048 -gpu swiftshader_indirect -camera-back none -accel on > boot.log 2>&1 &
           timeout 300 adb wait-for-device || echo "== device never appeared" >> emu.log
           booted=0
           for i in $(seq 1 120); do

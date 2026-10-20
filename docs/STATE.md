@@ -251,3 +251,17 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
   - Anything Maven puts in Google Calendar is always a fixed **event** to work around (he'll give it accurate times). Calendar entries never become tasks.
   - The app **writes its plan into Google Calendar** (its own calendar) so the day is visible there. No separate "tasks" input calendar.
   - Routine moves into the app; Maven will delete his Google routine calendars, and the app writes routine into Google Calendar the same way.
+
+### More decisions (2026-10-20, later)
+
+- **Goals (his words):** giving back to community and church · being a mentally and physically strong person · developing prosthetics and physical therapy devices · being a man of God · being a good friend/boyfriend/relative.
+- **Task list view stays** alongside the map (findable when the map gets big).
+- **Routine (his list):** wake 5:30–6:00 · bed by 10:00 · immediately drink fluids · cardio · shower · vitamins + creatine · eating · working out · brushing teeth.
+- **Trading every weekday at 8:30** (not just M/W/F). Conflicts with ME 3411 Tue/Thu 8:00–9:15 — open question how to plan it.
+- **Anchors must be calibrated, not deleted.** He wants set times so his body gets into the mental space at those times on those days, but the planner must also weigh what's hot. The v0.1 anchors (Friday craft block, Saturday craft, Sunday review, CSWE, scout manual) were seeded from the old template and haven't been re-validated.
+
+### Future vision (not this build)
+
+- Stats weigh in on planning and **auto-assign** what to work on.
+- **Re-plan every hour** when things haven't been done: re-evaluate when to do things, and **drop what there's no longer time for** ("lost that privilege").
+- **"Pick 3" the evening before:** choose the three things that matter most tomorrow; the planner protects them.

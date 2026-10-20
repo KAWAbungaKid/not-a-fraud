@@ -77,16 +77,35 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm || echo 'no /dev/kvm'
-      - name: Smoke test on emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          disable-animations: true
-          emulator-boot-timeout: 900
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot -no-metrics
-          script: bash -c 'set -o pipefail; gradle :android:connectedDebugAndroidTest --console=plain 2>&1 | tee emu.log; st=$?; adb logcat -d AndroidRuntime:E TestRunner:I *:S >> emu.log; exit $st'
+      - name: Boot emulator and run instrumented tests
+        run: |
+          set +e
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          {
+            echo "== kvm"; ls -l /dev/kvm
+            yes | sdkmanager --licenses >/dev/null
+            sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" 2>&1 | grep -v '^\[' | tail -3
+            echo no | avdmanager create avd -n ci -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force
+            echo "== emulator version"; emulator -version | head -1
+          } > emu.log 2>&1
+          nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none -accel on > boot.log 2>&1 &
+          adb wait-for-device
+          booted=0
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && booted=1 && break
+            sleep 5
+          done
+          echo "== booted=$booted after $((i*5))s" >> emu.log
+          echo "== boot.log tail" >> emu.log; tail -40 boot.log >> emu.log
+          [ $booted = 1 ] || exit 1
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell input keyevent 82
+          gradle :android:connectedDebugAndroidTest --console=plain >> emu.log 2>&1
+          st=$?
+          adb logcat -d AndroidRuntime:E TestRunner:I '*:S' >> emu.log
+          exit $st
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: emulator, file: emu.log }

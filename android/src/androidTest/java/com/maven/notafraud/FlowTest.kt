@@ -55,7 +55,8 @@ class FlowTest {
             rule.onAllNodes(hasSetTextAction())[0].performTextInput("Emulator test task")
             rule.onNodeWithText("Save").performClick()
             rule.waitForIdle()
-            assertTrue(rule.onAllNodesWithText("Emulator test task").fetchSemanticsNodes().isNotEmpty())
+            // The list is long and lazily composed, so check the store rather than scrolling.
+            assertTrue(Graph.data.tasks.any { it.title == "Emulator test task" })
             rule.onNodeWithText("Plan").performClick()
             rule.waitForIdle()
             rule.onNodeWithText("Replan").performClick()

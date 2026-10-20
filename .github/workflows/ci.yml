@@ -80,7 +80,7 @@ jobs:
       - name: Boot emulator and run instrumented tests
         run: |
           set +e
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/node_modules "$AGENT_TOOLSDIRECTORY" /usr/share/swift || true
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/node_modules /usr/share/swift || true
           df -h "$HOME" | tail -1 > emu-df.txt
           sudo apt-get update -qq && sudo apt-get install -y -qq libpulse0 libgl1 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 >/dev/null
           export ANDROID_AVD_HOME="$HOME/.android/avd"; mkdir -p "$ANDROID_AVD_HOME"

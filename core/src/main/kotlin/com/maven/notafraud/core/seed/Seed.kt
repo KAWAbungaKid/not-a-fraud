@@ -72,61 +72,38 @@ object Seed {
 
     fun data(now: Long, zoneId: String = "America/Chicago"): AppData {
         val zone = ZoneId.of(zoneId)
-        val p = linkedMapOf(
-            "me3411" to Project(name = "ME 3411 Dynamic Systems", kind = ProjectKind.SCHOOL),
-            "me3521" to Project(name = "ME 3521 Applied Thermo", kind = ProjectKind.SCHOOL),
-            "me3525" to Project(name = "ME 3525 Heat Transfer", kind = ProjectKind.SCHOOL),
-            "bio" to Project(name = "BIO SCI 3333 A&P", kind = ProjectKind.SCHOOL),
-            "me4840" to Project(name = "ME 4840 Lab", kind = ProjectKind.SCHOOL),
-            "pt" to Project(name = "PT device", kind = ProjectKind.PROJECT),
-            "biosensor" to Project(name = "Biosensor research", kind = ProjectKind.RESEARCH),
-            "work" to Project(name = "Engineering tech job", kind = ProjectKind.PROJECT),
-            "naf" to Project(name = "Not a Fraud", kind = ProjectKind.PROJECT),
-            "side" to Project(name = "Side projects", kind = ProjectKind.PROJECT),
-            "admin" to Project(name = "Admin", kind = ProjectKind.ADMIN),
-            "life" to Project(name = "Life", kind = ProjectKind.LIFE),
+        fun kind(k: String) = when (k) {
+            "school" -> ProjectKind.SCHOOL; "research" -> ProjectKind.RESEARCH; "admin" -> ProjectKind.ADMIN
+            "life" -> ProjectKind.LIFE; else -> ProjectKind.PROJECT
+        }
+        val projectIds = HashMap<String, String>()
+        val projects = WebAppSeed.projects.map { p ->
+            Project(name = p.name, kind = kind(p.kind)).also { projectIds[p.key] = it.id }
+        } + listOf(
+            Project(name = "Side projects", kind = ProjectKind.PROJECT),
+            Project(name = "Life", kind = ProjectKind.LIFE),
         )
+        fun iso(s: String?) = s?.let { java.time.Instant.parse(it).toEpochMilli() }
+        fun prio(s: String) = when (s) { "high" -> Priority.HIGH; "low" -> Priority.LOW; else -> Priority.NORMAL }
+        fun energy(s: String) = when (s) { "high" -> Energy.HIGH; "low" -> Energy.LOW; else -> Energy.MED }
+
+        val tasks = WebAppSeed.tasks.map { t ->
+            val base = Task(
+                title = t.title, projectId = projectIds[t.project], estMin = t.estMin, dueAt = iso(t.dueIso),
+                priority = prio(t.priority), energy = energy(t.energy), minBlockMin = t.minBlockMin,
+                status = if (t.done) com.maven.notafraud.core.model.TaskStatus.DONE else com.maven.notafraud.core.model.TaskStatus.TODO,
+                doneAt = iso(t.doneIso), createdAt = now,
+            )
+            // The hello-world step is superseded by this app existing; what's left is installing it.
+            if (t.key == "t-android-hello") base.copy(title = "Install Not a Fraud + grant permissions (Setup tab)", estMin = 45, energy = Energy.LOW, minBlockMin = 30, priority = Priority.HIGH)
+            else base
+        }
 
         fun at(date: String, h: Int, m: Int = 0) = Time.at(LocalDate.parse(date), h * 60 + m, zone)
-
-        fun exam(title: String, proj: String, date: String, h: Int = 8, m: Int = 0, est: Int = 360) = Task(
-            title = title, projectId = p.getValue(proj).id, estMin = est, dueAt = at(date, h, m),
-            priority = Priority.HIGH, energy = Energy.HIGH, minBlockMin = 45,
-            notBefore = at(date, h, m) - 10 * Time.DAY, createdAt = now,
-        )
-
-        val tasks = listOf(
-            exam("Study: A&P exam (Oct 21)", "bio", "2026-10-21", est = 240),
-            exam("Study: A&P exam (Nov 13)", "bio", "2026-11-13"),
-            exam("Study: ME 3411 exam (Nov 17)", "me3411", "2026-11-17", est = 480),
-            exam("Study: Heat Transfer exam (Nov 17)", "me3525", "2026-11-17"),
-            exam("Study: A&P final (Dec 11)", "bio", "2026-12-11", est = 480),
-            exam("Study: Heat Transfer final (Dec 15)", "me3525", "2026-12-15", est = 480),
-            exam("Study: ME 3411 final (Dec 16)", "me3411", "2026-12-16", 12, 30, est = 600),
-            Task(
-                title = "Email Thermo + Instrumentation profs for exam dates", projectId = p.getValue("admin").id,
-                estMin = 15, dueAt = at("2026-10-22", 17), priority = Priority.HIGH, energy = Energy.LOW, minBlockMin = 10, createdAt = now,
-            ),
-            Task(
-                title = "Not a Fraud: install + grant permissions", projectId = p.getValue("naf").id,
-                estMin = 45, dueAt = at("2026-10-23", 18), priority = Priority.NORMAL, energy = Energy.LOW, minBlockMin = 30, createdAt = now,
-            ),
-            Task(
-                title = "PT device: next design step", projectId = p.getValue("pt").id,
-                estMin = 120, priority = Priority.HIGH, energy = Energy.HIGH, minBlockMin = 60, createdAt = now,
-            ),
-        ).filter { it.dueAt == null || it.dueAt > now }
-
         val events = listOf(
             CalEvent(uid = "seed-me3411-final", title = "ME 3411 final", start = at("2026-12-16", 12, 30), end = at("2026-12-16", 14, 30), source = "seed"),
         )
 
-        return AppData(
-            projects = p.values.toList(),
-            tasks = tasks,
-            events = events,
-            anchors = anchors(),
-            seeded = true,
-        )
+        return AppData(projects = projects, tasks = tasks, events = events, anchors = anchors(), seeded = true)
     }
 }

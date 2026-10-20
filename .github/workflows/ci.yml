@@ -89,7 +89,7 @@ jobs:
             echo "== emulator version"; emulator -version | head -1
           } > emu.log 2>&1
           nohup emulator -avd ci -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none -accel on > boot.log 2>&1 &
-          adb wait-for-device
+          timeout 300 adb wait-for-device || echo "== device never appeared" >> emu.log
           booted=0
           for i in $(seq 1 120); do
             [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && booted=1 && break

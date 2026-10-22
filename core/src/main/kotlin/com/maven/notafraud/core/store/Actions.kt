@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.store
 
+import com.maven.notafraud.core.model.routineFor
 import com.maven.notafraud.core.guard.Credits
 import com.maven.notafraud.core.model.ActiveSession
 import com.maven.notafraud.core.model.AppData
@@ -71,7 +72,7 @@ object Actions {
         if (taskId == null || minutes < 20) return d
         val skill = d.skills.firstOrNull { it.practiceTaskId == taskId } ?: return d
         val tree = d.skillTrees.firstOrNull { it.id == skill.treeId && it.sport } ?: return d
-        val workout = d.routine.firstOrNull { it.id == "r-workout" } ?: return d
+        val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT) ?: return d
         val date = Time.dateOf(now, Time.zone(d.settings.zoneId)).toString()
         if (d.routineDays.firstOrNull { it.date == date }?.done?.containsKey(workout.id) == true) return d
         val note = com.maven.notafraud.core.routine.RoutinePolicy.SPORT_NOTES.firstOrNull { it.equals(tree.name, ignoreCase = true) } ?: "Sport"
@@ -183,13 +184,13 @@ object Actions {
         val ctx = d.days.firstOrNull { it.date == date.toString() } ?: return d
         val day = d.routineDays.firstOrNull { it.date == date.toString() }
         var x = d
-        val wake = d.routine.firstOrNull { it.id == "r-wake" }
+        val wake = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WAKE)
         if (wake != null && day?.done?.containsKey(wake.id) != true) {
             val woke = ctx.sleepEnd?.takeIf { Time.dateOf(it, Time.zone(d.settings.zoneId)) == date }
             if (woke != null) x = checkRoutine(x, wake.id, woke, "from your watch")
             else if (ctx.firstUnlock != null) x = checkRoutine(x, wake.id, ctx.firstUnlock, "first unlock")
         }
-        val workout = d.routine.firstOrNull { it.id == "r-workout" }
+        val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT)
         if (workout != null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
             val zone = Time.zone(d.settings.zoneId)
             x = checkRoutine(x, workout.id, Time.at(date, 12 * 60, zone).coerceAtMost(System.currentTimeMillis()), "from Samsung Health")
@@ -201,7 +202,8 @@ object Actions {
 
     fun setPicks(d: AppData, date: LocalDate, taskIds: List<String>, now: Long): AppData {
         val withPicks = d.copy(picks = (d.picks + (date.toString() to taskIds.distinct().take(3))).filterKeys { it >= date.minusDays(14).toString() })
-        return if (taskIds.isNotEmpty() && d.routine.any { it.id == "r-pick3" }) checkRoutine(withPicks, "r-pick3", now) else withPicks
+        val pick = d.routineFor(com.maven.notafraud.core.model.AutoCheck.PICK3)
+        return if (taskIds.isNotEmpty() && pick != null) checkRoutine(withPicks, pick.id, now) else withPicks
     }
 
     // ---- Hierarchy -------------------------------------------------------------------------
@@ -379,4 +381,63 @@ object Actions {
         val ctx = d.days.firstOrNull { it.date == date.toString() } ?: com.maven.notafraud.core.model.DayContext(date.toString())
         return d.copy(days = d.days.filterNot { it.date == date.toString() } + ctx.copy(promptedAt = now))
     }
+
+    // ---- Semester -------------------------------------------------------------------------
+
+    /** Sets the term dates; every class block follows them (start, end, days off). */
+    fun setSemester(d: AppData, sem: com.maven.notafraud.core.model.Semester): AppData = d.copy(
+        semester = sem,
+        anchors = d.anchors.map {
+            if (it.kind == com.maven.notafraud.core.model.AnchorKind.CLASS) it.copy(fromDate = sem.start, untilDate = sem.end, skipDates = sem.offDates) else it
+        },
+    )
+
+    /**
+     * Adds or edits a class: its meeting blocks (one anchor per days/time pattern) plus a School project of the same name,
+     * with a catch-up practice item if [catchUpMin] > 0.
+     */
+    fun saveClass(d: AppData, name: String, meetings: List<com.maven.notafraud.core.model.Anchor>, oldName: String?, catchUpMin: Int, now: Long): AppData {
+        val sem = d.semester
+        val keep = d.anchors.filterNot { it.kind == com.maven.notafraud.core.model.AnchorKind.CLASS && (it.title == oldName || it.title == name) }
+        val fresh = meetings.map {
+            it.copy(title = name, kind = com.maven.notafraud.core.model.AnchorKind.CLASS, mode = com.maven.notafraud.core.model.AnchorMode.HARD,
+                fromDate = sem?.start ?: it.fromDate, untilDate = sem?.end ?: it.untilDate, skipDates = sem?.offDates ?: it.skipDates, dates = emptySet())
+        }
+        var x = d.copy(anchors = keep + fresh)
+        val existing = x.projects.firstOrNull { !it.archived && (it.name == oldName || it.name == name) }
+        val school = x.areas.firstOrNull { it.stat == "mind" && it.name.contains("school", true) } ?: x.areas.firstOrNull { it.name.contains("school", true) }
+        val project = existing?.copy(name = name) ?: com.maven.notafraud.core.model.Project(name = name, kind = com.maven.notafraud.core.model.ProjectKind.SCHOOL, areaId = school?.id)
+        x = x.copy(projects = if (existing != null) x.projects.map { if (it.id == existing.id) project else it } else x.projects + project)
+        val key = "catchup:${project.id}"
+        val cu = x.tasks.firstOrNull { it.sourceKey == key }
+        x = when {
+            catchUpMin > 0 && cu == null -> x.copy(tasks = x.tasks + Task(
+                title = "Study: $name", projectId = project.id, kind = com.maven.notafraud.core.model.TaskKind.PRACTICE, estMin = catchUpMin,
+                weeklyTargetMin = catchUpMin, minBlockMin = 30, maxBlockMin = 90, energy = com.maven.notafraud.core.model.Energy.HIGH, createdAt = now, sourceKey = key,
+            ))
+            catchUpMin > 0 && cu != null -> x.copy(tasks = x.tasks.map { if (it.id == cu.id) it.copy(weeklyTargetMin = catchUpMin, estMin = catchUpMin) else it })
+            catchUpMin == 0 && cu != null && cu.status == com.maven.notafraud.core.model.TaskStatus.TODO -> x.copy(tasks = x.tasks.filterNot { it.id == cu.id })
+            else -> x
+        }
+        return x
+    }
+
+    fun deleteClass(d: AppData, name: String): AppData =
+        d.copy(anchors = d.anchors.filterNot { it.kind == com.maven.notafraud.core.model.AnchorKind.CLASS && it.title == name })
+
+    /**
+     * Semester over: class blocks go, the chosen class projects are archived (their tasks and logged time stay,
+     * but nothing in them gets planned), open weekly study items in them are closed.
+     */
+    fun endSemester(d: AppData, archiveProjectIds: Set<String>, now: Long): AppData = d.copy(
+        semester = null,
+        anchors = d.anchors.filterNot { it.kind == com.maven.notafraud.core.model.AnchorKind.CLASS },
+        projects = d.projects.map { if (it.id in archiveProjectIds) it.copy(archived = true) else it },
+        tasks = d.tasks.map {
+            if (it.projectId in archiveProjectIds && it.kind == com.maven.notafraud.core.model.TaskKind.PRACTICE && it.status == com.maven.notafraud.core.model.TaskStatus.TODO)
+                it.copy(status = com.maven.notafraud.core.model.TaskStatus.DONE, doneAt = now) else it
+        },
+        todayPlan = null,
+        weekPlan = emptyList(),
+    )
 }

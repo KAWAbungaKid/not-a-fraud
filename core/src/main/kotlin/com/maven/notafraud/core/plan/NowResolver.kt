@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.plan
 
+import com.maven.notafraud.core.model.liveTasks
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.model.Task
 import com.maven.notafraud.core.score.Scorer
@@ -51,7 +52,7 @@ object NowResolver {
             )
         }
 
-        val suggested = Scorer.rank(data.tasks, now, minutesLeft ?: 60, plan.energy).firstOrNull()?.first
+        val suggested = Scorer.rank(data.liveTasks(), now, minutesLeft ?: 60, plan.energy).firstOrNull()?.first
 
         if (current != null) {
             val until = "until ${Time.clock(current.end, zone)}"

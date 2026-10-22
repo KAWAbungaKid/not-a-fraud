@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.plan
 
+import com.maven.notafraud.core.model.liveTasks
 import com.maven.notafraud.core.model.AnchorKind
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.model.CalEvent
@@ -86,7 +87,7 @@ object Planning {
         }
         // Due this week but the week has no room for all of it.
         val horizon = Time.at(today.plusDays(WEEK_DAYS + 1L), 0, zone)
-        val atRisk = d.tasks.filter { t ->
+        val atRisk = d.liveTasks().filter { t ->
             t.status == com.maven.notafraud.core.model.TaskStatus.TODO && t.dueAt != null && t.dueAt < horizon && t.dueAt > now &&
                 t.kind != com.maven.notafraud.core.model.TaskKind.PRACTICE &&
                 com.maven.notafraud.core.score.Scorer.minutesLeft(t) - (carried[t.id] ?: 0) > 10

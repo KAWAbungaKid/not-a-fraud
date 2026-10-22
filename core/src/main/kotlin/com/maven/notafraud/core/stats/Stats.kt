@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.stats
 
+import com.maven.notafraud.core.model.routineFor
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.model.RoutineCategory
 import com.maven.notafraud.core.model.TaskKind
@@ -29,24 +30,25 @@ data class Stat(
 object Stats {
     const val LOW = 4.0
 
-    /** Stat key -> areas it covers (for stat-driven importance). */
-    val AREAS = mapOf(
-        "body" to setOf("a-fitness", "a-health"),
-        "mind" to setOf("a-school", "a-mind"),
-        "work" to setOf("a-research", "a-pt", "a-career"),
-        "hygiene" to setOf("a-health"),
-        "discipline" to setOf("a-systems"),
-        "social" to setOf("a-people"),
-        "spirit" to setOf("a-faith", "a-church"),
+    /** Starting stat for the seeded areas (migration v6 copies this into Area.stat; after that the area decides). */
+    val DEFAULT_AREA_STAT = mapOf(
+        "a-fitness" to "body", "a-health" to "body", "a-school" to "mind", "a-mind" to "mind",
+        "a-research" to "work", "a-pt" to "work", "a-career" to "work", "a-systems" to "discipline",
+        "a-people" to "social", "a-faith" to "spirit", "a-church" to "spirit",
     )
+
+    val KEYS = listOf("body" to "Body", "mind" to "Mind", "work" to "Work", "hygiene" to "Hygiene", "discipline" to "Discipline", "social" to "Social", "spirit" to "Spirit")
+
+    /** Areas that feed a stat (Area.stat, editable on the map). */
+    fun areasFor(d: AppData, key: String): Set<String> = d.areas.filter { it.stat == key }.map { it.id }.toSet()
+
 
     private fun clamp(x: Double) = x.coerceIn(1.0, 10.0)
     private fun avg(xs: List<Double>) = if (xs.isEmpty()) null else xs.average()
 
     fun all(d: AppData, today: LocalDate): List<Stat> = listOf(
-        body(d, today), mind(d, today), work(d, today), hygiene(d, today), discipline(d, today), checkIn(d, today, "social", "Social"),
-        checkIn(d, today, "spirit", "Spirit"),
-    )
+        body(d, today), mind(d, today), work(d, today), hygiene(d, today), discipline(d, today),
+    ) + if (d.settings.checkInEnabled) listOf(checkIn(d, today, "social", "Social"), checkIn(d, today, "spirit", "Spirit")) else emptyList()
 
     /** Areas whose stat is low: the planner gives them one more importance. */
     fun lowAreas(d: AppData, today: LocalDate): Set<String> {
@@ -62,7 +64,7 @@ object Stats {
     }
 
     private fun workoutScore(d: AppData, ds: List<LocalDate>): Double? {
-        val w = d.routine.firstOrNull { it.id == "r-workout" } ?: return null
+        val w = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT) ?: return null
         val n = ds.count { day -> RoutinePolicy.day(d, day).done.containsKey(w.id) }
         return clamp(10.0 * n / (w.weeklyTarget ?: 6))
     }
@@ -94,7 +96,7 @@ object Stats {
                 stepsScore(d, ds)?.let { "Steps" to "%.1f".format(it) },
                 rate(d, ds, RoutineCategory.MEAL)?.let { "Meals eaten" to "%.1f".format(it) },
             ),
-            AREAS.getValue("body"),
+            areasFor(d, "body"),
         )
     }
 
@@ -107,24 +109,24 @@ object Stats {
     }
 
     private fun mind(d: AppData, today: LocalDate): Stat {
-        val target = d.tasks.filter { it.kind == TaskKind.PRACTICE && d.projects.firstOrNull { p -> p.id == it.projectId }?.areaId in setOf("a-school", "a-mind") }
+        val target = d.tasks.filter { it.kind == TaskKind.PRACTICE && d.projects.firstOrNull { p -> p.id == it.projectId }?.areaId in areasFor(d, "mind") }
             .sumOf { it.weeklyTargetMin ?: 0 }.coerceAtLeast(300)
-        fun calc(ds: List<LocalDate>) = clamp(10.0 * minutesIn(d, ds, setOf("a-school", "a-mind")) / target).takeIf { d.sessions.isNotEmpty() }
-        val m = minutesIn(d, days(today), setOf("a-school", "a-mind"))
-        return Stat("mind", "Mind", calc(days(today)), calc(days(today, 1)), listOf("Study logged" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), AREAS.getValue("mind"))
+        fun calc(ds: List<LocalDate>) = clamp(10.0 * minutesIn(d, ds, areasFor(d, "mind")) / target).takeIf { d.sessions.isNotEmpty() }
+        val m = minutesIn(d, days(today), areasFor(d, "mind"))
+        return Stat("mind", "Mind", calc(days(today)), calc(days(today, 1)), listOf("Study logged" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), areasFor(d, "mind"))
     }
 
     private fun work(d: AppData, today: LocalDate): Stat {
-        val areas = setOf("a-research", "a-pt", "a-career")
+        val areas = areasFor(d, "work")
         val target = 360
         fun calc(ds: List<LocalDate>) = clamp(10.0 * minutesIn(d, ds, areas) / target).takeIf { d.sessions.isNotEmpty() }
         val m = minutesIn(d, days(today), areas)
-        return Stat("work", "Work", calc(days(today)), calc(days(today, 1)), listOf("Research / PT / career" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), AREAS.getValue("work"))
+        return Stat("work", "Work", calc(days(today)), calc(days(today, 1)), listOf("Research / PT / career" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), areasFor(d, "work"))
     }
 
     private fun hygiene(d: AppData, today: LocalDate) = Stat(
         "hygiene", "Hygiene", rate(d, days(today), RoutineCategory.HYGIENE), rate(d, days(today, 1), RoutineCategory.HYGIENE),
-        listOfNotNull(rate(d, days(today), RoutineCategory.HYGIENE)?.let { "Done" to "${(it * 10).roundToInt()}%" }), AREAS.getValue("hygiene"),
+        listOfNotNull(rate(d, days(today), RoutineCategory.HYGIENE)?.let { "Done" to "${(it * 10).roundToInt()}%" }), areasFor(d, "hygiene"),
     )
 
     /** Plan adherence: logged minutes vs minutes the morning plan asked for. Derived, never self-rated. */
@@ -140,7 +142,7 @@ object Stats {
             }
             return avg(ratios)?.let { clamp(it * 10) }
         }
-        return Stat("discipline", "Discipline", calc(days(today)), calc(days(today, 1)), listOf("Plan followed" to (calc(days(today))?.let { "${(it * 10).roundToInt()}%" } ?: "not enough days yet")), AREAS.getValue("discipline"))
+        return Stat("discipline", "Discipline", calc(days(today)), calc(days(today, 1)), listOf("Plan followed" to (calc(days(today))?.let { "${(it * 10).roundToInt()}%" } ?: "not enough days yet")), areasFor(d, "discipline"))
     }
 
     private fun checkIn(d: AppData, today: LocalDate, key: String, name: String): Stat {
@@ -149,7 +151,7 @@ object Stats {
             ?: d.checkIns.firstOrNull { it.weekStart == week.minusDays(7).toString() }?.ratings?.get(key)
         val now = rating(wk)?.let { clamp(it * 2.0) }
         val prev = rating(wk.minusDays(7))?.let { clamp(it * 2.0) }
-        return Stat(key, name, now, prev, listOf("Weekly check-in" to (rating(wk)?.let { "$it/5" } ?: "not yet")), AREAS[key].orEmpty())
+        return Stat(key, name, now, prev, listOf("Weekly check-in" to (rating(wk)?.let { "$it/5" } ?: "not yet")), areasFor(d, key))
     }
 
     /** Most-pushed tasks over the last 14 days (patterns, neutral for now). */

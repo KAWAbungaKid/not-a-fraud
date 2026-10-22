@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.plan
 
+import com.maven.notafraud.core.model.liveTasks
 import com.maven.notafraud.core.model.Anchor
 import com.maven.notafraud.core.model.AnchorKind
 import com.maven.notafraud.core.model.AnchorMode
@@ -170,7 +171,7 @@ class DayPlanner(
         val dayStart = Time.at(date, s.dayStartMin, zone)
         val dayEnd = Time.at(date, s.dayEndMin, zone)
 
-        val open = data.tasks.filter { it.status == TaskStatus.TODO && it.kind != TaskKind.WAITING }
+        val open = data.liveTasks().filter { it.status == TaskStatus.TODO && it.kind != TaskKind.WAITING }
         val lowStat = com.maven.notafraud.core.stats.Stats.lowAreas(data, date)
         val hotTasks = open.filter { Heat.deadlineHot(it, now) }
         val picks = data.picks[date.toString()].orEmpty().toSet()

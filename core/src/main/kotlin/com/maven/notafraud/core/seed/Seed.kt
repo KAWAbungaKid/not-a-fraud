@@ -25,11 +25,11 @@ import java.time.ZoneId
  * [data] runs on a fresh install; [Migration] upgrades an existing install.
  */
 object Seed {
-    private const val SEM_START = "2026-08-24"
-    private const val SEM_END = "2026-12-11"
+    const val SEM_START = "2026-08-24"
+    const val SEM_END = "2026-12-11"
 
     /** Thanksgiving week: no classes (confirmed). */
-    private val THANKSGIVING = setOf("2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27")
+    val THANKSGIVING = setOf("2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27")
 
     private val RESEARCH_DATES = listOf(
         "2026-10-17", "2026-10-18", "2026-10-24", "2026-10-31",
@@ -135,7 +135,7 @@ object Seed {
         fun r(
             id: String, title: String, cat: RoutineCategory, s: Int, due: Int, angry: Int,
             reserve: Int = 0, days: Set<Int> = ALL, trigger: RoutineTrigger = RoutineTrigger.TIME, weekly: Int? = null,
-        ) = RoutineItem(id, title, cat, trigger, s, due, angry, days, reserve, true, weekly, o++)
+        ) = RoutineItem(id, title, cat, trigger, s, due, angry, days, reserve, true, weekly, o++, Migration.AUTO_CHECK[id])
         return listOf(
             r("r-wake", "Wake up", RoutineCategory.SLEEP, t(5, 30), t(6), t(6, 30)),
             r("r-fluids", "Drink fluids right away", RoutineCategory.BODY, t(5, 30), t(6, 15), t(7)),
@@ -185,7 +185,8 @@ object Seed {
 
         val base = AppData(
             schema = Migration.CURRENT,
-            goals = goals(), areas = areas(), projects = projects, tasks = tasks, events = events,
+            semester = com.maven.notafraud.core.model.Semester("Fall 2026", SEM_START, SEM_END, THANKSGIVING),
+            goals = goals(), areas = areas().map { it.copy(stat = com.maven.notafraud.core.stats.Stats.DEFAULT_AREA_STAT[it.id]) }, projects = projects, tasks = tasks, events = events,
             anchors = anchors(), routine = routine(), seeded = true,
             settings = com.maven.notafraud.core.model.Settings(routineSince = now),
         )
@@ -196,7 +197,14 @@ object Seed {
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 5
+    const val CURRENT = 6
+
+    /** Seeded routine items that tick themselves (v0.5 replaced the hard-coded ids with RoutineItem.autoCheck). */
+    val AUTO_CHECK = mapOf(
+        "r-wake" to com.maven.notafraud.core.model.AutoCheck.WAKE,
+        "r-workout" to com.maven.notafraud.core.model.AutoCheck.WORKOUT,
+        "r-pick3" to com.maven.notafraud.core.model.AutoCheck.PICK3,
+    )
 
     fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
         var x = d
@@ -204,7 +212,30 @@ object Migration {
         if (x.schema < 3) x = toV3(x, now)
         if (x.schema < 4) x = toV4(x)
         if (x.schema < 5) x = toV5(x)
+        if (x.schema < 6) x = toV6(x)
         return x
+    }
+
+    /**
+     * v0.5: less hard-coded. Routine auto-checks and area stats become fields; the fall semester becomes a Semester;
+     * a manual low/high priority folds into importance (high stays only as "firm deadline" on tasks with a due date).
+     */
+    private fun toV6(d: AppData): AppData {
+        val routine = d.routine.map { r -> if (r.autoCheck == null) r.copy(autoCheck = AUTO_CHECK[r.id]) else r }
+        val areas = d.areas.map { a -> if (a.stat == null) a.copy(stat = com.maven.notafraud.core.stats.Stats.DEFAULT_AREA_STAT[a.id]) else a }
+        val hasClasses = d.anchors.any { it.kind == com.maven.notafraud.core.model.AnchorKind.CLASS }
+        val semester = d.semester ?: if (hasClasses) com.maven.notafraud.core.model.Semester("Fall 2026", Seed.SEM_START, Seed.SEM_END, Seed.THANKSGIVING) else null
+        val areaImp = areas.associate { it.id to it.importance }
+        val tasks = d.tasks.map { t ->
+            if (t.sourceKey != null || t.importance != null) return@map if (t.sourceKey == null && t.dueAt == null && t.priority != Priority.NORMAL) t.copy(priority = Priority.NORMAL) else t
+            val base = d.projects.firstOrNull { it.id == t.projectId }?.areaId?.let { areaImp[it] } ?: 3
+            when {
+                t.priority == Priority.LOW -> t.copy(importance = (base - 1).coerceAtLeast(1), priority = Priority.NORMAL)
+                t.priority == Priority.HIGH && t.dueAt == null -> t.copy(importance = (base + 1).coerceAtMost(5), priority = Priority.NORMAL)
+                else -> t
+            }
+        }
+        return d.copy(schema = 6, routine = routine, areas = areas, semester = semester, tasks = tasks, todayPlan = null, weekPlan = emptyList())
     }
 
     /** Starter skill trees from Maven's examples (all editable): athletics and climbing count as sport. */

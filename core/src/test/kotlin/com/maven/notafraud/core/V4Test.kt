@@ -115,7 +115,8 @@ class V4Test {
 
     @Test
     fun `check-in feeds social and spirit`() {
-        val d = Actions.checkIn(base(), LocalDate.parse("2026-10-19"), mapOf("social" to 1, "spirit" to 5), at(thu, 9))
+        val on = base().let { it.copy(settings = it.settings.copy(checkInEnabled = true)) }
+        val d = Actions.checkIn(on, LocalDate.parse("2026-10-19"), mapOf("social" to 1, "spirit" to 5), at(thu, 9))
         val stats = Stats.all(d, thu).associateBy { it.key }
         assertEquals(2.0, stats.getValue("social").score)
         assertEquals(10.0, stats.getValue("spirit").score)

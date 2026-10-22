@@ -66,6 +66,8 @@ data class Area(
     val archived: Boolean = false,
     /** 1–5 baseline for everything under this area (later driven by stats). */
     val importance: Int = 3,
+    /** Stat this area feeds (body, mind, work, hygiene, discipline, social, spirit). A low stat raises the area. */
+    val stat: String? = null,
 )
 
 @Serializable
@@ -230,7 +232,24 @@ data class RoutineItem(
     /** Times per week this should happen (workouts: 6). Null = every listed day. */
     val weeklyTarget: Int? = null,
     val order: Int = 0,
+    /** Checks itself off when this happens (no hard-coded item ids). */
+    val autoCheck: AutoCheck? = null,
 )
+
+/** What can tick a routine item on its own. */
+@Serializable
+enum class AutoCheck {
+    /** Wake time from the watch, or the first unlock after 4am. */
+    WAKE,
+    /** 20+ min workout in Samsung Health, or 20+ min on a sport skill. Also what Stats and burnout count as a workout. */
+    WORKOUT,
+    /** Picking tomorrow's 3. */
+    PICK3,
+}
+
+/** A school term: class blocks run between [start] and [end], except [offDates] (breaks). */
+@Serializable
+data class Semester(val name: String, val start: String, val end: String, val offDates: Set<String> = emptySet())
 
 /** What got done on one day. Times are epoch ms. */
 @Serializable
@@ -379,6 +398,12 @@ data class Settings(
     val accent: String = "green",
     /** Things that actually recharge (walk, gym, being bored, art…), shown on recharge blocks. */
     val rechargeIdeas: List<String> = listOf("Walk outside", "Gym", "Be bored: no phone, let it process", "Art"),
+    /** Pages in the bottom bar (More is always last). Ids: now, plan, tasks, routine, stats, skills, classes. */
+    val tabs: List<String> = listOf("now", "plan", "routine", "tasks"),
+    /** Now-page cards switched off: pick3, numbers, moved, today, upnext, idea. */
+    val nowHidden: Set<String> = emptySet(),
+    /** Weekly 1–5 check-in for the stats the phone can't measure (social, spirit). Off: tabled for now. */
+    val checkInEnabled: Boolean = false,
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
@@ -489,6 +514,7 @@ data class AppData(
     val skillTrees: List<SkillTree> = emptyList(),
     val skills: List<Skill> = emptyList(),
     val checkIns: List<CheckIn> = emptyList(),
+    val semester: Semester? = null,
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),
@@ -508,3 +534,12 @@ data class AppData(
     /** Today's generated plan; regenerated on a new day or on Replan. */
     val todayPlan: DayPlan? = null,
 )
+
+
+/** Tasks that can be planned: not in an archived project (an ended semester's classes, a shelved project). */
+fun AppData.liveTasks(): List<Task> {
+    val archived = projects.filter { it.archived }.map { it.id }.toSet()
+    return if (archived.isEmpty()) tasks else tasks.filter { it.projectId !in archived }
+}
+
+fun AppData.routineFor(a: AutoCheck): RoutineItem? = routine.firstOrNull { it.autoCheck == a && it.enabled } ?: routine.firstOrNull { it.autoCheck == a }

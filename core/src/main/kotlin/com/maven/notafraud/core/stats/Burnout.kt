@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.stats
 
+import com.maven.notafraud.core.model.routineFor
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.plan.DayAdvisor
 import com.maven.notafraud.core.plan.Time
@@ -24,7 +25,7 @@ object Burnout {
         if (past.size >= 3 && phoneToday > 120 && phoneToday > past.average() * 1.5) out += "phone ${Time.durationText(phoneToday)} (usually ${Time.durationText(past.average().toInt())})"
         val hungry = RoutinePolicy.statuses(d, now).filter { it.item.category == com.maven.notafraud.core.model.RoutineCategory.MEAL && it.mood == Mood.ANGRY }
         if (hungry.isNotEmpty()) out += "missed ${hungry.joinToString { it.item.title.lowercase() }}"
-        val w = d.routine.firstOrNull { it.id == "r-workout" }
+        val w = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT)
         if (w != null && d.routineDays.isNotEmpty() && (0..3).none { RoutinePolicy.day(d, today.minusDays(it.toLong())).done.containsKey(w.id) }) out += "no workout in 3+ days"
         return out
     }

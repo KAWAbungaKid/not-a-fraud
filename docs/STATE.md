@@ -5,23 +5,20 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-20, v0.2.0)
+## 0. Where things stand (2026-10-21, v0.3.0)
 
-v0.1.0 installed 2026-10-20 and working. **v0.2.0** built the same day from the design conversation in section 10:
+v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
 | | Capability | Status |
 |---|---|---|
-| 1 | App + **website** blocking with earn-to-unlock | Built. Sites: guard reads browser address bar (Chrome, Samsung Internet, Brave, Edge, Firefox, Opera, DDG) only while a browser is in front |
-| 2 | "Do this now" notification + escalating nags | Built; now also shows the most pressing routine item |
-| 3 | Day planner | Built: block modes (hard / habit / container), hot-deadline override, pick 3, routine time reserved, trading weekdays + ME 3411 make-up tasks |
-| 4 | Hierarchy: goals → areas → projects → tasks | Built: **Map** (Tasks → Map) with editing; list view with search |
-| 5 | Routine tab with escalating "anger" | Built: windows, late/angry nudges every 30 min, bedtime trigger (charging / screen off after 9pm), 6/week workout target, Health Connect autofill |
-| 6 | Google Calendar | Built: reads all calendars as fixed events (except excluded + own); writes today's plan into a user-created "Not a Fraud" calendar |
-| 7 | Phone + PC screen time | Built (v0.1) |
-| 8 | Stats, XP, auto-assign, hourly re-plan with dropping | Not built — section 10 "Future vision" |
-| — | Phone ↔ PC sync | Not built (needs Firebase project) |
-
-**Still unverified on the real phone:** site blocking address-bar ids on his browser version, calendar write syncing up to Google, bedtime trigger feel, routine nag volume.
+| 1 | App + website blocking, earn-to-unlock | Built. v0.3: calls never blocked (AudioManager mode), reply windows on notification tap, typing extends windows (keyboard window watched only during free windows), "still texting", credits wait 60 s, instant emergency, Quick Snap tile, per-app BlockProfile |
+| 2 | "Do this now" + nags | Built |
+| 3 | Planner | Built. v0.3: 7-day drafts, task kinds (focus / steps+waits / practice / errand / waiting / low-brain), importance 1–5 (area + task) + bump, How's today modes (push / recharge / reset / write off) + advisor, do later / not today / pick a day / something came up, skip + make up any block |
+| 4 | Hierarchy map | Built (v0.2) |
+| 5 | Routine | Built. v0.3: on-time grading, wake from watch or first unlock, naps split from night sleep, bedtime sound on the alarm stream (gets through DND), sport counts after 3 standard workouts |
+| 6 | Google Calendar | Built. v0.3: per-calendar Events / Deadlines / Ignore (Canvas → deadline tasks synced by event id), auto exam study tasks, 7 days written (future = "(draft)") |
+| 7 | Catch-up study | Practice item per class, 3 h/week; research area importance 5, research tasks pinned hot; old web-app tasks in a review queue |
+| 8 | Stats, skill tree, learning session lengths, burnout signals, hourly re-plan | v0.4 (section 11 split) |
 
 ### How work happens
 Claude writes all code and pushes to `main`; GitHub Actions is the compiler (the Claude sandbox
@@ -295,5 +292,7 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 - "Still texting?" after the window, but longer real conversations must not get cut off.
 - Emergency = instant, no passphrase. Credits keep the 60 s wait (it kills the urge to scroll).
 - Wants all of this customizable so he can try different setups.
+
+**v0.3 vs v0.4 split (agreed):** v0.3 = everything above except: stats (and stats-driven area importance), the Skyrim-style skill tree (built on practice time), learning real session lengths, burnout signals with push/reset prompts beyond the manual "How's today?", hourly re-plan that drops what no longer fits, patterns from deferrals, colour customization → v0.4.
 
 **Future:** own workout and diet apps (with his Excel workout math) talking to this app; meal timing and food choice; catch-up / sneak-in workouts on busy weeks.

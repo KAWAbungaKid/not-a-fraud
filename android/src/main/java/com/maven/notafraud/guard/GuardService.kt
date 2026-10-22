@@ -109,7 +109,7 @@ class GuardService : AccessibilityService() {
     }
 
     private fun onForeground(pkg: String) {
-        if (pkg in TRANSPARENT) return
+        if (pkg in TRANSPARENT || pkg in KEYBOARDS) return
         if (pkg == foregroundPkg) return
         foregroundPkg = pkg
         browserInFront = pkg in Sites.BROWSERS

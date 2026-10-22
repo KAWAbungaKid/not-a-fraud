@@ -118,21 +118,26 @@ object PhoneCalendar {
         settings.calendarModes[cal.id]?.let { return it }
         if (cal.id in settings.excludedCalendarIds || cal.id == settings.outputCalendarId) return com.maven.notafraud.core.model.CalMode.IGNORE
         val n = (cal.name + " " + (cal.account ?: "")).lowercase()
-        return if (listOf("canvas", "instructure", "assignment", "coursework").any { it in n }) com.maven.notafraud.core.model.CalMode.DEADLINES
-        else com.maven.notafraud.core.model.CalMode.EVENTS
+        return when {
+            listOf("canvas", "instructure", "assignment", "coursework").any { it in n } -> com.maven.notafraud.core.model.CalMode.DEADLINES
+            listOf("test", "exam").any { it in cal.name.lowercase() } -> com.maven.notafraud.core.model.CalMode.TESTS
+            else -> com.maven.notafraud.core.model.CalMode.EVENTS
+        }
     }
 
-    data class Split(val events: List<CalEvent>, val deadlines: List<CalEvent>)
+    data class Split(val events: List<CalEvent>, val deadlines: List<CalEvent>, val tests: List<CalEvent>)
 
     /** Reads every calendar once and splits by mode: events to plan around, deadlines to turn into tasks. */
     fun readSplit(ctx: Context): Split? {
         val all = read(ctx, daysAhead = 60) ?: return null
         val settings = Graph.data.settings
         val modes = calendars(ctx).associate { it.id to modeFor(it, settings) }
-        val events = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.EVENTS }
+        val tests = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.TESTS }
+        // Tests are fixed time too: they block the plan like any event.
+        val events = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.EVENTS } + tests
         val deadlines = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.DEADLINES }
             .map { it.copy(uid = it.uid.substringBeforeLast('-')) } // one task per event, not per instance
-        return Split(events, deadlines)
+        return Split(events, deadlines, tests)
     }
 
     /**

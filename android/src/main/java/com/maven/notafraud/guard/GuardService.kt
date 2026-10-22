@@ -209,6 +209,14 @@ class GuardService : AccessibilityService() {
         currentAction = decision.action
         when (decision.action) {
             GuardAction.BLOCK -> {
+                // Someone messaged in the last few minutes: this open is a reply. Free window, once per message.
+                val label = AppLabels.label(this, pkg)
+                val reply = Credits.replyWindowIfMessage(Graph.data.ledger, Graph.data.rules.profile(pkg), pkg, label, now)
+                if (reply != null && !pkg.startsWith(Sites.PREFIX)) {
+                    Graph.update { x -> x.copy(ledger = Credits.replyWindowIfMessage(x.ledger, x.rules.profile(pkg), pkg, label, now) ?: x.ledger) }
+                    reevaluate()
+                    return
+                }
                 // Still typing when the window runs out: keep it open instead of cutting the conversation.
                 if (Graph.data.ledger.freeWindowUntil[pkg]?.let { now - it < 60_000 } == true && keyboardUp() && Graph.data.rules.profile(pkg).extendWhileTyping) {
                     Graph.update { x -> x.copy(ledger = Credits.freeWindow(x.ledger, pkg, 2, now, "Still typing")) }
@@ -227,13 +235,8 @@ class GuardService : AccessibilityService() {
 
     private fun block(pkg: String) {
         Notifier.cancelNag(this)
-        // Give a notification tap a moment to open its reply window first (the two arrive together).
-        post(700) {
-            if (currentPkg != pkg) return@post
-            val d = GuardPolicy.decide(pkg, Graph.data, System.currentTimeMillis(), packageName.removeSuffix(".dev"))
-            if (d.action != GuardAction.BLOCK || inCall()) { evaluate(pkg); return@post }
-            showBlock(pkg)
-        }
+        // Immediately. If a notification tap opens a reply window a moment later, the block screen closes itself.
+        showBlock(pkg)
     }
 
     private fun showBlock(pkg: String) {

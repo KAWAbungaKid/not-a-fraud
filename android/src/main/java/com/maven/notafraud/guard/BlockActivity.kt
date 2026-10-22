@@ -54,6 +54,13 @@ class BlockActivity : ComponentActivity() {
 
     private var pkg by mutableStateOf("")
     private var returnTo: String? = null
+    val subject: String get() = pkg
+
+    /** Called when a reply window opens while this screen is up. */
+    fun openNow() = runOnUiThread { openTarget() }
+
+    override fun onResume() { super.onResume(); current = this }
+    override fun onPause() { if (current === this) current = null; super.onPause() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -197,5 +204,7 @@ class BlockActivity : ComponentActivity() {
     companion object {
         const val EXTRA_PKG = "pkg"
         const val EXTRA_RETURN_TO = "returnTo"
+        @Volatile var current: BlockActivity? = null
+            private set
     }
 }

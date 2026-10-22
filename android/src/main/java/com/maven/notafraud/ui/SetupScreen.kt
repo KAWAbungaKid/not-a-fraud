@@ -487,7 +487,7 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
             }
         }
         SectionLabel("Each calendar is…")
-        Text("Events: fixed time the plan works around. Deadlines (Canvas): each entry becomes a task due then. Ignore: skipped.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        Text("Events: fixed time the plan works around. Deadlines (Canvas): each entry becomes a task due then. Tests: fixed time plus a study task leading up to it. Ignore: skipped.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         cals.filter { it.id != data.settings.outputCalendarId }.forEach { c ->
             val mode = com.maven.notafraud.sense.PhoneCalendar.modeFor(c, data.settings)
             Text(c.name, maxLines = 1)
@@ -499,7 +499,20 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
                 }
             }
         }
-        SwitchRow("Exams get study tasks automatically", data.settings.autoExamTasks) { on -> Graph.update { it.copy(settings = it.settings.copy(autoExamTasks = on)) } }
+        SectionLabel("Studying per test (Tests calendars)")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (h in listOf(2, 4, 6, 8, 10)) androidx.compose.material3.FilterChip(data.settings.studyMinPerTest == h * 60, {
+                Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyMinPerTest = h * 60)) }
+            }, { Text("${h}h") })
+        }
+        Text("Start studying up to", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (dd in listOf(5, 7, 10, 14)) androidx.compose.material3.FilterChip(data.settings.studyLeadDays == dd, {
+                Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyLeadDays = dd)) }
+            }, { Text("$dd days before") })
+        }
+        Text("Changes apply to new tests; existing study tasks can be edited like any task.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        SwitchRow("Also spot exams in Events calendars by title", data.settings.autoExamTasks) { on -> Graph.update { it.copy(settings = it.settings.copy(autoExamTasks = on)) } }
     }
 }
 

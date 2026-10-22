@@ -41,11 +41,32 @@ object RoutinePolicy {
 
     fun appliesOn(item: RoutineItem, date: LocalDate) = item.enabled && date.dayOfWeek.value in item.days
 
-    fun weekCount(d: AppData, item: RoutineItem, date: LocalDate): Int {
+    /** Notes that mark a workout as a sport (climbing, games…). These only count once [STANDARD_FIRST] standard workouts are in. */
+    val SPORT_NOTES = setOf("Climbing", "Sport", "Hike", "Swim", "Breaking")
+    const val STANDARD_FIRST = 3
+
+    data class WeekTally(val standard: Int, val sport: Int) {
+        val counted: Int get() = standard + if (standard >= STANDARD_FIRST) sport else 0
+    }
+
+    fun weekTally(d: AppData, item: RoutineItem, date: LocalDate): WeekTally {
         val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-        return (0..6).map { monday.plusDays(it.toLong()).toString() }.count { iso ->
-            d.routineDays.firstOrNull { it.date == iso }?.done?.containsKey(item.id) == true
+        var standard = 0
+        var sport = 0
+        for (i in 0..6) {
+            val rd = d.routineDays.firstOrNull { it.date == monday.plusDays(i.toLong()).toString() } ?: continue
+            if (!rd.done.containsKey(item.id)) continue
+            if (rd.notes[item.id] in SPORT_NOTES) sport++ else standard++
         }
+        return WeekTally(standard, sport)
+    }
+
+    fun weekCount(d: AppData, item: RoutineItem, date: LocalDate): Int = weekTally(d, item, date).counted
+
+    /** Done, but after its due time (woke at 6:40 when due by 6:00). */
+    fun doneLate(d: AppData, st: RoutineStatus): Boolean {
+        val at = st.doneAt ?: return false
+        return Time.minuteOfDay(at, Time.zone(d.settings.zoneId)) > st.item.dueMin
     }
 
     fun status(d: AppData, item: RoutineItem, now: Long): RoutineStatus {

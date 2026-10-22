@@ -24,6 +24,27 @@ enum class Energy { LOW, MED, HIGH }
 @Serializable
 enum class TaskStatus { TODO, DONE }
 
+/**
+ * What kind of time a task needs (STATE.md section 11).
+ * FOCUS: full attention until done. STEPS: attended steps with unattended waits between (laundry, research runs).
+ * PRACTICE: open-ended time-in toward a weekly target (skills, catch-up study). ERRAND: go somewhere.
+ * WAITING: blocked on someone else, never planned until unblocked. FILLER: low-brain, good when tired.
+ */
+@Serializable
+enum class TaskKind { FOCUS, STEPS, PRACTICE, ERRAND, WAITING, FILLER }
+
+/** One step of a STEPS task. [waitBeforeMin] is unattended time after the previous step (washer running, samples exposing). */
+@Serializable
+data class TaskStep(
+    val id: String = newId(),
+    val title: String,
+    val min: Int,
+    val waitBeforeMin: Int = 0,
+    /** Must start right when the wait ends (research timing). Otherwise any time after. */
+    val exact: Boolean = false,
+    val doneAt: Long? = null,
+)
+
 /** Top of the hierarchy: what a life well spent looks like, in Maven's words. Never scheduled. */
 @Serializable
 data class Goal(
@@ -43,6 +64,8 @@ data class Area(
     val goalIds: Set<String> = emptySet(),
     val order: Int = 0,
     val archived: Boolean = false,
+    /** 1–5 baseline for everything under this area (later driven by stats). */
+    val importance: Int = 3,
 )
 
 @Serializable
@@ -77,6 +100,20 @@ data class Task(
     val hot: Boolean = false,
     /** Set when the app generated this task (e.g. "makeup:<class>:<date>", "exam:<uid>"), so it is created once. */
     val sourceKey: String? = null,
+    val kind: TaskKind = TaskKind.FOCUS,
+    val steps: List<TaskStep> = emptyList(),
+    /** PRACTICE: minutes per week to aim for. */
+    val weeklyTargetMin: Int? = null,
+    /** PRACTICE (and any kind): longest useful block. Null = planner default. */
+    val maxBlockMin: Int? = null,
+    /** 1–5; null = inherit the area's importance. */
+    val importance: Int? = null,
+    /** Bumped: +1 importance until this instant. */
+    val bumpUntil: Long? = null,
+    /** Each time it was pushed off ("not today", "later"). Neutral for now; patterns come later. */
+    val deferrals: List<Long> = emptyList(),
+    /** WAITING: who or what it's waiting on. */
+    val waitingOn: String = "",
 )
 
 @Serializable
@@ -87,6 +124,7 @@ data class CalEvent(
     val end: Long,
     val source: String = "ics",
     val allDay: Boolean = false,
+    val calendarId: Long? = null,
 )
 
 @Serializable
@@ -157,6 +195,8 @@ data class Anchor(
     val yieldsToHot: Boolean = false,
     /** CONTAINER only: fill with tasks from these areas. Empty = project-kind tasks. */
     val fillAreaIds: Set<String> = emptySet(),
+    /** Dates skipped with "make up later" (a make-up task was created). */
+    val madeUpDates: Set<String> = emptySet(),
 )
 
 @Serializable
@@ -220,7 +260,12 @@ data class AppRules(
     val blockingEnabled: Boolean = true,
     /** Websites blocked inside browsers (matched against the address bar host and its parents). */
     val blockedSites: Set<String> = DEFAULT_SITES,
+    /** Per-app blocking profiles; apps without one use [defaultProfile]. */
+    val profiles: Map<String, BlockProfile> = mapOf("com.snapchat.android" to BlockProfile(quickOpen = true)),
+    val defaultProfile: BlockProfile = BlockProfile(),
 ) {
+    fun profile(pkg: String) = profiles[pkg] ?: defaultProfile
+
     companion object {
         val DEFAULT_BLOCKED = setOf(
             "com.instagram.android",
@@ -246,6 +291,25 @@ data class AppRules(
     }
 }
 
+/**
+ * How strict blocking is for one app (STATE.md section 11). All of it is adjustable so different setups can be tried.
+ */
+@Serializable
+data class BlockProfile(
+    /** Free minutes when the app is opened by tapping one of its notifications. 0 = off. */
+    val replyWindowMin: Int = 5,
+    /** Quick-open (Quick Settings tile) for this app. */
+    val quickOpen: Boolean = false,
+    val quickOpenMin: Int = 5,
+    val quickOpenPerDay: Int = 6,
+    /** While in a free window, typing keeps it open. */
+    val extendWhileTyping: Boolean = true,
+    /** Wait before banked credits unlock it (kills the urge to scroll). */
+    val creditWaitSec: Int = 60,
+    /** Instant emergency unlocks per day. */
+    val emergencyPerDay: Int = 3,
+)
+
 @Serializable
 data class LedgerEntry(
     val at: Long,
@@ -260,6 +324,10 @@ data class Ledger(
     /** Package -> epoch ms until which it is unlocked. "*" means everything. */
     val unlockedUntil: Map<String, Long> = emptyMap(),
     val emergencyUses: List<Long> = emptyList(),
+    /** pkg -> quick-open times (last 2 days). */
+    val quickOpens: Map<String, List<Long>> = emptyMap(),
+    /** pkg -> end of the current free window (reply / quick-open / still-texting), so the block screen can offer "still texting?". */
+    val freeWindowUntil: Map<String, Long> = emptyMap(),
 )
 
 @Serializable
@@ -291,7 +359,25 @@ data class Settings(
     val outputCalendarId: Long? = null,
     /** Phone calendar ids never read as events (old routine calendars, holidays...). */
     val excludedCalendarIds: Set<Long> = emptySet(),
+    /** Phone calendar id -> how its entries are used. Missing = guessed (Canvas-like names = DEADLINES, else EVENTS). */
+    val calendarModes: Map<Long, CalMode> = emptyMap(),
+    /** Exams found in calendars get a study task automatically. */
+    val autoExamTasks: Boolean = true,
+    /** Play a short alarm-stream sound with bedtime nudges (gets through Do Not Disturb / Bedtime mode). */
+    val bedtimeSound: Boolean = true,
 )
+
+@Serializable
+enum class CalMode { EVENTS, DEADLINES, IGNORE }
+
+/** "How's today?" choices. */
+@Serializable
+enum class DayMode { PUSH, RECHARGE, RESET, WRITEOFF }
+
+@Serializable
+data class Nap(val start: Long, val end: Long) {
+    val minutes: Int get() = ((end - start) / 60_000).toInt()
+}
 
 /** Per-day context: how the day started. Drives the bad-day softening. */
 @Serializable
@@ -304,6 +390,14 @@ data class DayContext(
     val workoutMin: Int? = null,
     /** User said "rough day" by hand. */
     val markedRough: Boolean = false,
+    val naps: List<Nap> = emptyList(),
+    /** First phone unlock after 4am: wake-up fallback when the watch wasn't worn. */
+    val firstUnlock: Long? = null,
+    /** "How's today?" answer, and when it was chosen. */
+    val mode: DayMode? = null,
+    val modeAt: Long? = null,
+    /** Recharge: minutes of nap/walk to put first. */
+    val rechargeMin: Int = 20,
 )
 
 @Serializable
@@ -336,6 +430,12 @@ data class AppData(
     val picks: Map<String, List<String>> = emptyMap(),
     /** Calendar event uids the user said aren't exams worth a study task. */
     val ignoredExamUids: Set<String> = emptySet(),
+    /** Generated tasks the user deleted, by sourceKey, so they aren't re-created. */
+    val ignoredSourceKeys: Set<String> = emptySet(),
+    /** Old tasks waiting for the user's Keep / Done / Delete. */
+    val reviewTaskIds: Set<String> = emptySet(),
+    /** Draft plans for the next 6 days (today is [todayPlan]). */
+    val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),
     val tasks: List<Task> = emptyList(),
     val events: List<CalEvent> = emptyList(),

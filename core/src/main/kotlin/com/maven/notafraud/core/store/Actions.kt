@@ -23,7 +23,16 @@ object Actions {
 
     fun updateTask(d: AppData, task: Task) = d.copy(tasks = d.tasks.map { if (it.id == task.id) task else it })
 
-    fun deleteTask(d: AppData, id: String) = d.copy(tasks = d.tasks.filterNot { it.id == id })
+    /** Deleting a generated task (exam study, deadline, make-up, catch-up) remembers it so it isn't re-created. */
+    fun deleteTask(d: AppData, id: String): AppData {
+        val t = d.tasks.firstOrNull { it.id == id } ?: return d
+        return d.copy(
+            tasks = d.tasks.filterNot { it.id == id },
+            ignoredSourceKeys = t.sourceKey?.let { d.ignoredSourceKeys + it } ?: d.ignoredSourceKeys,
+            reviewTaskIds = d.reviewTaskIds - id,
+            picks = d.picks.mapValues { (_, v) -> v - id },
+        )
+    }
 
     fun setDone(d: AppData, id: String, done: Boolean, now: Long) = d.copy(tasks = d.tasks.map {
         if (it.id != id) it
@@ -161,8 +170,10 @@ object Actions {
         val day = d.routineDays.firstOrNull { it.date == date.toString() }
         var x = d
         val wake = d.routine.firstOrNull { it.id == "r-wake" }
-        if (wake != null && ctx.sleepEnd != null && day?.done?.containsKey(wake.id) != true) {
-            x = checkRoutine(x, wake.id, ctx.sleepEnd, "from Samsung Health")
+        if (wake != null && day?.done?.containsKey(wake.id) != true) {
+            val woke = ctx.sleepEnd?.takeIf { Time.dateOf(it, Time.zone(d.settings.zoneId)) == date }
+            if (woke != null) x = checkRoutine(x, wake.id, woke, "from your watch")
+            else if (ctx.firstUnlock != null) x = checkRoutine(x, wake.id, ctx.firstUnlock, "first unlock")
         }
         val workout = d.routine.firstOrNull { it.id == "r-workout" }
         if (workout != null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
@@ -220,4 +231,98 @@ object Actions {
     }
 
     fun ignoreExam(d: AppData, uid: String) = d.copy(ignoredExamUids = d.ignoredExamUids + uid)
+
+    // ---- Do later / not today ------------------------------------------------------------
+
+    private fun defer(d: AppData, id: String, until: Long, now: Long) = d.copy(tasks = d.tasks.map {
+        if (it.id == id) it.copy(notBefore = until, deferrals = (it.deferrals + now).takeLast(50)) else it
+    }).let { if (it.active?.taskId == id) stopSession(it, now) else it }
+
+    /** Off today's plan; back tomorrow. */
+    fun notToday(d: AppData, id: String, now: Long): AppData {
+        val zone = Time.zone(d.settings.zoneId)
+        return defer(d, id, Time.at(Time.dateOf(now, zone).plusDays(1), 0, zone), now)
+    }
+
+    fun laterToday(d: AppData, id: String, at: Long, now: Long) = defer(d, id, at, now)
+
+    fun pickDay(d: AppData, id: String, date: LocalDate, now: Long): AppData {
+        val zone = Time.zone(d.settings.zoneId)
+        return defer(d, id, Time.at(date, 0, zone), now)
+    }
+
+    /** Something came up: the current task steps aside for an hour and the day re-plans. */
+    fun somethingCameUp(d: AppData, taskId: String?, now: Long): AppData {
+        val stopped = if (d.active != null) stopSession(d, now) else d
+        return if (taskId != null) defer(stopped, taskId, now + 60 * Time.MIN, now) else stopped
+    }
+
+    // ---- Skip a block and make it up -----------------------------------------------------
+
+    /** Skip a weekly block on [date]; with [makeUp], a make-up task of the same length is created. */
+    fun skipAnchor(d: AppData, anchorId: String, date: LocalDate, makeUp: Boolean, now: Long): AppData {
+        val a = d.anchors.firstOrNull { it.id == anchorId } ?: return d
+        val zone = Time.zone(d.settings.zoneId)
+        val iso = date.toString()
+        val updated = if (a.dates.isNotEmpty()) a.copy(dates = a.dates - iso, madeUpDates = if (makeUp) a.madeUpDates + iso else a.madeUpDates)
+        else a.copy(skipDates = a.skipDates + iso, madeUpDates = if (makeUp) a.madeUpDates + iso else a.madeUpDates)
+        var x = d.copy(anchors = d.anchors.map { if (it.id == a.id) updated else it })
+        if (makeUp) {
+            val key = "makeup:${a.title}:$iso"
+            if (x.tasks.none { it.sourceKey == key }) {
+                val code = a.title.split(' ').take(2).joinToString(" ")
+                x = x.copy(tasks = x.tasks + Task(
+                    title = "Make up: ${a.title} (${date.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${date.monthValue}/${date.dayOfMonth})",
+                    projectId = x.projects.firstOrNull { !it.archived && it.name.startsWith(code) }?.id,
+                    estMin = (a.endMin - a.startMin).coerceAtLeast(15),
+                    dueAt = Time.at(date.plusDays(3), 21 * 60, zone),
+                    priority = com.maven.notafraud.core.model.Priority.HIGH,
+                    minBlockMin = 30,
+                    createdAt = now,
+                    sourceKey = key,
+                ))
+            }
+        }
+        return x
+    }
+
+    // ---- Importance ----------------------------------------------------------------------
+
+    fun bump(d: AppData, id: String, now: Long) = d.copy(tasks = d.tasks.map { if (it.id == id) it.copy(bumpUntil = now + 7 * Time.DAY) else it })
+
+    // ---- Steps ---------------------------------------------------------------------------
+
+    fun checkStep(d: AppData, taskId: String, stepId: String, done: Boolean, now: Long): AppData {
+        val x = d.copy(tasks = d.tasks.map { t ->
+            if (t.id != taskId) t else t.copy(
+                steps = t.steps.map { st -> if (st.id == stepId) st.copy(doneAt = if (done) now else null) else st },
+                lastWorkedAt = now,
+            )
+        })
+        val t = x.tasks.first { it.id == taskId }
+        return if (done && t.steps.all { it.doneAt != null }) setDone(x, taskId, true, now) else x
+    }
+
+    // ---- Review of old tasks -------------------------------------------------------------
+
+    fun reviewKeep(d: AppData, id: String) = d.copy(reviewTaskIds = d.reviewTaskIds - id)
+    fun reviewDone(d: AppData, id: String, now: Long) = setDone(d, id, true, now).copy(reviewTaskIds = d.reviewTaskIds - id)
+
+    // ---- Day mode ------------------------------------------------------------------------
+
+    fun setDayMode(d: AppData, date: LocalDate, mode: com.maven.notafraud.core.model.DayMode?, rechargeMin: Int, now: Long): AppData {
+        val existing = d.days.firstOrNull { it.date == date.toString() } ?: com.maven.notafraud.core.model.DayContext(date.toString())
+        val ctx = existing.copy(mode = mode, modeAt = now, rechargeMin = rechargeMin, markedRough = mode != null && mode != com.maven.notafraud.core.model.DayMode.PUSH)
+        return d.copy(days = d.days.filterNot { it.date == date.toString() } + ctx)
+    }
+
+    fun recordFirstUnlock(d: AppData, at: Long): AppData {
+        val zone = Time.zone(d.settings.zoneId)
+        if (Time.minuteOfDay(at, zone) < 4 * 60) return d
+        val date = Time.dateOf(at, zone).toString()
+        val existing = d.days.firstOrNull { it.date == date }
+        if (existing?.firstUnlock != null) return d
+        val ctx = (existing ?: com.maven.notafraud.core.model.DayContext(date)).copy(firstUnlock = at)
+        return d.copy(days = d.days.filterNot { it.date == date } + ctx)
+    }
 }

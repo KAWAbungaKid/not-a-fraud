@@ -60,6 +60,8 @@ object NowResolver {
                 BlockKind.BREAK -> "Break" to "Stand up, water, walk · $until"
                 BlockKind.EVENT -> current.title to until
                 BlockKind.ANCHOR -> current.title to if (current.protected) "Protected time. Enjoy it." else until
+                BlockKind.RECHARGE -> current.title to "$until · this counts as part of the plan"
+                BlockKind.BACKGROUND -> current.title to until
             }
             return NowState(
                 headline, listOf(detail, nextText).filter { it.isNotBlank() }.joinToString(" · "),
@@ -100,6 +102,8 @@ object NowResolver {
                 BlockKind.EVENT -> 0.0
                 BlockKind.TASK -> 1.0
                 BlockKind.BREAK -> 3.0
+                BlockKind.RECHARGE -> -0.5
+                BlockKind.BACKGROUND -> 5.0
             }
         }
 }

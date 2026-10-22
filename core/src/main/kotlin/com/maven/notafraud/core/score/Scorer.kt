@@ -34,6 +34,7 @@ object Scorer {
     )
 
     fun minutesLeft(task: Task): Int {
+        if (task.steps.isNotEmpty()) return task.steps.filter { it.doneAt == null }.sumOf { it.min }
         val est = max(10, task.estMin)
         return max(10, est - task.loggedMin)
     }
@@ -78,7 +79,7 @@ object Scorer {
 
     /** Open tasks ranked best-first. */
     fun rank(tasks: List<Task>, now: Long, freeWindowMin: Int, userEnergy: Energy): List<Pair<Task, Double>> =
-        tasks.filter { it.status == com.maven.notafraud.core.model.TaskStatus.TODO }
+        tasks.filter { it.status == com.maven.notafraud.core.model.TaskStatus.TODO && it.kind != com.maven.notafraud.core.model.TaskKind.WAITING }
             .filter { it.notBefore == null || it.notBefore <= now }
             .map { it to score(it, now, freeWindowMin, userEnergy) }
             .sortedByDescending { it.second }

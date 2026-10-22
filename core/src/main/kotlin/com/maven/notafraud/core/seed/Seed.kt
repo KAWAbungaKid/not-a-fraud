@@ -55,8 +55,8 @@ object Seed {
     )
 
     fun areas(): List<Area> = listOf(
-        Area("a-school", "School", setOf("g-prosthetics"), 0),
-        Area("a-research", "Research", setOf("g-prosthetics"), 1),
+        Area("a-school", "School", setOf("g-prosthetics"), 0, importance = 4),
+        Area("a-research", "Research", setOf("g-prosthetics"), 1, importance = 5),
         Area("a-pt", "PT device", setOf("g-prosthetics", "g-mold"), 2),
         Area("a-career", "Career", setOf("g-prosthetics", "g-mold"), 3),
         Area("a-making", "Making and building", setOf("g-prosthetics"), 4),
@@ -185,23 +185,70 @@ object Seed {
             CalEvent(uid = "seed-me3411-final", title = "ME 3411 final", start = at("2026-12-16", 12, 30), end = at("2026-12-16", 14, 30), source = "seed"),
         )
 
-        return AppData(
+        val base = AppData(
             schema = Migration.CURRENT,
             goals = goals(), areas = areas(), projects = projects, tasks = tasks, events = events,
             anchors = anchors(), routine = routine(), seeded = true,
             settings = com.maven.notafraud.core.model.Settings(routineSince = now),
         )
+        return base.copy(tasks = base.tasks + Migration.catchUpTasks(base, now))
     }
 }
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 2
+    const val CURRENT = 3
 
     fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
         var x = d
         if (x.schema < 2) x = toV2(x, now)
+        if (x.schema < 3) x = toV3(x, now)
         return x
+    }
+
+    /** Catch-up practice per class: time-in each week toward getting back on top of it. */
+    fun catchUpTasks(d: AppData, now: Long): List<Task> =
+        d.projects.filter { !it.archived && it.kind == ProjectKind.SCHOOL }
+            .filter { p -> d.tasks.none { it.sourceKey == "catchup:${p.id}" } && "catchup:${p.id}" !in d.ignoredSourceKeys }
+            .map { p ->
+                Task(
+                    title = "Catch up: ${p.name}",
+                    projectId = p.id,
+                    kind = com.maven.notafraud.core.model.TaskKind.PRACTICE,
+                    estMin = 180,
+                    weeklyTargetMin = 180,
+                    minBlockMin = 30,
+                    maxBlockMin = 90,
+                    energy = Energy.HIGH,
+                    createdAt = now,
+                    sourceKey = "catchup:${p.id}",
+                )
+            }
+
+    /**
+     * v0.2 -> v0.3: research top importance and its open tasks pinned hot, school importance 4,
+     * a catch-up practice item per class, old web-app tasks queued for review.
+     */
+    private fun toV3(d: AppData, now: Long): AppData {
+        val areas = d.areas.map {
+            when (it.id) {
+                "a-research" -> it.copy(importance = 5)
+                "a-school" -> it.copy(importance = 4)
+                else -> it
+            }
+        }
+        val researchProjects = d.projects.filter { it.areaId == "a-research" }.map { it.id }.toSet()
+        val tasks = d.tasks.map { if (it.projectId in researchProjects && it.status == TaskStatus.TODO) it.copy(hot = true) else it }
+        val webTitles = WebAppSeed.tasks.map { it.title }.toSet()
+        val review = tasks.filter { it.status == TaskStatus.TODO && it.sourceKey == null && it.title in webTitles }.map { it.id }.toSet()
+        val x = d.copy(areas = areas, tasks = tasks)
+        return x.copy(
+            schema = 3,
+            tasks = x.tasks + catchUpTasks(x, now),
+            reviewTaskIds = d.reviewTaskIds + review,
+            todayPlan = null,
+            weekPlan = emptyList(),
+        )
     }
 
     /**

@@ -73,4 +73,49 @@ object Credits {
             (entries + e).takeLast(MAX_ENTRIES)
         }
     }
+
+    // ---- Free windows (v0.3) -------------------------------------------------------------
+
+    /** Free, logged access for [minutes] (reply window, quick-open, still texting). */
+    fun freeWindow(ledger: Ledger, pkg: String, minutes: Int, now: Long, reason: String): Ledger {
+        val until = maxOf(ledger.unlockedUntil[pkg] ?: 0L, now + minutes * Time.MIN)
+        return ledger.copy(
+            unlockedUntil = ledger.unlockedUntil + (pkg to until),
+            freeWindowUntil = ledger.freeWindowUntil + (pkg to until),
+            entries = (ledger.entries + LedgerEntry(now, 0.0, reason)).takeLast(MAX_ENTRIES),
+        )
+    }
+
+    fun quickOpensToday(ledger: Ledger, pkg: String, startOfToday: Long) = ledger.quickOpens[pkg].orEmpty().count { it >= startOfToday }
+
+    fun quickOpen(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, now: Long, startOfToday: Long): Ledger? {
+        if (!profile.quickOpen || quickOpensToday(ledger, pkg, startOfToday) >= profile.quickOpenPerDay) return null
+        val l = freeWindow(ledger, pkg, profile.quickOpenMin, now, "Quick open: $label")
+        return l.copy(quickOpens = l.quickOpens + (pkg to (l.quickOpens[pkg].orEmpty().filter { it > now - 2 * Time.DAY } + now)))
+    }
+
+    /** Typing inside a free window keeps it open at least [minutes] more. No-op outside a free window. */
+    fun extendWhileTyping(ledger: Ledger, pkg: String, now: Long, minutes: Int = 2): Ledger {
+        val until = ledger.freeWindowUntil[pkg] ?: return ledger
+        if (until < now) return ledger
+        val target = now + minutes * Time.MIN
+        if (target <= until) return ledger
+        return ledger.copy(unlockedUntil = ledger.unlockedUntil + (pkg to target), freeWindowUntil = ledger.freeWindowUntil + (pkg to target))
+    }
+
+    /** A free window ended within the last 10 minutes: the block screen offers "still texting?". */
+    fun canStillTexting(ledger: Ledger, pkg: String, now: Long): Boolean {
+        val until = ledger.freeWindowUntil[pkg] ?: return false
+        return until <= now + 30_000 && now - until < 10 * Time.MIN
+    }
+
+    /** Instant emergency (no wait, no phrase), limited per app per day. */
+    fun emergencyInstant(ledger: Ledger, settings: Settings, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, now: Long, startOfToday: Long): Ledger? {
+        if (emergencyUsesToday(ledger, startOfToday) >= profile.emergencyPerDay) return null
+        return ledger.copy(
+            unlockedUntil = ledger.unlockedUntil + (pkg to now + settings.emergencyUnlockMin * Time.MIN),
+            emergencyUses = (ledger.emergencyUses + now).filter { it > now - 2 * Time.DAY },
+            entries = (ledger.entries + LedgerEntry(now, 0.0, "Emergency unlock: $label")).takeLast(MAX_ENTRIES),
+        )
+    }
 }

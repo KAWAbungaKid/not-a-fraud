@@ -53,7 +53,7 @@ Samsung Health → ⋮ → **Settings → Health Connect** → allow it to write
 
 1. On a computer, open **calendar.google.com** → left side **Other calendars → + → Create new calendar** → name it **Not a Fraud** → Create.
 2. On the phone wait a minute for it to sync, then **More → Google Calendar** → tap **Not a Fraud** under "Tap to write plan here".
-3. Under "Read as events", untick any calendar the app should ignore (your old routine calendars, holidays). Everything left ticked is treated as fixed events.
+3. Under "Each calendar is…", set every calendar: **Events** (fixed time to plan around), **Deadlines** (Canvas: each entry becomes a task due then), or **Ignore** (old routine calendars, holidays). Canvas-looking calendars start as Deadlines.
 
 From then on the day's plan (tasks, blocks, routine reminders) appears in the Not a Fraud calendar and updates as the plan changes. Don't edit those events in Google Calendar; change things in the app.
 
@@ -67,7 +67,11 @@ Setup → **Blocking**:
 
 You start with 15 credit minutes.
 
-### 6. Check it works (2 minutes)
+### 6. Quick Snap tile
+
+Pull the notification shade down twice → pencil (edit) → drag **Quick Snap** into your tiles. Tapping it opens Snapchat free for 5 minutes, 6 times a day.
+
+### 7. Check it works (2 minutes)
 
 1. Open Instagram → the block screen should appear.
 2. Tap **10m** → Instagram opens. After 3 minutes you get the first nudge.

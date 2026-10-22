@@ -40,9 +40,12 @@ class FlowTest {
             rule.waitForIdle()
             assertTrue(rule.onAllNodesWithText("locked", substring = true).fetchSemanticsNodes().isNotEmpty())
             assertTrue(rule.onAllNodesWithText("min banked", substring = true).fetchSemanticsNodes().isNotEmpty())
-            rule.onNodeWithText("Emergency unlock").performClick()
+            assertTrue(rule.onAllNodesWithText("Emergency: open now", substring = true).fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithText("10m").performClick()
             rule.waitForIdle()
-            assertTrue(rule.onAllNodesWithText("Wait", substring = true).fetchSemanticsNodes().isNotEmpty())
+            assertTrue(rule.onAllNodesWithText("Opening in", substring = true).fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithText("Never mind").performClick()
+            rule.waitForIdle()
         }
     }
 

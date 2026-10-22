@@ -201,4 +201,37 @@ object Generated {
         }
         return d.copy(tasks = tasks)
     }
+
+    /**
+     * Tests calendar: every entry gets a study task (Settings.studyMinPerTest, may start studyLeadDays before),
+     * keyed by the calendar event so moving the test moves the deadline and deleting it removes untouched studying.
+     */
+    fun syncTests(d: AppData, tests: List<CalEvent>, now: Long): AppData {
+        val s = d.settings
+        fun key(e: CalEvent) = "test:" + e.uid
+        val byKey = tests.filter { it.start > now - Time.DAY }.associateBy(::key)
+        var tasks = d.tasks.mapNotNull { t ->
+            val k = t.sourceKey ?: return@mapNotNull t
+            if (!k.startsWith("test:")) return@mapNotNull t
+            val e = byKey[k]
+            when {
+                e != null -> {
+                    val title = "Study: ${e.title}"
+                    if (t.title != title || t.dueAt != e.start) t.copy(title = title, dueAt = e.start, notBefore = e.start - s.studyLeadDays * Time.DAY) else t
+                }
+                t.status == com.maven.notafraud.core.model.TaskStatus.TODO && t.loggedMin == 0 -> null
+                else -> t
+            }
+        }
+        val have = tasks.mapNotNull { it.sourceKey }.toSet()
+        for ((k, e) in byKey) {
+            if (k in have || k in d.ignoredSourceKeys || e.start < now) continue
+            tasks = tasks + studyTaskFor(d, e, now, s.studyMinPerTest).copy(
+                projectId = projectForTitle(d, e.title) ?: studyTaskFor(d, e, now).projectId,
+                notBefore = e.start - s.studyLeadDays * Time.DAY,
+                sourceKey = k,
+            )
+        }
+        return d.copy(tasks = tasks)
+    }
 }

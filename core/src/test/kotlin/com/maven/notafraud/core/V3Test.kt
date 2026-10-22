@@ -155,7 +155,7 @@ class V3Test {
     @Test
     fun `exams in the calendar get study tasks automatically`() {
         val ev = CalEvent(uid = "ex1", title = "A&P Exam 4", start = at(wed.plusDays(20), 11), end = at(wed.plusDays(20), 12), source = "phone")
-        val d = Generated.autoExams(base().copy(events = listOf(ev)), at(wed, 9))
+        val d = Generated.autoExams(base().copy(events = listOf(ev), settings = base().settings.copy(autoExamTasks = true)), at(wed, 9))
         assertEquals(1, d.tasks.count { it.sourceKey == "exam:ex1" })
         assertEquals(d, Generated.autoExams(d, at(wed, 9)))
     }
@@ -232,11 +232,50 @@ class V3Test {
     fun `v3 migration adds catch-up practice, research importance, review queue`() {
         val v2 = Seed.data(at(wed, 4)).let { it.copy(schema = 2, tasks = it.tasks.filterNot { t -> t.sourceKey?.startsWith("catchup:") == true }) }
         val v3 = Migration.apply(v2, at(wed, 9))
-        assertEquals(3, v3.schema)
+        assertEquals(Migration.CURRENT, v3.schema)
         assertEquals(5, v3.areas.first { it.id == "a-research" }.importance)
         assertTrue(v3.tasks.count { it.kind == TaskKind.PRACTICE && it.title.startsWith("Catch up:") } >= 4)
         assertTrue(v3.reviewTaskIds.isNotEmpty())
         assertTrue(v3.tasks.filter { t -> v3.projects.first { it.id == t.projectId }.areaId == "a-research" && t.status == TaskStatus.TODO }.all { it.hot })
         assertEquals(v3, Migration.apply(v3))
+    }
+
+    @Test
+    fun `tests calendar makes study tasks that follow the test and leave with it`() {
+        val ev = CalEvent(uid = "t1", title = "ME 3525 Exam 2", start = at(wed.plusDays(12), 10), end = at(wed.plusDays(12), 11), source = "phone")
+        var d = Generated.syncTests(base(), listOf(ev), at(wed, 9))
+        val t = d.tasks.single { it.sourceKey == "test:t1" }
+        assertEquals(360, t.estMin)
+        assertEquals("ME 3525 Heat Transfer", d.projects.first { it.id == t.projectId }.name)
+        assertEquals(ev.start - 10 * Time.DAY, t.notBefore)
+        val moved = ev.copy(start = ev.start + Time.DAY, end = ev.end + Time.DAY)
+        d = Generated.syncTests(d, listOf(moved), at(wed, 10))
+        assertEquals(moved.start, d.tasks.single { it.sourceKey == "test:t1" }.dueAt)
+        d = Generated.syncTests(d, emptyList(), at(wed, 11))
+        assertTrue(d.tasks.none { it.sourceKey == "test:t1" })
+    }
+
+    @Test
+    fun `opening snap soon after a message gets one reply window per message`() {
+        val now = 1_800_000_000_000L
+        val p = BlockProfile()
+        var l = Credits.messageArrived(Ledger(), "snap", now)
+        val w = Credits.replyWindowIfMessage(l, p, "snap", "Snapchat", now + 2 * Time.MIN)
+        assertNotNull(w)
+        assertTrue(Credits.isUnlocked(w, "snap", now + 6 * Time.MIN))
+        assertNull(Credits.replyWindowIfMessage(w, p, "snap", "Snapchat", now + 8 * Time.MIN), "same message, no second window")
+        l = Credits.messageArrived(w, "snap", now + 9 * Time.MIN)
+        assertNotNull(Credits.replyWindowIfMessage(l, p, "snap", "Snapchat", now + 10 * Time.MIN))
+        assertNull(Credits.replyWindowIfMessage(Credits.messageArrived(Ledger(), "snap", now), p, "snap", "Snapchat", now + 20 * Time.MIN), "too long after")
+    }
+
+    @Test
+    fun `v4 migration removes seeded exam studying and the seeded final`() {
+        val old = Seed.data(at(wed, 4)).copy(schema = 3, events = listOf(CalEvent(uid = "seed-x", title = "ME 3411 final", start = 1, end = 2, source = "seed")),
+            tasks = listOf(Task(title = "Study for A&P Test 4", createdAt = 0), Task(title = "Study for ME 3411 Exam 3", createdAt = 0, loggedMin = 30), Task(title = "Study: Thermo exam", sourceKey = "exam:e9", createdAt = 0)))
+        val v4 = Migration.apply(old, at(wed, 9))
+        assertEquals(listOf("Study for ME 3411 Exam 3"), v4.tasks.map { it.title }, "worked-on studying is kept")
+        assertTrue(v4.events.isEmpty())
+        assertFalse(v4.settings.autoExamTasks)
     }
 }

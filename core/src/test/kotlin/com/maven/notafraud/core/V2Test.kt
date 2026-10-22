@@ -60,7 +60,7 @@ class V2Test {
         assertEquals("a-research", v2.projects.first { it.id == "p2" }.areaId)
         assertTrue(v2.routine.any { it.title == "Lunch" })
         assertTrue(v2.anchors.none { it.title == "Lift" || it.title == "Lunch" }, "meals and lifting moved to routine")
-        assertEquals(TaskStatus.TODO, v2.tasks.first { it.title.startsWith("Study for Heat") }.status, "mis-tap undone")
+        assertTrue(v2.tasks.none { it.title.startsWith("Study for Heat") }, "seeded exam studying is gone (tests come from the calendar)")
         assertEquals(TaskStatus.DONE, v2.tasks.first { it.title.startsWith("Install") }.status)
         assertEquals(v2, Migration.apply(v2), "idempotent")
     }
@@ -193,7 +193,7 @@ class V2Test {
     fun `exam events without a study task are offered once`() {
         val now = at(tue, 9)
         val ev = CalEvent(uid = "e1", title = "Thermo Exam 2", start = at(tue.plusDays(9), 10), end = at(tue.plusDays(9), 11), source = "phone")
-        var d = data().copy(events = listOf(ev))
+        var d = data().copy(events = listOf(ev), settings = data().settings.copy(autoExamTasks = true))
         assertEquals(listOf("e1"), Generated.examCandidates(d, now).map { it.uid })
         val t = Generated.studyTaskFor(d, ev, now)
         d = Actions.addTask(d, t)

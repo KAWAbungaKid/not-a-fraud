@@ -171,7 +171,7 @@ object Seed {
         fun prio(s: String) = when (s) { "high" -> Priority.HIGH; "low" -> Priority.LOW; else -> Priority.NORMAL }
         fun energy(s: String) = when (s) { "high" -> Energy.HIGH; "low" -> Energy.LOW; else -> Energy.MED }
 
-        val tasks = WebAppSeed.tasks.filterNot { it.key == "t-android-hello" }.map { t ->
+        val tasks = WebAppSeed.tasks.filterNot { it.key == "t-android-hello" || it.title.startsWith("Study for") }.map { t ->
             Task(
                 title = t.title, projectId = projectIds[t.project], estMin = t.estMin, dueAt = iso(t.dueIso),
                 priority = prio(t.priority), energy = energy(t.energy), minBlockMin = t.minBlockMin,
@@ -181,9 +181,7 @@ object Seed {
         }
 
         fun at(date: String, h: Int, m: Int = 0) = Time.at(LocalDate.parse(date), h * 60 + m, zone)
-        val events = listOf(
-            CalEvent(uid = "seed-me3411-final", title = "ME 3411 final", start = at("2026-12-16", 12, 30), end = at("2026-12-16", 14, 30), source = "seed"),
-        )
+        val events = emptyList<CalEvent>()
 
         val base = AppData(
             schema = Migration.CURRENT,
@@ -197,13 +195,36 @@ object Seed {
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 3
+    const val CURRENT = 4
 
     fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
         var x = d
         if (x.schema < 2) x = toV2(x, now)
         if (x.schema < 3) x = toV3(x, now)
+        if (x.schema < 4) x = toV4(x)
         return x
+    }
+
+    /**
+     * v0.3 -> v0.4: tests come from a Tests calendar now. Drop the hard-coded exam study tasks
+     * (imported from the web app, or auto-made from exam-looking events) that haven't been worked on,
+     * and the seeded ME 3411 final event, so nothing doubles up with the calendar.
+     */
+    private fun toV4(d: AppData): AppData {
+        val webStudy = WebAppSeed.tasks.filter { it.title.startsWith("Study for") }.map { it.title }.toSet()
+        val drop = d.tasks.filter { t ->
+            t.status == TaskStatus.TODO && t.loggedMin == 0 &&
+                ((t.sourceKey == null && t.title in webStudy) || t.sourceKey?.startsWith("exam:") == true)
+        }.map { it.id }.toSet()
+        return d.copy(
+            schema = 4,
+            tasks = d.tasks.filterNot { it.id in drop },
+            reviewTaskIds = d.reviewTaskIds - drop,
+            events = d.events.filterNot { it.source == "seed" },
+            settings = d.settings.copy(autoExamTasks = false),
+            todayPlan = null,
+            weekPlan = emptyList(),
+        )
     }
 
     /** Catch-up practice per class: time-in each week toward getting back on top of it. */

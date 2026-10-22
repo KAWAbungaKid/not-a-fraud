@@ -118,4 +118,20 @@ object Credits {
             entries = (ledger.entries + LedgerEntry(now, 0.0, "Emergency unlock: $label")).takeLast(MAX_ENTRIES),
         )
     }
+
+    /** A message notification arrived for [pkg] (someone wrote to you). */
+    fun messageArrived(ledger: Ledger, pkg: String, at: Long) = ledger.copy(lastMessageAt = ledger.lastMessageAt + (pkg to at))
+
+    /**
+     * Reply window: opening the app within [withinMin] of a new message (by tapping the notification or
+     * any other way) is free for the profile's reply minutes, once per new message.
+     */
+    fun replyWindowIfMessage(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, now: Long, withinMin: Int = 15): Ledger? {
+        if (profile.replyWindowMin <= 0) return null
+        val msg = ledger.lastMessageAt[pkg] ?: return null
+        if (now - msg > withinMin * Time.MIN) return null
+        if ((ledger.messageWindowUsed[pkg] ?: 0L) >= msg) return null
+        return freeWindow(ledger, pkg, profile.replyWindowMin, now, "Reply window: $label")
+            .let { it.copy(messageWindowUsed = it.messageWindowUsed + (pkg to msg)) }
+    }
 }

@@ -328,6 +328,9 @@ data class Ledger(
     val quickOpens: Map<String, List<Long>> = emptyMap(),
     /** pkg -> end of the current free window (reply / quick-open / still-texting), so the block screen can offer "still texting?". */
     val freeWindowUntil: Map<String, Long> = emptyMap(),
+    /** pkg -> when its newest message notification arrived, and the last one already used for a reply window. */
+    val lastMessageAt: Map<String, Long> = emptyMap(),
+    val messageWindowUsed: Map<String, Long> = emptyMap(),
 )
 
 @Serializable
@@ -361,14 +364,25 @@ data class Settings(
     val excludedCalendarIds: Set<Long> = emptySet(),
     /** Phone calendar id -> how its entries are used. Missing = guessed (Canvas-like names = DEADLINES, else EVENTS). */
     val calendarModes: Map<Long, CalMode> = emptyMap(),
-    /** Exams found in calendars get a study task automatically. */
-    val autoExamTasks: Boolean = true,
+    /** Events-calendar entries with "exam/test/quiz" in the title get study tasks (off: use a Tests calendar instead). */
+    val autoExamTasks: Boolean = false,
+    /** Tests calendar: study minutes per test, and how many days before it studying may start. */
+    val studyMinPerTest: Int = 360,
+    val studyLeadDays: Int = 10,
     /** Play a short alarm-stream sound with bedtime nudges (gets through Do Not Disturb / Bedtime mode). */
     val bedtimeSound: Boolean = true,
 )
 
 @Serializable
-enum class CalMode { EVENTS, DEADLINES, IGNORE }
+enum class CalMode {
+    /** Fixed time to plan around. */
+    EVENTS,
+    /** Each entry is a task due then (Canvas). */
+    DEADLINES,
+    /** Each entry is a test: fixed time to plan around, plus a study task leading up to it. */
+    TESTS,
+    IGNORE,
+}
 
 /** "How's today?" choices. */
 @Serializable

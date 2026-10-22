@@ -24,8 +24,40 @@ object Planning {
         if (d.todayPlan?.date == date.toString() && d.weekPlan.firstOrNull()?.date == date.plusDays(1).toString()) return d
         if (d.todayPlan?.date == date.toString()) return withWeek(d, now)
         val withGenerated = Generated.makeupTasks(d, date, now)
-        return withWeek(withGenerated.copy(todayPlan = planner.plan(date, withGenerated, now)), now)
+        val plan = planner.plan(date, withGenerated, now)
+        return withWeek(recordPlanned(withGenerated, plan).copy(todayPlan = plan), now)
     }
+
+    /** The morning plan's task minutes, for the Discipline stat (planned vs actually worked). */
+    private fun recordPlanned(d: AppData, plan: DayPlan): AppData {
+        val mins = plan.blocks.filter { it.kind == BlockKind.TASK }.sumOf { it.minutes }
+        val ctx = d.days.firstOrNull { it.date == plan.date } ?: com.maven.notafraud.core.model.DayContext(plan.date)
+        if (ctx.plannedTaskMin != null) return d
+        return d.copy(days = d.days.filterNot { it.date == plan.date } + ctx.copy(plannedTaskMin = mins))
+    }
+
+    /**
+     * Hourly / per-block re-plan: a task block that ended without being worked on means the day
+     * moved. Re-plan from now; whatever was on today's plan and no longer fits is listed as dropped.
+     */
+    fun autoReplan(d: AppData, now: Long): AppData {
+        if (!d.settings.autoReplan) return d
+        val plan = d.todayPlan ?: return d
+        if (d.active != null) return d
+        val slipped = plan.blocks.any { b ->
+            b.kind == BlockKind.TASK && b.end <= now && b.end > plan.generatedAt &&
+                d.sessions.none { s -> s.start < b.end && b.start < s.end } &&
+                d.tasks.firstOrNull { it.id == b.taskId }?.status == com.maven.notafraud.core.model.TaskStatus.TODO
+        }
+        if (!slipped) return d
+        val before = plan.blocks.filter { it.kind == BlockKind.TASK && it.end > now - 60 * Time.MIN }.mapNotNull { it.taskId }.toSet()
+        val after = replan(d, now)
+        val stillToday = after.todayPlan!!.blocks.filter { it.kind == BlockKind.TASK && it.start >= now }.mapNotNull { it.taskId }.toSet()
+        val dropped = (before - stillToday).mapNotNull { id -> after.tasks.firstOrNull { it.id == id && it.status == com.maven.notafraud.core.model.TaskStatus.TODO }?.title }
+        val merged = (plan.dropped + dropped).distinct().takeLast(8)
+        return after.copy(todayPlan = after.todayPlan!!.copy(dropped = merged))
+    }
+
 
     /** Re-plan from now on, keeping the task blocks that already happened today. */
     fun replan(d: AppData, now: Long): AppData {
@@ -52,7 +84,14 @@ object Planning {
             plan.allotted.forEach { (k, v) -> carried[k] = (carried[k] ?: 0) + v }
             week += plan
         }
-        return d.copy(weekPlan = week)
+        // Due this week but the week has no room for all of it.
+        val horizon = Time.at(today.plusDays(WEEK_DAYS + 1L), 0, zone)
+        val atRisk = d.tasks.filter { t ->
+            t.status == com.maven.notafraud.core.model.TaskStatus.TODO && t.dueAt != null && t.dueAt < horizon && t.dueAt > now &&
+                t.kind != com.maven.notafraud.core.model.TaskKind.PRACTICE &&
+                com.maven.notafraud.core.score.Scorer.minutesLeft(t) - (carried[t.id] ?: 0) > 10
+        }.sortedBy { it.dueAt }.map { it.title }
+        return d.copy(weekPlan = week, todayPlan = d.todayPlan?.copy(atRisk = atRisk))
     }
 
     /** Today's plan or a draft day from the week. */

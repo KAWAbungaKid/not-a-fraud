@@ -189,20 +189,43 @@ object Seed {
             anchors = anchors(), routine = routine(), seeded = true,
             settings = com.maven.notafraud.core.model.Settings(routineSince = now),
         )
-        return base.copy(tasks = base.tasks + Migration.catchUpTasks(base, now))
+        val (trees, skills) = Migration.skillTrees()
+        return base.copy(tasks = base.tasks + Migration.catchUpTasks(base, now), skillTrees = trees, skills = skills)
     }
 }
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 4
+    const val CURRENT = 5
 
     fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
         var x = d
         if (x.schema < 2) x = toV2(x, now)
         if (x.schema < 3) x = toV3(x, now)
         if (x.schema < 4) x = toV4(x)
+        if (x.schema < 5) x = toV5(x)
         return x
+    }
+
+    /** Starter skill trees from Maven's examples (all editable): athletics and climbing count as sport. */
+    fun skillTrees(): Pair<List<com.maven.notafraud.core.model.SkillTree>, List<com.maven.notafraud.core.model.Skill>> {
+        val ath = com.maven.notafraud.core.model.SkillTree(id = "st-athletics", name = "Athletics", sport = true, order = 0)
+        val climb = com.maven.notafraud.core.model.SkillTree(id = "st-climbing", name = "Climbing", sport = true, order = 1)
+        val music = com.maven.notafraud.core.model.SkillTree(id = "st-music", name = "Music", order = 2)
+        val magic = com.maven.notafraud.core.model.SkillTree(id = "st-magic", name = "Magic", order = 3)
+        val skills = listOf(
+            com.maven.notafraud.core.model.Skill(id = "sk-backflip", treeId = ath.id, name = "Backflip"),
+            com.maven.notafraud.core.model.Skill(id = "sk-flair", treeId = ath.id, name = "Flair (breaking)"),
+            com.maven.notafraud.core.model.Skill(id = "sk-boulder", treeId = climb.id, name = "Bouldering"),
+            com.maven.notafraud.core.model.Skill(id = "sk-piano", treeId = music.id, name = "Piano"),
+            com.maven.notafraud.core.model.Skill(id = "sk-cards", treeId = magic.id, name = "Card tricks"),
+        )
+        return listOf(ath, climb, music, magic) to skills
+    }
+
+    private fun toV5(d: AppData): AppData {
+        val (trees, skills) = skillTrees()
+        return d.copy(schema = 5, skillTrees = d.skillTrees.ifEmpty { trees }, skills = d.skills.ifEmpty { skills })
     }
 
     /**

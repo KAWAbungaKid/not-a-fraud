@@ -62,7 +62,20 @@ object Actions {
             if (it.id == a.taskId) it.copy(loggedMin = it.loggedMin + minutes, lastWorkedAt = now) else it
         }
         val ledger = Credits.earn(d.ledger, d.settings, minutes.toDouble(), d.settings.earnPerSessionMin, "Worked: ${a.title}", now)
-        return d.copy(active = null, sessions = d.sessions + session, tasks = tasks, ledger = ledger)
+        val logged = d.copy(active = null, sessions = d.sessions + session, tasks = tasks, ledger = ledger)
+        return sportCountsAsWorkout(logged, a.taskId, minutes, now)
+    }
+
+    /** 20+ minutes on a skill in a sport tree (climbing, athletics…) checks today's workout with that sport. */
+    private fun sportCountsAsWorkout(d: AppData, taskId: String?, minutes: Int, now: Long): AppData {
+        if (taskId == null || minutes < 20) return d
+        val skill = d.skills.firstOrNull { it.practiceTaskId == taskId } ?: return d
+        val tree = d.skillTrees.firstOrNull { it.id == skill.treeId && it.sport } ?: return d
+        val workout = d.routine.firstOrNull { it.id == "r-workout" } ?: return d
+        val date = Time.dateOf(now, Time.zone(d.settings.zoneId)).toString()
+        if (d.routineDays.firstOrNull { it.date == date }?.done?.containsKey(workout.id) == true) return d
+        val note = com.maven.notafraud.core.routine.RoutinePolicy.SPORT_NOTES.firstOrNull { it.equals(tree.name, ignoreCase = true) } ?: "Sport"
+        return checkRoutine(d, workout.id, now, note)
     }
 
     /**
@@ -325,5 +338,45 @@ object Actions {
         if (existing?.firstUnlock != null) return d
         val ctx = (existing ?: com.maven.notafraud.core.model.DayContext(date)).copy(firstUnlock = at)
         return d.copy(days = d.days.filterNot { it.date == date } + ctx)
+    }
+
+    // ---- Skills --------------------------------------------------------------------------
+
+    fun upsertTree(d: AppData, t: com.maven.notafraud.core.model.SkillTree) =
+        d.copy(skillTrees = if (d.skillTrees.any { it.id == t.id }) d.skillTrees.map { if (it.id == t.id) t else it } else d.skillTrees + t.copy(order = d.skillTrees.size))
+
+    fun deleteTree(d: AppData, id: String) = d.copy(skillTrees = d.skillTrees.filterNot { it.id == id }, skills = d.skills.filterNot { it.treeId == id })
+
+    fun upsertSkill(d: AppData, s: com.maven.notafraud.core.model.Skill) =
+        d.copy(skills = if (d.skills.any { it.id == s.id }) d.skills.map { if (it.id == s.id) s else it } else d.skills + s)
+
+    fun deleteSkill(d: AppData, id: String) = d.copy(skills = d.skills.filterNot { it.id == id }.map { if (it.parentId == id) it.copy(parentId = null) else it })
+
+    /** A practice task for the skill (created once), so the planner sprinkles it into gaps and its sessions level the skill. */
+    fun practiceSkill(d: AppData, skillId: String, weeklyMin: Int, now: Long): AppData {
+        val s = d.skills.firstOrNull { it.id == skillId } ?: return d
+        if (s.practiceTaskId != null && d.tasks.any { it.id == s.practiceTaskId }) return d
+        val tree = d.skillTrees.firstOrNull { it.id == s.treeId }
+        val project = d.projects.firstOrNull { it.name == "Skills" } ?: com.maven.notafraud.core.model.Project(name = "Skills", kind = com.maven.notafraud.core.model.ProjectKind.PROJECT, areaId = if (tree?.sport == true) "a-fitness" else "a-mind")
+        val task = Task(
+            title = "Practice: ${s.name}", projectId = project.id, kind = com.maven.notafraud.core.model.TaskKind.PRACTICE,
+            weeklyTargetMin = weeklyMin, estMin = weeklyMin, minBlockMin = 15, maxBlockMin = 60, createdAt = now,
+            sourceKey = "skill:${s.id}",
+        )
+        val withProject = if (d.projects.any { it.id == project.id }) d else d.copy(projects = d.projects + project)
+        return withProject.copy(tasks = withProject.tasks + task, skills = withProject.skills.map { if (it.id == skillId) it.copy(practiceTaskId = task.id) else it })
+    }
+
+    fun addSkillMinutes(d: AppData, skillId: String, minutes: Int) =
+        d.copy(skills = d.skills.map { if (it.id == skillId) it.copy(manualMin = (it.manualMin + minutes).coerceAtLeast(0)) else it })
+
+    // ---- Weekly check-in / burnout prompt --------------------------------------------------
+
+    fun checkIn(d: AppData, weekStart: LocalDate, ratings: Map<String, Int>, now: Long) =
+        d.copy(checkIns = (d.checkIns.filterNot { it.weekStart == weekStart.toString() } + com.maven.notafraud.core.model.CheckIn(weekStart.toString(), ratings, now)).takeLast(60))
+
+    fun markPrompted(d: AppData, date: LocalDate, now: Long): AppData {
+        val ctx = d.days.firstOrNull { it.date == date.toString() } ?: com.maven.notafraud.core.model.DayContext(date.toString())
+        return d.copy(days = d.days.filterNot { it.date == date.toString() } + ctx.copy(promptedAt = now))
     }
 }

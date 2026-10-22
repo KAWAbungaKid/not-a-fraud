@@ -60,6 +60,10 @@ data class DayPlan(
     val mode: DayMode? = null,
     /** Minutes placed per task in this plan (week planning carries these forward). */
     val allotted: Map<String, Int> = emptyMap(),
+    /** Planned for today earlier, but no longer fits after a re-plan ("lost the slot"). */
+    val dropped: List<String> = emptyList(),
+    /** Due within the week but the week doesn't have room for all of it. */
+    val atRisk: List<String> = emptyList(),
 ) {
     /** Instants worth waking for: block starts/ends (background ends too — "washer's done"). */
     val boundaries: List<Long> get() = blocks.flatMap { listOf(it.start, it.end) }.distinct().sorted()
@@ -90,14 +94,16 @@ object RoughDay {
 object Importance {
     private val MULT = doubleArrayOf(0.6, 0.8, 1.0, 1.3, 1.6)
 
-    fun level(task: Task, d: AppData, now: Long): Int {
-        val area = d.projects.firstOrNull { it.id == task.projectId }?.areaId?.let { a -> d.areas.firstOrNull { it.id == a } }
-        val base = task.importance ?: area?.importance ?: 3
+    /** [lowStatAreas]: areas whose stat is low get +1 (STATE.md section 11: stats set the baseline, tasks override). */
+    fun level(task: Task, d: AppData, now: Long, lowStatAreas: Set<String> = emptySet()): Int {
+        val areaId = d.projects.firstOrNull { it.id == task.projectId }?.areaId
+        val area = areaId?.let { a -> d.areas.firstOrNull { it.id == a } }
+        val base = task.importance ?: ((area?.importance ?: 3) + if (areaId != null && areaId in lowStatAreas) 1 else 0)
         val bump = if ((task.bumpUntil ?: 0) > now) 1 else 0
         return (base + bump).coerceIn(1, 5)
     }
 
-    fun mult(task: Task, d: AppData, now: Long) = MULT[level(task, d, now) - 1]
+    fun mult(task: Task, d: AppData, now: Long, lowStatAreas: Set<String> = emptySet()) = MULT[level(task, d, now, lowStatAreas) - 1]
 }
 
 /** Practice items: time-in toward a weekly target. */
@@ -165,6 +171,7 @@ class DayPlanner(
         val dayEnd = Time.at(date, s.dayEndMin, zone)
 
         val open = data.tasks.filter { it.status == TaskStatus.TODO && it.kind != TaskKind.WAITING }
+        val lowStat = com.maven.notafraud.core.stats.Stats.lowAreas(data, date)
         val hotTasks = open.filter { Heat.deadlineHot(it, now) }
         val picks = data.picks[date.toString()].orEmpty().toSet()
 
@@ -240,7 +247,7 @@ class DayPlanner(
                 val title = when {
                     mode == DayMode.RECHARGE && len >= 60 -> "Recharge: ${len}-minute nap"
                     mode == DayMode.RECHARGE -> "Recharge: ${len}-min nap or walk"
-                    else -> "Recharge: walk, gym, art, or just be bored"
+                    else -> "Recharge: " + s.rechargeIdeas.take(3).joinToString(", ").ifBlank { "walk, gym, art, or just be bored" }
                 }
                 extra += PlanBlock(t0, t0 + len * Time.MIN, BlockKind.RECHARGE, title, protected = true)
                 occupy(t0, t0 + len * Time.MIN)
@@ -272,7 +279,7 @@ class DayPlanner(
                 val virtual = task.copy(loggedMin = task.loggedMin + (carried[task.id] ?: 0) + (allotted[task.id] ?: 0))
                 Scorer.score(virtual, t, w, e)
             }
-            sc *= Importance.mult(task, data, now)
+            sc *= Importance.mult(task, data, now, lowStat)
             if (task.kind == TaskKind.FILLER) sc *= if (e == Energy.LOW || w < 30 || Time.minuteOfDay(t, zone) >= 20 * 60) 1.4 else 0.8
             if (task.id in picks) sc = sc * 2 + 40
             if (task.hot) sc *= 1.5
@@ -331,7 +338,9 @@ class DayPlanner(
                     .maxByOrNull { it.third } ?: break
 
                 val (task, n, _) = pick
-                val cap = task.maxBlockMin ?: if (task.kind == TaskKind.PRACTICE) 60 else chunkCap
+                val learned = if (task.kind == TaskKind.PRACTICE) com.maven.notafraud.core.stats.Learning.typicalMin(data, task.id) else null
+                val cap = (learned?.let { roundDown5((it * 1.2).toInt()).coerceAtLeast(task.minBlockMin) } ?: Int.MAX_VALUE)
+                    .coerceAtMost(task.maxBlockMin ?: if (task.kind == TaskKind.PRACTICE) 60 else chunkCap)
                 var len = minOf(n, w, chunkCap, capLeft, cap)
                 len = roundDown5(len).coerceAtLeast(min(5, len))
                 if (len < minWindowMin && len < n) break

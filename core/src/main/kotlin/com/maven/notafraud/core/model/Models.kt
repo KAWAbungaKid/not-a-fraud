@@ -371,7 +371,41 @@ data class Settings(
     val studyLeadDays: Int = 10,
     /** Play a short alarm-stream sound with bedtime nudges (gets through Do Not Disturb / Bedtime mode). */
     val bedtimeSound: Boolean = true,
+    /** A stat under 4/10 adds one importance to the areas it covers. */
+    val statsDriveImportance: Boolean = true,
+    /** Re-plan on its own when a planned block slips by. */
+    val autoReplan: Boolean = true,
+    /** Accent colour key: green, amber, cyan, violet, rose, white. */
+    val accent: String = "green",
+    /** Things that actually recharge (walk, gym, being bored, art…), shown on recharge blocks. */
+    val rechargeIdeas: List<String> = listOf("Walk outside", "Gym", "Be bored: no phone, let it process", "Art"),
 )
+
+/** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
+@Serializable
+data class SkillTree(
+    val id: String = newId(),
+    val name: String,
+    val sport: Boolean = false,
+    val order: Int = 0,
+)
+
+/** One skill node. [parentId] = the skill it builds on. Time comes from its practice task plus manual minutes. */
+@Serializable
+data class Skill(
+    val id: String = newId(),
+    val treeId: String,
+    val name: String,
+    val parentId: String? = null,
+    val practiceTaskId: String? = null,
+    val manualMin: Int = 0,
+    val notes: String = "",
+    val unlockedAt: Long? = null,
+)
+
+/** Sunday check-in for what sensors can't measure. Ratings 1–5 by key (social, spirit, stress, happiness). */
+@Serializable
+data class CheckIn(val weekStart: String, val ratings: Map<String, Int> = emptyMap(), val at: Long = 0)
 
 @Serializable
 enum class CalMode {
@@ -412,6 +446,10 @@ data class DayContext(
     val modeAt: Long? = null,
     /** Recharge: minutes of nap/walk to put first. */
     val rechargeMin: Int = 20,
+    /** Task minutes in the day's first plan (for plan adherence → Discipline). */
+    val plannedTaskMin: Int? = null,
+    /** When the burnout prompt was shown (once a day). */
+    val promptedAt: Long? = null,
 )
 
 @Serializable
@@ -448,6 +486,9 @@ data class AppData(
     val ignoredSourceKeys: Set<String> = emptySet(),
     /** Old tasks waiting for the user's Keep / Done / Delete. */
     val reviewTaskIds: Set<String> = emptySet(),
+    val skillTrees: List<SkillTree> = emptyList(),
+    val skills: List<Skill> = emptyList(),
+    val checkIns: List<CheckIn> = emptyList(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),

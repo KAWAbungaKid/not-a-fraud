@@ -296,3 +296,11 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 **v0.3 vs v0.4 split (agreed):** v0.3 = everything above except: stats (and stats-driven area importance), the Skyrim-style skill tree (built on practice time), learning real session lengths, burnout signals with push/reset prompts beyond the manual "How's today?", hourly re-plan that drops what no longer fits, patterns from deferrals, colour customization → v0.4.
 
 **Future:** own workout and diet apps (with his Excel workout math) talking to this app; meal timing and food choice; catch-up / sneak-in workouts on busy weeks.
+
+
+## 12. v0.3.1 (2026-10-21)
+
+- Exam studying was doubling: seeded exam tasks (from the web app) plus the same exams in Google Calendar. **Direction (Maven): rely on Google Calendar, move away from the hard-coded import** so a version for other people isn't a big change. Done: new calendar mode **TESTS** (fixed time + auto study task, synced by event id); seeded exam studying, v0.3 keyword-made exam tasks and the seeded ME 3411 final removed by migration v4 (worked-on tasks kept); keyword spotting off by default.
+- **Toward an app for other people:** the remaining Maven-specific seed (anchors, routine times, web-app tasks, goals/areas) should become an onboarding flow with neutral defaults. Not started; keep new features calendar- and settings-driven, not hard-coded.
+- Block screen was slower in v0.3 (a 700 ms wait for notification taps) — removed; the block screen now closes itself if a reply window opens after it.
+- Snapchat reply window "not working all the time": notification-tap detection depends on the app removing its notification on click. Added the robust rule: opening a blocked app within 15 min of a new message notification (category message/social/call, not story/streak) is a free reply window, once per message.

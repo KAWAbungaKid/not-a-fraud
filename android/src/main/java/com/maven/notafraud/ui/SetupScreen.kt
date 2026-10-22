@@ -47,14 +47,12 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import com.maven.notafraud.BuildConfig
 import com.maven.notafraud.Graph
-import com.maven.notafraud.core.ics.IcsParser
 import com.maven.notafraud.core.model.Anchor
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.model.Project
 import com.maven.notafraud.core.model.ProjectKind
 import com.maven.notafraud.core.plan.Time
 import com.maven.notafraud.core.store.Actions
-import com.maven.notafraud.core.store.WebImport
 import com.maven.notafraud.sense.AppLabels
 import com.maven.notafraud.sense.Health
 import com.maven.notafraud.sense.Perms
@@ -65,7 +63,7 @@ import java.io.File
 private enum class Picker { BLOCKED, FOCUS, MIRRORED }
 
 @Composable
-fun SetupScreen(data: AppData, resumes: Long) {
+fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var picker by remember { mutableStateOf<Picker?>(null) }
@@ -86,22 +84,6 @@ fun SetupScreen(data: AppData, resumes: Long) {
     val healthLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         scope.launch { Workers.syncSensors(ctx) }
     }
-    val icsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val text = readText(ctx, uri) ?: return@rememberLauncherForActivityResult
-        val events = IcsParser.parse(text, Graph.zone)
-        Graph.changeAndReplan(ctx) { Actions.mergeIcs(it, events) }
-        toast = "Imported ${events.size} calendar events."
-    }
-    val webLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        val text = readText(ctx, uri) ?: return@rememberLauncherForActivityResult
-        toast = runCatching {
-            var result: WebImport.Result? = null
-            Graph.changeAndReplan(ctx) { d -> WebImport.merge(d, text).also { result = it }.data }
-            result!!.let { "Imported ${it.tasks} tasks, ${it.projects} projects, ${it.events} events, ${it.sessions} sessions." }
-        }.getOrElse { "Couldn't read that file: ${it.message}" }
-    }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         val text = readText(ctx, uri) ?: return@rememberLauncherForActivityResult
@@ -110,6 +92,7 @@ fun SetupScreen(data: AppData, resumes: Long) {
 
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Spacer(Modifier.height(8.dp)) }
+        if (section == "setup") {
         item {
             val done = listOf(p.notifications, p.accessibility, p.usage, p.listener, healthGranted, p.calendar, p.exact, p.battery).count { it }
             Text("Setup · $done/8 done", style = MaterialTheme.typography.titleLarge)
@@ -175,7 +158,9 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
-        item { SectionLabel("Blocking") }
+        }
+
+        if (section == "blocking") {
         item {
             Panel {
                 SwitchRow("Blocking on", data.rules.blockingEnabled) { on -> Graph.update { it.copy(rules = it.rules.copy(blockingEnabled = on)) } }
@@ -184,8 +169,11 @@ fun SetupScreen(data: AppData, resumes: Long) {
                 SwitchRow("Bedtime nudges make a sound (through Do Not Disturb)", data.settings.bedtimeSound) { on -> Graph.update { it.copy(settings = it.settings.copy(bedtimeSound = on)) } }
                 TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.size})") }
                 TextButton(onClick = { editingSites = true }) { Text("Blocked websites (${data.rules.blockedSites.size})") }
-                TextButton(onClick = { editingProfile = "com.snapchat.android" }) { Text("Snapchat rules (reply window, Quick Snap, typing)") }
-                TextButton(onClick = { editingProfile = "" }) { Text("Rules for every other blocked app") }
+                for (pkg in data.rules.blocked.sortedBy { AppLabels.label(ctx, it) }) {
+                    val custom = pkg in data.rules.profiles
+                    TextButton(onClick = { editingProfile = pkg }) { Text("${AppLabels.label(ctx, pkg)} rules" + if (custom) " (own rules)" else " (default rules)") }
+                }
+                TextButton(onClick = { editingProfile = "" }) { Text("Default rules for blocked apps (reply window, typing, still texting)") }
                 Text("Quick Snap: pull down twice → pencil/edit → drag the \"Quick Snap\" tile into your quick settings.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.size})") }
                             }
@@ -219,12 +207,15 @@ fun SetupScreen(data: AppData, resumes: Long) {
         item { SectionLabel("Why wasn't I blocked?") }
         item { GuardLogPanel() }
 
-        item { SectionLabel("Planning") }
+        }
+
+        if (section == "planning") {
         item {
             var ideas by remember { mutableStateOf(false) }
             Panel {
                 SwitchRow("Re-plan when a block slips by", data.settings.autoReplan) { on -> Graph.update { it.copy(settings = it.settings.copy(autoReplan = on)) } }
                 SwitchRow("Low stats raise their areas' importance", data.settings.statsDriveImportance) { on -> Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(statsDriveImportance = on)) } }
+                SwitchRow("Weekly check-in (Social, Spirit stats)", data.settings.checkInEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(checkInEnabled = on)) } }
                 TextButton(onClick = { ideas = true }) { Text("Recharge ideas: " + data.settings.rechargeIdeas.joinToString(", ").ifBlank { "none" }) }
             }
             if (ideas) ListDialog("Recharge ideas", "One per line. Recharge blocks suggest these.", data.settings.rechargeIdeas, { ideas = false }) { l ->
@@ -232,32 +223,23 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
-        item { SectionLabel("Look") }
-        item {
-            Panel {
-                Text("Accent color", style = MaterialTheme.typography.titleSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    for ((name, c) in ACCENTS) {
-                        Box(
-                            Modifier.size(36.dp).clip(CircleShape).background(c.first)
-                                .then(if (data.settings.accent == name) Modifier.background(c.first) else Modifier)
-                                .clickable { Graph.update { it.copy(settings = it.settings.copy(accent = name)) } },
-                            contentAlignment = Alignment.Center,
-                        ) { if (data.settings.accent == name) Text("✓", color = Palette.bg) }
-                    }
-                }
-            }
         }
 
-        item { SectionLabel("Google Calendar") }
+        if (section == "look") item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { LookControls(data) } }
+
+        if (section == "calendar") {
         item { CalendarPanel(data, resumes) }
 
-        item { SectionLabel("Weekly blocks") }
+        item { SectionLabel("Samsung Health") }
+        item { HealthPanel(resumes) { if (healthStatus == HealthConnectClient.SDK_AVAILABLE) healthLauncher.launch(Health.PERMISSIONS) } }
+        }
+
+        if (section == "blocks") {
         item {
-            Text("Hard never moves. Habit keeps its slot unless a deadline is hot (if allowed). Container gets filled with your hottest project work. Meals, cardio and workouts are in Routine.",
+            Text("Hard never moves. Habit keeps its slot unless a deadline is hot (if allowed). Container gets filled with your hottest project work. Classes are on the Classes page; meals, cardio and workouts are in Routine.",
                 color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         }
-        val recurring = data.anchors.filter { it.dates.isEmpty() }.sortedWith(compareBy({ it.days.minOrNull() ?: 8 }, { it.startMin }))
+        val recurring = data.anchors.filter { it.dates.isEmpty() && it.kind != com.maven.notafraud.core.model.AnchorKind.CLASS }.sortedWith(compareBy({ it.days.minOrNull() ?: 8 }, { it.startMin }))
         items(recurring, key = { it.id }) { a -> AnchorRow(a) { editingAnchor = a } }
         item {
             TextButton(onClick = {
@@ -265,7 +247,7 @@ fun SetupScreen(data: AppData, resumes: Long) {
                     mode = com.maven.notafraud.core.model.AnchorMode.HABIT)
             }) { Text("Add weekly block") }
         }
-        item {
+        if (data.anchors.any { it.dates.isNotEmpty() }) item {
             val dated = data.anchors.filter { it.dates.isNotEmpty() }
             val days = dated.flatMap { it.dates }.distinct().sorted()
             Panel(Modifier.clickable { editingResearch = true }) {
@@ -275,14 +257,16 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
-        item { SectionLabel("Projects") }
+        }
+
+        if (section == "projects") {
         item { ProjectsPanel(data) }
 
-        item { SectionLabel("Data") }
+        }
+
+        if (section == "data") {
         item {
             Panel {
-                TextButton(onClick = { icsLauncher.launch(arrayOf("text/calendar", "text/*", "*/*")) }) { Text("Import .ics calendar file") }
-                TextButton(onClick = { webLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) { Text("Import from Project Max web app (.json)") }
                 TextButton(onClick = { shareBackup(ctx) }) { Text("Export backup") }
                 TextButton(onClick = { restoreLauncher.launch(arrayOf("application/json", "*/*")) }) { Text("Restore backup (replaces everything)") }
                 TextButton(onClick = { scope.launch { Workers.syncSensors(ctx); toast = "Synced." } }) { Text("Sync sensors now") }
@@ -290,7 +274,6 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
-        item { SectionLabel("About") }
         item {
             Panel {
                 Text("Not a Fraud ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
@@ -298,6 +281,7 @@ fun SetupScreen(data: AppData, resumes: Long) {
                     Text("Check for updates")
                 }
             }
+        }
         }
         item { Spacer(Modifier.height(32.dp)) }
     }
@@ -682,5 +666,28 @@ private fun GuardLogPanel() {
                     color = if (e.decision.startsWith("allowed")) Palette.amber else Palette.text)
             }
         }
+    }
+}
+
+
+/** What Health Connect actually has: permissions and every sleep record of the last 2 days, with the app that wrote it. */
+@Composable
+private fun HealthPanel(resumes: Long, onGrant: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var tick by remember { mutableStateOf(0) }
+    val lines by produceState(listOf("Checking…"), resumes, tick) { value = runCatching { Health.diagnose(ctx) }.getOrElse { listOf("Couldn't ask Health Connect: ${it.message}") } }
+    Panel {
+        for (l in lines) Text(l, style = MaterialTheme.typography.bodySmall, color = if ("NO" in l || "No sleep" in l || "failed" in l) Palette.amber else Palette.text)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onGrant) { Text("Grant access") }
+            TextButton(onClick = { scope.launch { Workers.syncSensors(ctx); tick++ } }) { Text("Sync now") }
+            TextButton(onClick = { open(ctx, Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS").putExtra(Intent.EXTRA_PACKAGE_NAME, ctx.packageName)) }) { Text("Health Connect") }
+        }
+        Text(
+            "If no sleep records show up: open Samsung Health → ⋮ → Settings → Health Connect, and make sure Samsung Health is allowed to WRITE Sleep (and Exercise, Steps). " +
+                "Samsung Health copies data over when it syncs, so opening Samsung Health once in the morning helps. Records listed here from com.sec.android.app.shealth mean it's working.",
+            color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+        )
     }
 }

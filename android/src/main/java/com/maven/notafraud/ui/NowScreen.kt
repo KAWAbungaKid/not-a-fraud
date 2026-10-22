@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.maven.notafraud.Graph
 import com.maven.notafraud.core.model.AppData
+import com.maven.notafraud.core.model.liveTasks
 import com.maven.notafraud.core.plan.Generated
 import com.maven.notafraud.core.plan.NowResolver
 import com.maven.notafraud.core.plan.Planning
@@ -54,9 +55,10 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
     val startToday = Time.at(today, 0, zone)
     val focusToday = data.sessions.filter { it.start >= startToday }.sumOf { it.minutes } +
         (data.active?.let { ((now - it.start) / Time.MIN).toInt() } ?: 0)
-    val ranked = remember(data, now / 60_000) { Scorer.rank(data.tasks, now, 60, withPlan.todayPlan!!.energy).take(5) }
+    val ranked = remember(data, now / 60_000) { Scorer.rank(data.liveTasks(), now, 60, withPlan.todayPlan!!.energy).take(5) }
     var idea by rememberSaveable { mutableStateOf("") }
 
+    val hidden = data.settings.nowHidden
     fun act(fn: (AppData) -> AppData) { Graph.update(fn); Graph.refresh(ctx) }
 
     LazyColumn(
@@ -113,9 +115,9 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             if (open) ReviewDialog(data, now) { open = false }
         }
 
-        item { PickThree(data, now) }
+        if ("pick3" !in hidden) item { PickThree(data, now) }
 
-        item {
+        if ("numbers" !in hidden) item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Stat("Credits", "${data.ledger.balanceMin.toInt()}m", Modifier.weight(1f))
                 val napMin = dayCtx?.naps?.sumOf { it.minutes } ?: 0
@@ -126,7 +128,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
         }
 
         val plan = withPlan.todayPlan
-        if (plan != null && (plan.dropped.isNotEmpty() || plan.atRisk.isNotEmpty())) item {
+        if ("moved" !in hidden && plan != null && (plan.dropped.isNotEmpty() || plan.atRisk.isNotEmpty())) item {
             Panel {
                 if (plan.dropped.isNotEmpty()) {
                     SectionLabel("Moved off today")
@@ -143,7 +145,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
 
         val week = com.maven.notafraud.core.plan.Practice.weekStart(today)
         val checkedIn = data.checkIns.any { it.weekStart == week.toString() }
-        if (!checkedIn && (today.dayOfWeek == java.time.DayOfWeek.SUNDAY || today.dayOfWeek == java.time.DayOfWeek.SATURDAY)) item {
+        if (data.settings.checkInEnabled && !checkedIn && (today.dayOfWeek == java.time.DayOfWeek.SUNDAY || today.dayOfWeek == java.time.DayOfWeek.SATURDAY)) item {
             var open by remember { mutableStateOf(false) }
             Panel(Modifier.clickable { open = true }) {
                 Text("Weekly check-in", style = MaterialTheme.typography.titleMedium)
@@ -152,7 +154,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             if (open) CheckInDialog(data, now) { open = false }
         }
 
-        item {
+        if ("today" !in hidden || Graph.lowPromptPending) item {
             var asking by remember { mutableStateOf(Graph.lowPromptPending.also { Graph.lowPromptPending = false }) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val mode = dayCtx?.mode
@@ -169,8 +171,8 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             if (asking) HowsToday(data, now) { asking = false }
         }
 
-        item { SectionLabel("Up next") }
-        items(ranked, key = { it.first.id }) { (task, score) ->
+        if ("upnext" !in hidden) item { SectionLabel("Up next") }
+        if ("upnext" !in hidden) items(ranked, key = { it.first.id }) { (task, score) ->
             val project = data.projects.firstOrNull { it.id == task.projectId }?.name
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -186,10 +188,10 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                 }
             }
         }
-        if (ranked.isEmpty()) item { Text("No open tasks. Add some in Tasks.", color = Palette.textDim) }
+        if ("upnext" !in hidden && ranked.isEmpty()) item { Text("No open tasks. Add some in Tasks.", color = Palette.textDim) }
 
-        item { SectionLabel("Capture an idea (waits for Friday)") }
-        item {
+        if ("idea" !in hidden) item { SectionLabel("Capture an idea (waits for Friday)") }
+        if ("idea" !in hidden) item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(idea, { idea = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Side project idea…") })
                 TextButton(onClick = {
@@ -198,17 +200,6 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
 
-        val top = usage?.minutesByApp?.entries?.sortedByDescending { it.value }?.take(6).orEmpty()
-        if (top.isNotEmpty()) {
-            item { SectionLabel("Phone screen time today") }
-            items(top, key = { it.key }) { (pkg, mins) ->
-                val blocked = pkg in data.rules.blocked
-                Row(Modifier.fillMaxWidth()) {
-                    Text(usage?.labels?.get(pkg) ?: pkg, Modifier.weight(1f), color = if (blocked) Palette.amber else Palette.text)
-                    Text(Time.durationText(mins), style = Mono, color = Palette.textDim)
-                }
-            }
-        }
         item { Spacer(Modifier.padding(bottom = 24.dp)) }
     }
 }
@@ -258,7 +249,7 @@ fun PickThree(data: AppData, now: Long) {
 
     if (choosing) {
         var chosen by remember { mutableStateOf(picked) }
-        val options = Scorer.rank(data.tasks, Time.at(target, 8 * 60, zone), 120, data.settings.energy).map { it.first }
+        val options = Scorer.rank(data.liveTasks(), Time.at(target, 8 * 60, zone), 120, data.settings.energy).map { it.first }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { choosing = false },
             title = { Text("Pick 3 for ${target.format(DateTimeFormatter.ofPattern("EEEE", Locale.US))}") },

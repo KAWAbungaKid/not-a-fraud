@@ -26,11 +26,13 @@ class SmokeTest {
         rule.waitForIdle()
         assertTrue(rule.onAllNodesWithText("RIGHT NOW").fetchSemanticsNodes().isNotEmpty() ||
             rule.onAllNodesWithText("WORKING").fetchSemanticsNodes().isNotEmpty())
-        for (tab in listOf("Plan", "You", "Tasks", "More", "Now")) {
+        for (tab in listOf("Plan", "Routine", "Tasks", "More", "Now")) {
             rule.onNodeWithText(tab).performClick()
             rule.waitForIdle()
         }
         rule.onNodeWithText("More").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Setup checks").performClick()
         rule.waitForIdle()
         assertTrue(rule.onAllNodesWithText("Setup ·", substring = true).fetchSemanticsNodes().isNotEmpty())
     }

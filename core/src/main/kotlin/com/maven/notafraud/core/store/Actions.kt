@@ -404,9 +404,9 @@ object Actions {
                 fromDate = sem?.start ?: it.fromDate, untilDate = sem?.end ?: it.untilDate, skipDates = sem?.offDates ?: it.skipDates, dates = emptySet())
         }
         var x = d.copy(anchors = keep + fresh)
-        val existing = x.projects.firstOrNull { !it.archived && (it.name == oldName || it.name == name) }
+        val existing = classProject(x, oldName ?: name) ?: classProject(x, name)
         val school = x.areas.firstOrNull { it.stat == "mind" && it.name.contains("school", true) } ?: x.areas.firstOrNull { it.name.contains("school", true) }
-        val project = existing?.copy(name = name) ?: com.maven.notafraud.core.model.Project(name = name, kind = com.maven.notafraud.core.model.ProjectKind.SCHOOL, areaId = school?.id)
+        val project = existing ?: com.maven.notafraud.core.model.Project(name = name, kind = com.maven.notafraud.core.model.ProjectKind.SCHOOL, areaId = school?.id)
         x = x.copy(projects = if (existing != null) x.projects.map { if (it.id == existing.id) project else it } else x.projects + project)
         val key = "catchup:${project.id}"
         val cu = x.tasks.firstOrNull { it.sourceKey == key }
@@ -420,6 +420,14 @@ object Actions {
             else -> x
         }
         return x
+    }
+
+    /** The project for a class: same name, or a School project with the same course number ("ME 3521 ..." ↔ "ME 3521 Applied Thermo"). */
+    fun classProject(d: AppData, name: String): com.maven.notafraud.core.model.Project? {
+        val live = d.projects.filter { !it.archived }
+        live.firstOrNull { it.name == name }?.let { return it }
+        val num = Regex("""\b(\d{4})\b""").find(name)?.groupValues?.get(1) ?: return null
+        return live.firstOrNull { it.kind == com.maven.notafraud.core.model.ProjectKind.SCHOOL && Regex("""\b$num\b""").containsMatchIn(it.name) }
     }
 
     fun deleteClass(d: AppData, name: String): AppData =

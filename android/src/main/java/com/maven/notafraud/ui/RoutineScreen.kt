@@ -238,6 +238,15 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     RoutineCategory.entries.forEach { c -> FilterChip(r.category == c, { r = r.copy(category = c) }, { Text(c.name.lowercase()) }) }
                 }
+                SectionLabel("Checks itself when")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(r.autoCheck == null, { r = r.copy(autoCheck = null) }, { Text("only by hand") })
+                    for ((a, label) in listOf(
+                        com.maven.notafraud.core.model.AutoCheck.WAKE to "you wake up (watch / first unlock)",
+                        com.maven.notafraud.core.model.AutoCheck.WORKOUT to "a workout is logged",
+                        com.maven.notafraud.core.model.AutoCheck.PICK3 to "you pick tomorrow's 3",
+                    )) FilterChip(r.autoCheck == a, { r = r.copy(autoCheck = a) }, { Text(label) })
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Also check when going to bed", Modifier.weight(1f))
                     Switch(r.trigger == RoutineTrigger.BEDTIME, { r = r.copy(trigger = if (it) RoutineTrigger.BEDTIME else RoutineTrigger.TIME) })

@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountTree
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewTimeline
@@ -82,50 +83,61 @@ class MainActivity : ComponentActivity() {
             if (!Perms.notifications(ctx)) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        val tabs = tabsOf(data)
+        val angry = remember(data, now / 60_000) {
+            com.maven.notafraud.core.routine.RoutinePolicy.statuses(data, now).count { it.mood == com.maven.notafraud.core.routine.Mood.ANGRY }
+        }
+        // Back: a page opened from More goes back to More; a bar page goes back to the first tab.
+        androidx.activity.compose.BackHandler(enabled = tab != tabs.first().id) {
+            tab = if (tab == TAB_MORE || tabs.any { it.id == tab }) tabs.first().id else TAB_MORE
+        }
+        val inBar = tab == TAB_MORE || tabs.any { it.id == tab }
+
         Scaffold(
             bottomBar = {
                 NavigationBar {
-                    tabItem(TAB_NOW, "Now", Icons.Filled.PlayArrow)
-                    tabItem(TAB_PLAN, "Plan", Icons.Filled.ViewTimeline)
-                    val angry = remember(data, now / 60_000) {
-                        com.maven.notafraud.core.routine.RoutinePolicy.statuses(data, now).count { it.mood == com.maven.notafraud.core.routine.Mood.ANGRY }
-                    }
-                    NavigationBarItem(
-                        selected = tab == TAB_ROUTINE,
-                        onClick = { tab = TAB_ROUTINE },
-                        icon = { BadgedBox(badge = { if (angry > 0) Badge { Text("$angry") } }) { Icon(Icons.Filled.Person, null) } },
-                        label = { Text("You") },
+                    for (p in tabs) NavigationBarItem(
+                        selected = tab == p.id,
+                        onClick = { tab = p.id },
+                        icon = {
+                            if (p.id == TAB_ROUTINE && angry > 0) BadgedBox(badge = { Badge { Text("$angry") } }) { Icon(p.icon, null) }
+                            else Icon(p.icon, null)
+                        },
+                        label = { Text(p.label, maxLines = 1) },
                     )
-                    tabItem(TAB_TASKS, "Tasks", Icons.Filled.AccountTree)
                     NavigationBarItem(
-                        selected = tab == TAB_SETUP,
-                        onClick = { tab = TAB_SETUP },
-                        icon = { Icon(Icons.Filled.Settings, null) },
+                        selected = !inBar || tab == TAB_MORE,
+                        onClick = { tab = TAB_MORE },
+                        icon = { Icon(Icons.Filled.Menu, null) },
                         label = { Text("More") },
                     )
                 }
             },
         ) { pad ->
             Box(Modifier.padding(pad)) {
-                when (tab) {
-                    TAB_NOW -> NowScreen(data, now, onOpenTab = { tab = it })
-                    TAB_PLAN -> PlanScreen(data, now)
-                    TAB_ROUTINE -> YouScreen(data, now)
-                    TAB_TASKS -> TasksScreen(data, now)
-                    TAB_SETUP -> SetupScreen(data, resumes)
+                androidx.compose.foundation.layout.Column {
+                    if (!inBar) page(tab)?.let { p ->
+                        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            androidx.compose.material3.IconButton(onClick = { tab = TAB_MORE }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                            Text(p.label, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        when (tab) {
+                            TAB_NOW -> NowScreen(data, now, onOpenTab = { tab = it })
+                            TAB_PLAN -> PlanScreen(data, now)
+                            TAB_ROUTINE -> RoutineScreen(data, now)
+                            TAB_TASKS -> TasksScreen(data, now)
+                            "stats" -> StatsScreen(data, now)
+                            "skills" -> SkillsScreen(data)
+                            "classes" -> ClassesScreen(data, now)
+                            TAB_MORE -> MoreScreen(data) { tab = it }
+                            else -> SetupScreen(data, resumes, section = tab)
+                        }
+                    }
                 }
             }
         }
-    }
-
-    @Composable
-    private fun androidx.compose.foundation.layout.RowScope.tabItem(id: String, label: String, icon: ImageVector) {
-        NavigationBarItem(
-            selected = tab == id,
-            onClick = { tab = id },
-            icon = { Icon(icon, null) },
-            label = { Text(label) },
-        )
     }
 
     companion object {
@@ -135,5 +147,6 @@ class MainActivity : ComponentActivity() {
         const val TAB_TASKS = "tasks"
         const val TAB_ROUTINE = "routine"
         const val TAB_SETUP = "setup"
+        const val TAB_MORE = "more"
     }
 }

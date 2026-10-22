@@ -1,5 +1,6 @@
 package com.maven.notafraud.desktop
 
+import com.maven.notafraud.core.model.liveTasks
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -214,7 +215,7 @@ private fun NowTab(store: DataStore, tracker: Tracker, data: AppData, now: Long)
         }
         if (plan.note.isNotBlank()) item { Text(plan.note, color = Color(0xFFFFC857)) }
         item { Label("Up next") }
-        items(Scorer.rank(data.tasks, now, 60, plan.energy).take(6), key = { it.first.id }) { (t, _) ->
+        items(Scorer.rank(data.liveTasks(), now, 60, plan.energy).take(6), key = { it.first.id }) { (t, _) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(t.title, Modifier.weight(1f))
                 TextButton(onClick = { store.update { Actions.startSession(it, t.id, null, System.currentTimeMillis()) } }) { Text("Start") }

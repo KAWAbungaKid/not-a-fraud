@@ -390,6 +390,15 @@ private fun NodeSheet(
                                 Text(g.name, maxLines = 2)
                             }
                         }
+                        SectionLabel("Importance (everything in this area starts here)")
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            for (i in 1..5) androidx.compose.material3.FilterChip(area.importance == i, { change { Actions.upsertArea(it, area.copy(importance = i)) } }, { Text("$i") })
+                        }
+                        SectionLabel("Counts toward stat")
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            androidx.compose.material3.FilterChip(area.stat == null, { change { Actions.upsertArea(it, area.copy(stat = null)) } }, { Text("none") })
+                            for ((k, label) in com.maven.notafraud.core.stats.Stats.KEYS) androidx.compose.material3.FilterChip(area.stat == k, { change { Actions.upsertArea(it, area.copy(stat = k)) } }, { Text(label) })
+                        }
                     }
                     SectionLabel("Projects")
                     d.projects.filter { !it.archived && (if (area == null) d.areas.none { a -> a.id == it.areaId } else it.areaId == area.id) }
@@ -437,7 +446,7 @@ private fun NodeSheet(
                 NodeType.TASK -> {
                     val t = d.tasks.firstOrNull { it.id == n.refId }
                     if (t != null) {
-                        Text(listOfNotNull("${t.loggedMin}/${t.estMin} min", t.priority.name.lowercase(), if (t.hot) "pinned hot" else null).joinToString(" · "), color = Palette.textDim)
+                        Text(listOfNotNull("${t.loggedMin}/${t.estMin} min", if (t.priority == com.maven.notafraud.core.model.Priority.HIGH && t.dueAt != null) "firm deadline" else null, t.importance?.let { "importance $it" }, if (t.hot) "pinned hot" else null).joinToString(" · "), color = Palette.textDim)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { onEditTask(t) }) { Text("Edit") }
                             OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) }; onDismiss() }) { Text("Done") }

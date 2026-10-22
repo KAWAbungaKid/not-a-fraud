@@ -157,7 +157,7 @@ private fun TaskRow(t: Task, now: Long, zone: java.time.ZoneId, onToggle: (Boole
                 val meta = listOfNotNull(
                     "${t.loggedMin}/${t.estMin}m",
                     t.dueAt?.let { "due " + dueText(it, now, zone) },
-                    t.priority.takeIf { it != Priority.NORMAL }?.name?.lowercase(),
+                    if (t.priority == Priority.HIGH && t.dueAt != null) "firm deadline" else null,
                     if (t.hot) "hot" else null,
                     t.notBefore?.takeIf { it > now }?.let { "from " + Time.dateOf(it, zone).format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)) },
                 )
@@ -264,11 +264,11 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                     if (due != null) TextButton(onClick = { t = t.copy(dueAt = null) }) { Text("Clear", color = Palette.textDim) }
                 }
 
-                SectionLabel("Priority")
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (p in Priority.entries) FilterChip(t.priority == p, { t = t.copy(priority = p) }, { Text(p.name.lowercase()) })
+                if (t.dueAt != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Firm deadline (pushed hard as it closes in)", Modifier.weight(1f))
+                    androidx.compose.material3.Switch(checked = t.priority == Priority.HIGH, onCheckedChange = { t = t.copy(priority = if (it) Priority.HIGH else Priority.NORMAL) })
                 }
-                SectionLabel("Importance")
+                SectionLabel("Importance (\"area\" = the area's level)")
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     FilterChip(t.importance == null, { t = t.copy(importance = null) }, { Text("area") })
                     for (i in 1..5) FilterChip(t.importance == i, { t = t.copy(importance = i) }, { Text("$i") })

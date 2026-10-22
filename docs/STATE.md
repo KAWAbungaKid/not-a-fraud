@@ -5,9 +5,9 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-21, v0.4.0)
+## 0. Where things stand (2026-10-22, v0.5.0)
 
-v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
+v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
 
 v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
@@ -319,3 +319,32 @@ Built overnight on Maven's request ("add features discussed previously"); rollba
 - **Guard**: VoIP calls count only with an active recording (fixes "in communication" false positives — prime suspect for Snapchat not blocking). Guard decision log (`guard/GuardLog.kt`, filesDir/guardlog.txt, 200 entries) shown in More. Free-window countdown notification. Message window 10 min.
 - **UI**: bottom tab "You" = Routine | Stats | Skills; accent colors (`Settings.accent`); recharge ideas editor.
 - Open: confirm Snapchat with the log; onboarding with neutral defaults for other users; text-brightness option.
+
+
+## 14. v0.5.0 (2026-10-22)
+
+**Maven's feedback on 0.4:** Snapchat had two separate issues: (1) the blocker sometimes didn't open (fixed in 0.3.1/0.4), (2) it blocked him *during a FaceTime call in Snap* (fixed by the call check). Both fine now; no change needed. Stats: **table most of it** until more data can be connected automatically; don't make him track lots of things weekly. Samsung Health sleep wasn't syncing. Skill tree should look more like Skyrim. Pages too long → more pages and choose which to show. Make it more universal (semester changes). Clean up redundancy; track universalization items for later. Asked whether Pick 3 auto-checks (it did, via hard-coded id).
+
+**Built:**
+- Navigation: `ui/Pages.kt` registry; bottom bar = `Settings.tabs` (≤4) + More; More = menu; settings split into section pages (`SetupScreen(section=…)`); Now cards hideable (`Settings.nowHidden`).
+- `Semester` (AppData.semester), `Actions.setSemester/saveClass/deleteClass/endSemester/classProject`; Classes page. Archived projects' tasks excluded from planning (`AppData.liveTasks()`).
+- `RoutineItem.autoCheck` (WAKE / WORKOUT / PICK3) replaces ids r-wake / r-workout / r-pick3. `Area.stat` replaces the hard-coded stat→area map. Migration v6.
+- Priority folded: UI shows importance + "Firm deadline" (Priority.HIGH with a due date, which drives Heat). Calendar deadlines/tests still set HIGH.
+- Health: per-permission reads, 3-day backfill, background-read permission, diagnostics panel.
+- Constellation skill trees (`ui/SkillsScreen.kt`).
+- Check-in off by default (`Settings.checkInEnabled`); Social/Spirit hidden unless on.
+- Removed .ics + web-app import buttons; per-app rule list instead of Snapchat-only.
+
+**Universal backlog (keep for the "app for other people" version):**
+- Routine categories are a fixed enum (meal / hygiene / body / sleep / other). Stats and nudges key off them. Future: user-defined categories with a "counts as" mapping.
+- Seed data is still Maven's (goals, areas, anchors, routine times, web-app tasks, research dates, starter skill trees) → onboarding with neutral templates.
+- "Research session days" editor is tied to the seeded biosensor templates → generic "dated sessions".
+- Workout notes list (lift, climb…) and sport detection (`SPORT_NOTES`) are fixed lists.
+- Stats targets are fixed (work 6 h/week, mind ≥5 h) → per-stat targets.
+- Recharge ideas / creed / emergency phrase are already settings.
+- Day start/end times live in settings but have no editor yet.
+
+**Redundancy still open (ask Maven):**
+- Three ways to schedule recurring practice: a Habit weekly block, a PRACTICE task with a weekly target, a skill's "Plan practice". Could merge into one.
+- "Pin as hot" vs "Bump for a week": both push a task up.
+- "Capture an idea" on Now vs adding a task.

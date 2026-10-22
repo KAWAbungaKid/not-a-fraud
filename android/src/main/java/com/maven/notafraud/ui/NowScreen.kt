@@ -1,6 +1,7 @@
 package com.maven.notafraud.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -103,18 +104,13 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
 
-        val exams = Generated.examCandidates(data, now)
-        if (exams.isNotEmpty()) item {
-            val e = exams.first()
-            Panel {
-                SectionLabel("Exam on your calendar")
-                Text(e.title, style = MaterialTheme.typography.titleMedium)
-                Text(Time.dateOf(e.start, zone).format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)) + " · " + Time.clockAmPm(e.start, zone) + " · no study task yet", color = Palette.textDim)
-                Row {
-                    TextButton(onClick = { Graph.changeAndReplan(ctx) { Actions.addTask(it, Generated.studyTaskFor(it, e, Graph.now())) } }) { Text("Add 6h study task") }
-                    TextButton(onClick = { Graph.update { Actions.ignoreExam(it, e.uid) } }) { Text("Not an exam", color = Palette.textDim) }
-                }
+        if (data.reviewTaskIds.isNotEmpty()) item {
+            var open by remember { mutableStateOf(false) }
+            Panel(Modifier.clickable { open = true }, highlight = true) {
+                Text("${data.reviewTaskIds.size} old tasks to review", style = MaterialTheme.typography.titleMedium)
+                Text("From the old web app. Keep, done, or delete: one tap each.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
             }
+            if (open) ReviewDialog(data, now) { open = false }
         }
 
         item { PickThree(data, now) }
@@ -122,24 +118,28 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Stat("Credits", "${data.ledger.balanceMin.toInt()}m", Modifier.weight(1f))
-                Stat("Sleep", dayCtx?.sleepHours?.let { "%.1fh".format(it) } ?: "—", Modifier.weight(1f))
+                val napMin = dayCtx?.naps?.sumOf { it.minutes } ?: 0
+                Stat("Sleep", (dayCtx?.sleepHours?.let { "%.1fh".format(it) } ?: "—") + if (napMin > 0) " +${napMin}m" else "", Modifier.weight(1f))
                 Stat("Focus", Time.durationText(focusToday), Modifier.weight(1f))
                 Stat("Phone", usage?.minutesByApp?.values?.sum()?.let { Time.durationText(it) } ?: "—", Modifier.weight(1f))
             }
         }
 
         item {
+            var asking by remember { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val mode = dayCtx?.mode
                 FilterChip(
-                    selected = rough,
-                    onClick = { Graph.changeAndReplan(ctx) { Actions.setRough(it, today, !(dayCtx?.markedRough ?: false)) } },
-                    label = { Text(if (rough) "Rough day: lighter plan" else "Rough day?") },
+                    selected = mode != null || rough,
+                    onClick = { asking = true },
+                    label = { Text(mode?.let { "Today: " + modeName(it) } ?: if (rough) "Rough day · How's today?" else "How's today?") },
                 )
                 Spacer(Modifier.width(8.dp))
                 withPlan.todayPlan?.note?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.amber, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.amber, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
+            if (asking) HowsToday(data, now) { asking = false }
         }
 
         item { SectionLabel("Up next") }
@@ -263,3 +263,85 @@ fun PickThree(data: AppData, now: Long) {
 }
 
 private fun Modifier.androidx_heightMax() = this.then(Modifier.heightIn(max = 420.dp))
+
+
+fun modeName(m: com.maven.notafraud.core.model.DayMode) = when (m) {
+    com.maven.notafraud.core.model.DayMode.PUSH -> "push"
+    com.maven.notafraud.core.model.DayMode.RECHARGE -> "recharge, then push"
+    com.maven.notafraud.core.model.DayMode.RESET -> "reset"
+    com.maven.notafraud.core.model.DayMode.WRITEOFF -> "written off"
+}
+
+/** "How's today?" — push / recharge then push / reset / write it off, with a suggestion. */
+@Composable
+fun HowsToday(data: AppData, now: Long, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val zone = Time.zone(data.settings.zoneId)
+    val today = Time.dateOf(now, zone)
+    val advice = remember { com.maven.notafraud.core.plan.DayAdvisor.suggest(data, now) }
+    var nap by remember { mutableStateOf(if (advice.mode == com.maven.notafraud.core.model.DayMode.RECHARGE) advice.rechargeMin else 20) }
+    fun choose(m: com.maven.notafraud.core.model.DayMode?) {
+        Graph.changeAndReplan(ctx) { Actions.setDayMode(it, today, m, nap, Graph.now()) }
+        onDismiss()
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("How's today?") },
+        confirmButton = { TextButton(onClick = { choose(null) }) { Text("Normal day") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Panel(highlight = true) {
+                    SectionLabel("Suggestion: " + modeName(advice.mode))
+                    Text(advice.reason)
+                }
+                ModeOption("Push", "Keep the plan. 25-minute blocks with 5-minute breaks, easiest win first.", advice.mode == com.maven.notafraud.core.model.DayMode.PUSH) { choose(com.maven.notafraud.core.model.DayMode.PUSH) }
+                ModeOption("Recharge, then push", "Nap or walk first, then a lighter plan (50-minute blocks, 4 h focus cap).", advice.mode == com.maven.notafraud.core.model.DayMode.RECHARGE) { choose(com.maven.notafraud.core.model.DayMode.RECHARGE) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (m in listOf(20, 45, 90)) FilterChip(nap == m, { nap = m }, { Text(if (m == 90) "90 nap" else "${m}m") })
+                }
+                ModeOption("Reset", "Only what's due soon, your picks and easy stuff, plus a recharge block. Everything else moves to the coming days.", advice.mode == com.maven.notafraud.core.model.DayMode.RESET) { choose(com.maven.notafraud.core.model.DayMode.RESET) }
+                ModeOption("Write it off", "Fixed commitments only (classes, exams, trading, events). Rest on purpose.", advice.mode == com.maven.notafraud.core.model.DayMode.WRITEOFF) { choose(com.maven.notafraud.core.model.DayMode.WRITEOFF) }
+            }
+        },
+    )
+}
+
+@Composable
+private fun ModeOption(title: String, text: String, suggested: Boolean, onClick: () -> Unit) {
+    Panel(Modifier.clickable(onClick = onClick)) {
+        Text(title + if (suggested) "  ·  suggested" else "", style = MaterialTheme.typography.titleMedium, color = if (suggested) Palette.green else MaterialTheme.colorScheme.onSurface)
+        Text(text, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** Old web-app tasks: keep / done / delete, one tap each. */
+@Composable
+fun ReviewDialog(data: AppData, now: Long, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val zone = Time.zone(data.settings.zoneId)
+    val list = data.tasks.filter { it.id in data.reviewTaskIds }.sortedBy { it.dueAt ?: Long.MAX_VALUE }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Review old tasks (${list.size})") },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(list, key = { it.id }) { t ->
+                    Panel {
+                        Text(t.title)
+                        Text(
+                            listOfNotNull(data.projects.firstOrNull { it.id == t.projectId }?.name, t.dueAt?.let { "due " + dueText(it, now, zone) }).joinToString(" · "),
+                            color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+                        )
+                        Row {
+                            TextButton(onClick = { Graph.update { Actions.reviewKeep(it, t.id) } }) { Text("Keep") }
+                            TextButton(onClick = { Graph.changeAndReplan(ctx) { Actions.reviewDone(it, t.id, Graph.now()) } }) { Text("Done") }
+                            TextButton(onClick = { Graph.changeAndReplan(ctx) { Actions.deleteTask(it, t.id) } }) { Text("Delete", color = Palette.red) }
+                        }
+                    }
+                }
+            }
+        },
+    )
+}

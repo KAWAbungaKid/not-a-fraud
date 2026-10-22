@@ -181,7 +181,14 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
         title = { Text(if (isNew) "New task" else "Edit task") },
         confirmButton = {
             TextButton(
-                onClick = { onSave(t.copy(title = t.title.trim(), estMin = est.toIntOrNull()?.coerceIn(5, 6000) ?: t.estMin)) },
+                onClick = {
+                    val estimate = when (t.kind) {
+                        com.maven.notafraud.core.model.TaskKind.STEPS -> t.steps.sumOf { it.min }.coerceAtLeast(5)
+                        com.maven.notafraud.core.model.TaskKind.PRACTICE -> t.weeklyTargetMin ?: t.estMin
+                        else -> est.toIntOrNull()?.coerceIn(5, 6000) ?: t.estMin
+                    }
+                    onSave(t.copy(title = t.title.trim(), estMin = estimate, weeklyTargetMin = if (t.kind == com.maven.notafraud.core.model.TaskKind.PRACTICE) (t.weeklyTargetMin ?: 120) else t.weeklyTargetMin))
+                },
                 enabled = t.title.isNotBlank(),
             ) { Text("Save") }
         },
@@ -210,11 +217,43 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                     }
                 }
 
+                SectionLabel("Kind")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (k in com.maven.notafraud.core.model.TaskKind.entries) {
+                        val label = when (k) {
+                            com.maven.notafraud.core.model.TaskKind.FOCUS -> "focus"
+                            com.maven.notafraud.core.model.TaskKind.STEPS -> "steps + waits"
+                            com.maven.notafraud.core.model.TaskKind.PRACTICE -> "practice"
+                            com.maven.notafraud.core.model.TaskKind.ERRAND -> "errand"
+                            com.maven.notafraud.core.model.TaskKind.WAITING -> "waiting on"
+                            com.maven.notafraud.core.model.TaskKind.FILLER -> "low-brain"
+                        }
+                        FilterChip(t.kind == k, { t = t.copy(kind = k) }, { Text(label) })
+                    }
+                }
+                when (t.kind) {
+                    com.maven.notafraud.core.model.TaskKind.STEPS -> StepsEditor(t.steps) { t = t.copy(steps = it) }
+                    com.maven.notafraud.core.model.TaskKind.PRACTICE -> {
+                        SectionLabel("Minutes per week")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (m in listOf(30, 60, 120, 180, 300, 420)) FilterChip(t.weeklyTargetMin == m, { t = t.copy(weeklyTargetMin = m, estMin = m) }, { Text(Time.durationText(m)) })
+                        }
+                        SectionLabel("Longest session")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (m in listOf(15, 30, 45, 60, 90)) FilterChip(t.maxBlockMin == m, { t = t.copy(maxBlockMin = m) }, { Text("${m}m") })
+                        }
+                    }
+                    com.maven.notafraud.core.model.TaskKind.WAITING ->
+                        OutlinedTextField(t.waitingOn, { t = t.copy(waitingOn = it) }, label = { Text("Waiting on (who/what)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    else -> Unit
+                }
+                if (t.kind != com.maven.notafraud.core.model.TaskKind.STEPS && t.kind != com.maven.notafraud.core.model.TaskKind.PRACTICE) {
                 SectionLabel("Estimate (min)")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (m in listOf(15, 30, 60, 90, 120, 240)) FilterChip(est == m.toString(), { est = m.toString() }, { Text("$m") })
                 }
                 OutlinedTextField(est, { est = it.filter(Char::isDigit) }, label = { Text("Minutes") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
 
                 SectionLabel("Due")
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -228,6 +267,15 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                 SectionLabel("Priority")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (p in Priority.entries) FilterChip(t.priority == p, { t = t.copy(priority = p) }, { Text(p.name.lowercase()) })
+                }
+                SectionLabel("Importance")
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilterChip(t.importance == null, { t = t.copy(importance = null) }, { Text("area") })
+                    for (i in 1..5) FilterChip(t.importance == i, { t = t.copy(importance = i) }, { Text("$i") })
+                }
+                val bumped = (t.bumpUntil ?: 0) > System.currentTimeMillis()
+                TextButton(onClick = { t = t.copy(bumpUntil = if (bumped) null else System.currentTimeMillis() + 7 * Time.DAY) }) {
+                    Text(if (bumped) "Bumped for this week (tap to undo)" else "Bump: +1 importance for a week")
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Pin as hot (planner pushes it up)", Modifier.weight(1f))
@@ -285,4 +333,36 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
             text = { TimePicker(state) },
         )
     }
+}
+
+
+/** Steps for laundry-style or research-style tasks: attended minutes, then an unattended wait before the next. */
+@Composable
+private fun StepsEditor(steps: List<com.maven.notafraud.core.model.TaskStep>, onChange: (List<com.maven.notafraud.core.model.TaskStep>) -> Unit) {
+    SectionLabel("Steps")
+    Text("Minutes = your attention. Wait = it runs without you (washer, samples). \"On time\" = must happen right when the wait ends.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+    steps.forEachIndexed { i, st ->
+        Panel {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (st.doneAt != null) Text("✓ ", color = Palette.green)
+                OutlinedTextField(st.title, { v -> onChange(steps.map { if (it.id == st.id) it.copy(title = v) else it }) }, singleLine = true, modifier = Modifier.weight(1f), label = { Text("Step ${i + 1}") })
+                TextButton(onClick = { onChange(steps.filterNot { it.id == st.id }) }) { Text("✕", color = Palette.textDim) }
+            }
+            if (i > 0) {
+                Text("Wait before (runs on its own)", style = MaterialTheme.typography.labelSmall, color = Palette.textDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (m in listOf(0, 15, 30, 45, 60, 120, 240)) FilterChip(st.waitBeforeMin == m, { onChange(steps.map { if (it.id == st.id) it.copy(waitBeforeMin = m) else it }) }, { Text(if (m == 0) "none" else Time.durationText(m)) })
+                }
+            }
+            Text("Your time", style = MaterialTheme.typography.labelSmall, color = Palette.textDim)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (m in listOf(5, 10, 15, 30, 45, 60)) FilterChip(st.min == m, { onChange(steps.map { if (it.id == st.id) it.copy(min = m) else it }) }, { Text("${m}m") })
+            }
+            if (i > 0) Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("On time", Modifier.weight(1f))
+                androidx.compose.material3.Switch(st.exact, { v -> onChange(steps.map { if (it.id == st.id) it.copy(exact = v) else it }) })
+            }
+        }
+    }
+    TextButton(onClick = { onChange(steps + com.maven.notafraud.core.model.TaskStep(title = "", min = 10, waitBeforeMin = if (steps.isEmpty()) 0 else 30)) }) { Text("Add step") }
 }

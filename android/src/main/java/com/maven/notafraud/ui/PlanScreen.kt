@@ -1,6 +1,8 @@
 package com.maven.notafraud.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,45 +51,130 @@ fun PlanScreen(data: AppData, now: Long) {
     val zone = Time.zone(data.settings.zoneId)
     val today = Time.dateOf(now, zone)
     var offset by rememberSaveable { mutableIntStateOf(0) }
+    var acting by remember { mutableStateOf<PlanBlock?>(null) }
     val date = today.plusDays(offset.toLong())
     val plan = remember(data, offset, now / 60_000) {
-        if (offset == 0) Planning.ensureToday(data, now).todayPlan!! else Planning.preview(data, date)
+        val withPlan = Planning.ensureToday(data, now)
+        if (offset == 0) withPlan.todayPlan!! else Planning.preview(withPlan, date)
     }
     val current = if (offset == 0) NowResolver.pickCurrent(plan.blocks, now) else null
 
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item {
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (i in 0..2) {
+            androidx.compose.foundation.lazy.LazyRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(Planning.WEEK_DAYS + 1) { i ->
                     val d = today.plusDays(i.toLong())
                     FilterChip(
                         selected = offset == i,
                         onClick = { offset = i },
-                        label = { Text(if (i == 0) "Today" else d.format(DateTimeFormatter.ofPattern("EEE", Locale.US))) },
+                        label = { Text(if (i == 0) "Today" else d.format(DateTimeFormatter.ofPattern("EEE d", Locale.US))) },
                     )
                 }
-                Spacer(Modifier.weight(1f))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (offset > 0) "Draft. It firms up the morning of, and shifts as things change." else "Tap a block for options.",
+                    color = Palette.textDim, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f),
+                )
                 if (offset == 0) TextButton(onClick = { Graph.replan(); Graph.refresh(ctx) }) { Text("Replan") }
             }
             if (plan.note.isNotBlank()) Text(plan.note, color = Palette.amber, style = MaterialTheme.typography.bodySmall)
-            if (offset > 0) Text("Preview. Tasks get placed for real on the morning of.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         }
-        items(plan.blocks, key = { "${it.start}-${it.kind}-${it.title}" }) { b ->
+        items(plan.blocks, key = { "${it.start}-${it.kind}-${it.title}-${it.stepId}" }) { b ->
             BlockRow(
                 b, zone,
                 isCurrent = b == current,
                 isPast = offset == 0 && b.end <= now,
-                onStart = b.taskId?.takeIf { offset == 0 }?.let { id -> { Graph.update { Actions.startSession(it, id, null, Graph.now()) }; Graph.refresh(ctx) } },
+                onTap = { acting = b },
             )
         }
         if (plan.blocks.isEmpty()) item { Text("Nothing planned.", color = Palette.textDim) }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    acting?.let { b -> BlockActions(b, data, java.time.LocalDate.parse(plan.date), today, onDismiss = { acting = null }) }
+}
+
+/** What you can do with a block: start / done / later / not today / pick a day / something came up; skip a class (and make it up). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, today: java.time.LocalDate, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val zone = Time.zone(d.settings.zoneId)
+    val task = d.tasks.firstOrNull { it.id == b.taskId }
+    val anchor = d.anchors.firstOrNull { it.id == b.anchorId }
+    var pickTime by remember { mutableStateOf(false) }
+    var pickDay by remember { mutableStateOf(false) }
+    fun done(fn: (AppData) -> AppData) { Graph.changeAndReplan(ctx) { fn(it) }; onDismiss() }
+
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        androidx.compose.foundation.layout.Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(b.title, style = MaterialTheme.typography.titleLarge)
+            Text("${Time.clock(b.start, zone)}–${Time.clock(b.end, zone)} · ${date.format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US))}", color = Palette.textDim)
+            if (task != null) {
+                if (date == today) {
+                    TextButton(onClick = { Graph.update { Actions.startSession(it, task.id, null, Graph.now()) }; Graph.refresh(ctx); onDismiss() }) { Text("Start now") }
+                }
+                if (b.stepId != null) {
+                    TextButton(onClick = { done { Actions.checkStep(it, task.id, b.stepId!!, true, Graph.now()) } }) { Text("This step is done") }
+                    TextButton(onClick = { done { Actions.setDone(it, task.id, true, Graph.now()) } }) { Text("The whole thing is done") }
+                } else {
+                    TextButton(onClick = { done { Actions.setDone(it, task.id, true, Graph.now()) } }) { Text("Done") }
+                }
+                if (date == today) {
+                    TextButton(onClick = { pickTime = true }) { Text("Later today…") }
+                    TextButton(onClick = { done { Actions.notToday(it, task.id, Graph.now()) } }) {
+                        val dueToday = task.dueAt?.let { Time.dateOf(it, zone) == today } == true
+                        Text(if (dueToday) "Not today (it's due today!)" else "Not today", color = if (dueToday) Palette.amber else MaterialTheme.colorScheme.primary)
+                    }
+                    TextButton(onClick = { done { Actions.somethingCameUp(it, task.id, Graph.now()) } }) { Text("Something came up: re-plan from now") }
+                }
+                TextButton(onClick = { pickDay = true }) { Text("Pick a day…") }
+                TextButton(onClick = { done { Actions.bump(it, task.id, Graph.now()) } }) { Text("Bump importance for a week") }
+            } else if (anchor != null && !anchor.protected) {
+                TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = true, now = Graph.now()) } }) { Text("Skip it and make it up later") }
+                TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = false, now = Graph.now()) } }) { Text("Skip it (no make-up)") }
+            } else {
+                Text(
+                    when (b.kind) {
+                        BlockKind.EVENT -> "From your Google Calendar. Change it there."
+                        BlockKind.BACKGROUND -> "Running on its own. The next step is planned for when it ends."
+                        else -> "Fixed block."
+                    },
+                    color = Palette.textDim,
+                )
+            }
+        }
+    }
+
+    if (pickTime) TimeDialog(Time.minuteOfDay(Graph.now(), zone) + 60, onDismiss = { pickTime = false }) { m ->
+        val at = Time.at(today, m, zone)
+        done { Actions.laterToday(it, task!!.id, at, Graph.now()) }
+        pickTime = false
+    }
+    if (pickDay) {
+        val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = today.plusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli())
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { pickDay = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { utc ->
+                        val day = java.time.Instant.ofEpochMilli(utc).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        done { Actions.pickDay(it, task!!.id, day, Graph.now()) }
+                    }
+                    pickDay = false
+                }) { Text("Move it") }
+            },
+            dismissButton = { TextButton(onClick = { pickDay = false }) { Text("Cancel") } },
+        ) { androidx.compose.material3.DatePicker(state) }
     }
 }
 
 fun blockColor(b: PlanBlock): Color = when {
     b.protected -> Palette.amber
     b.hot -> Palette.red
+    b.kind == BlockKind.RECHARGE -> Color(0xFFB0E0FF)
+    b.kind == BlockKind.BACKGROUND -> Palette.textDim
     b.kind == BlockKind.TASK -> Palette.green
     b.kind == BlockKind.BREAK -> Palette.textDim
     b.kind == BlockKind.EVENT -> Color(0xFF6EC8FF)
@@ -99,13 +186,14 @@ fun blockColor(b: PlanBlock): Color = when {
 }
 
 @Composable
-private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, isPast: Boolean, onStart: (() -> Unit)?) {
+private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, isPast: Boolean, onTap: () -> Unit) {
     val alpha = if (isPast) 0.45f else 1f
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
+            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else if (b.kind == BlockKind.BACKGROUND) Color.Transparent else MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onTap)
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
             .heightIn(min = 52.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -127,6 +215,6 @@ private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, i
             )
             if (tag.isNotEmpty()) Text(tag.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = if (b.hot) Palette.red else Palette.textDim.copy(alpha = alpha))
         }
-        if (onStart != null && !isPast) TextButton(onClick = onStart) { Text("Start") }
+
     }
 }

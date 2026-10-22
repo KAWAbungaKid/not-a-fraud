@@ -95,7 +95,7 @@ fun RoutineScreen(data: AppData, now: Long) {
                 )
             }
             items(statuses, key = { it.item.id }) { st ->
-                RoutineRow(st, zone, onToggle = {
+                RoutineRow(st, data, zone, onToggle = {
                     if (st.mood == Mood.DONE) Graph.update { Actions.uncheckRoutine(it, st.item.id, today) }
                     else if (st.item.weeklyTarget != null) noteFor = st
                     else Graph.update { Actions.checkRoutine(it, st.item.id, Graph.now()) }
@@ -118,9 +118,9 @@ fun RoutineScreen(data: AppData, now: Long) {
             title = { Text(st.item.title) },
             text = {
                 Column {
-                    Text("What was it? (optional)")
+                    Text("What was it? Sports (climbing, hike, swim, breaking…) count once you've done ${RoutinePolicy.STANDARD_FIRST} standard workouts this week.")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (o in listOf("Lift", "Climbing", "Run", "Sport", "Mobility")) FilterChip(note == o, { note = o }, { Text(o) })
+                        for (o in listOf("Lift", "Run", "Mobility", "Climbing", "Sport", "Hike", "Swim", "Breaking")) FilterChip(note == o, { note = o }, { Text(o) })
                     }
                 }
             },
@@ -145,22 +145,26 @@ fun RoutineScreen(data: AppData, now: Long) {
 }
 
 @Composable
-private fun RoutineRow(st: RoutineStatus, zone: java.time.ZoneId, onToggle: () -> Unit, onEdit: () -> Unit) {
+private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, onToggle: () -> Unit, onEdit: () -> Unit) {
     val i = st.item
-    val color = moodColor(st.mood)
+    val late = RoutinePolicy.doneLate(d, st)
+    val color = if (st.mood == Mood.DONE && late) Palette.amber else moodColor(st.mood)
     Panel(Modifier.clickable(onClick = onEdit), highlight = st.mood == Mood.ANGRY) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = st.mood == Mood.DONE, onCheckedChange = { onToggle() })
             Column(Modifier.weight(1f)) {
                 Text(i.title, fontWeight = if (st.mood == Mood.ANGRY) FontWeight.Bold else FontWeight.Normal)
                 val line = when (st.mood) {
-                    Mood.DONE -> "Done ${Time.clockAmPm(st.doneAt!!, zone)}" + (st.note?.let { " · $it" } ?: "")
+                    Mood.DONE -> "Done ${Time.clockAmPm(st.doneAt!!, zone)}" + (if (late) " · late (due ${hm(i.dueMin)})" else " · on time") + (st.note?.let { " · $it" } ?: "")
                     Mood.CALM -> st.note ?: "${hm(i.startMin)}–${hm(i.dueMin)}"
                     Mood.DUE -> "Now · by ${hm(i.dueMin)}"
                     Mood.LATE -> "${Time.durationText(st.minutesLate)} late"
                     Mood.ANGRY -> "${Time.durationText(st.minutesLate)} late. Do it now."
                     else -> ""
-                } + (st.weekDone?.let { w -> " · $w/${i.weeklyTarget} this week" } ?: "") +
+                } + (st.weekDone?.let { w ->
+                    val tally = RoutinePolicy.weekTally(d, i, Time.dateOf(System.currentTimeMillis(), zone))
+                    " · $w/${i.weeklyTarget} this week" + if (tally.sport > 0) " (${tally.standard} standard + ${tally.sport} sport" + (if (tally.standard < RoutinePolicy.STANDARD_FIRST) ", sport counts after ${RoutinePolicy.STANDARD_FIRST} standard)" else ")") else ""
+                } ?: "") +
                     (if (i.trigger == RoutineTrigger.BEDTIME && st.mood != Mood.DONE) " · checks when you go to bed" else "")
                 Text(line, color = color, style = MaterialTheme.typography.bodySmall)
             }

@@ -79,6 +79,7 @@ fun SetupScreen(data: AppData, resumes: Long) {
     var editingAnchor by remember { mutableStateOf<Anchor?>(null) }
     var editingSites by remember { mutableStateOf(false) }
     var editingResearch by remember { mutableStateOf(false) }
+    var editingProfile by remember { mutableStateOf<String?>(null) }
     val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         scope.launch { Workers.syncSensors(ctx); Graph.replan(); Graph.refresh(ctx) }
     }
@@ -180,8 +181,12 @@ fun SetupScreen(data: AppData, resumes: Long) {
                 SwitchRow("Blocking on", data.rules.blockingEnabled) { on -> Graph.update { it.copy(rules = it.rules.copy(blockingEnabled = on)) } }
                 SwitchRow("Nudges on", data.settings.nagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(nagsEnabled = on)) } }
                 SwitchRow("Routine nudges on", data.settings.routineNagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(routineNagsEnabled = on)) } }
+                SwitchRow("Bedtime nudges make a sound (through Do Not Disturb)", data.settings.bedtimeSound) { on -> Graph.update { it.copy(settings = it.settings.copy(bedtimeSound = on)) } }
                 TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.size})") }
                 TextButton(onClick = { editingSites = true }) { Text("Blocked websites (${data.rules.blockedSites.size})") }
+                TextButton(onClick = { editingProfile = "com.snapchat.android" }) { Text("Snapchat rules (reply window, Quick Snap, typing)") }
+                TextButton(onClick = { editingProfile = "" }) { Text("Rules for every other blocked app") }
+                Text("Quick Snap: pull down twice → pencil/edit → drag the \"Quick Snap\" tile into your quick settings.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.size})") }
                             }
         }
@@ -268,6 +273,16 @@ fun SetupScreen(data: AppData, resumes: Long) {
         AnchorEditor(a, data, isNew = data.anchors.none { it.id == a.id }, onDismiss = { editingAnchor = null },
             onSave = { Graph.changeAndReplan(ctx) { d -> com.maven.notafraud.core.store.Actions.upsertAnchor(d, it) }; editingAnchor = null },
             onDelete = { Graph.changeAndReplan(ctx) { d -> com.maven.notafraud.core.store.Actions.deleteAnchor(d, a.id) }; editingAnchor = null })
+    }
+    editingProfile?.let { pkg ->
+        val current = if (pkg.isEmpty()) data.rules.defaultProfile else data.rules.profile(pkg)
+        ProfileEditor(if (pkg.isEmpty()) "Other blocked apps" else com.maven.notafraud.sense.AppLabels.label(ctx, pkg), current, onDismiss = { editingProfile = null }) { p ->
+            Graph.update {
+                if (pkg.isEmpty()) it.copy(rules = it.rules.copy(defaultProfile = p))
+                else it.copy(rules = it.rules.copy(profiles = it.rules.profiles + (pkg to p)))
+            }
+            editingProfile = null
+        }
     }
     if (editingSites) {
         ListDialog("Blocked websites", "One per line, e.g. instagram.com. Subdomains are included.", data.rules.blockedSites.sorted(), onDismiss = { editingSites = false }) { list ->
@@ -471,16 +486,20 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
                 Text(c.name + (c.account?.let { " · $it" } ?: ""), maxLines = 1)
             }
         }
-        SectionLabel("Read as events (untick to ignore)")
+        SectionLabel("Each calendar is…")
+        Text("Events: fixed time the plan works around. Deadlines (Canvas): each entry becomes a task due then. Ignore: skipped.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         cals.filter { it.id != data.settings.outputCalendarId }.forEach { c ->
-            val on = c.id !in data.settings.excludedCalendarIds
-            Row(Modifier.fillMaxWidth().clickable {
-                Graph.update { it.copy(settings = it.settings.copy(excludedCalendarIds = if (on) it.settings.excludedCalendarIds + c.id else it.settings.excludedCalendarIds - c.id)) }
-            }, verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = on, onCheckedChange = null)
-                Text(c.name, maxLines = 1)
+            val mode = com.maven.notafraud.sense.PhoneCalendar.modeFor(c, data.settings)
+            Text(c.name, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (m in com.maven.notafraud.core.model.CalMode.entries) {
+                    androidx.compose.material3.FilterChip(mode == m, {
+                        Graph.update { it.copy(settings = it.settings.copy(calendarModes = it.settings.calendarModes + (c.id to m), excludedCalendarIds = it.settings.excludedCalendarIds - c.id)) }
+                    }, { Text(m.name.lowercase()) })
+                }
             }
         }
+        SwitchRow("Exams get study tasks automatically", data.settings.autoExamTasks) { on -> Graph.update { it.copy(settings = it.settings.copy(autoExamTasks = on)) } }
     }
 }
 
@@ -564,4 +583,39 @@ private fun shareBackup(ctx: Context) {
     val send = Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     ctx.startActivity(Intent.createChooser(send, "Save backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+
+/** Per-app blocking rules, so different setups can be tried (STATE.md section 11). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model.BlockProfile, onDismiss: () -> Unit, onSave: (com.maven.notafraud.core.model.BlockProfile) -> Unit) {
+    var p by remember { mutableStateOf(initial) }
+    @Composable
+    fun Chips(label: String, values: List<Int>, current: Int, fmt: (Int) -> String, set: (Int) -> Unit) {
+        SectionLabel(label)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (v in values) androidx.compose.material3.FilterChip(current == v, { set(v) }, { Text(fmt(v)) })
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        confirmButton = { TextButton(onClick = { onSave(p) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                Chips("Reply window when you tap its notification", listOf(0, 2, 3, 5, 10), p.replyWindowMin, { if (it == 0) "off" else "${it}m" }) { p = p.copy(replyWindowMin = it) }
+                SwitchRow("Typing keeps the window open", p.extendWhileTyping) { p = p.copy(extendWhileTyping = it) }
+                SwitchRow("Quick-open tile", p.quickOpen) { p = p.copy(quickOpen = it) }
+                if (p.quickOpen) {
+                    Chips("Quick-open length", listOf(2, 3, 5, 10), p.quickOpenMin, { "${it}m" }) { p = p.copy(quickOpenMin = it) }
+                    Chips("Quick-opens per day", listOf(3, 6, 10, 20), p.quickOpenPerDay, { "$it" }) { p = p.copy(quickOpenPerDay = it) }
+                }
+                Chips("Wait before credits unlock it", listOf(0, 15, 30, 60, 90), p.creditWaitSec, { "${it}s" }) { p = p.copy(creditWaitSec = it) }
+                Chips("Instant emergencies per day", listOf(1, 2, 3, 5), p.emergencyPerDay, { "$it" }) { p = p.copy(emergencyPerDay = it) }
+                Text("Calls (phone, Snapchat, FaceTime-style) are never blocked.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+    )
 }

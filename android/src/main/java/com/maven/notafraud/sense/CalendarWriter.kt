@@ -30,29 +30,34 @@ object CalendarWriter {
         exec.execute { runCatching { sync(app) }.onFailure { Log.w(TAG, "sync failed", it) } }
     }
 
+    /** Today firm, the next 6 days as drafts (they get re-planned each morning). */
     private fun desired(): List<Want> {
         val d = Graph.data
-        val plan = d.todayPlan ?: return emptyList()
+        val today = d.todayPlan ?: return emptyList()
         val zone = Graph.zone
-        val date = Graph.today()
         val events = d.events.filter { !it.allDay }
         fun overlapsEvent(b: PlanBlock) = events.any { e -> e.start < b.end && b.start < e.end && (minOf(e.end, b.end) - maxOf(e.start, b.start)) * 2 >= (b.end - b.start) }
         val out = mutableListOf<Want>()
-        for (b in plan.blocks) {
-            if (b.kind == BlockKind.EVENT || b.kind == BlockKind.BREAK) continue
-            if (b.kind == BlockKind.ANCHOR && overlapsEvent(b)) continue
-            val title = when {
-                b.kind == BlockKind.TASK && b.picked -> "★ ${b.title}"
-                b.kind == BlockKind.TASK -> "▸ ${b.title}"
-                else -> b.title
+        for ((i, plan) in (listOf(today) + d.weekPlan).withIndex()) {
+            val draft = i > 0
+            val date = java.time.LocalDate.parse(plan.date)
+            for (b in plan.blocks) {
+                if (b.kind == BlockKind.EVENT || b.kind == BlockKind.BREAK) continue
+                if (b.kind == BlockKind.ANCHOR && overlapsEvent(b)) continue
+                val title = when {
+                    b.kind == BlockKind.TASK && b.picked -> "★ ${b.title}"
+                    b.kind == BlockKind.TASK -> "▸ ${b.title}"
+                    b.kind == BlockKind.BACKGROUND -> "⟳ ${b.title}"
+                    else -> b.title
+                }.let { if (draft && b.kind == BlockKind.TASK) "$it (draft)" else it }
+                out += Want("${b.kind}|${b.start}|${b.end}|${b.title}|$draft".hashCode().toString(16), title, b.start, b.end)
             }
-            out += Want("${b.kind}|${b.start}|${b.end}|${b.title}".hashCode().toString(16), title, b.start, b.end)
-        }
-        // Routine checkboxes without reserved time show as short reminders.
-        for (r in d.routine) {
-            if (!r.enabled || r.reserveMin > 0 || date.dayOfWeek.value !in r.days) continue
-            val s = Time.at(date, r.startMin, zone)
-            out += Want("R|${r.id}|$s".hashCode().toString(16), "• ${r.title}", s, s + 10 * Time.MIN)
+            // Routine checkboxes without reserved time show as short reminders.
+            for (r in d.routine) {
+                if (!r.enabled || r.reserveMin > 0 || date.dayOfWeek.value !in r.days) continue
+                val s0 = Time.at(date, r.startMin, zone)
+                out += Want("R|${r.id}|$s0".hashCode().toString(16), "• ${r.title}", s0, s0 + 10 * Time.MIN)
+            }
         }
         return out
     }
@@ -67,7 +72,7 @@ object CalendarWriter {
 
         val zone = Graph.zone
         val dayStart = Time.at(Graph.today(), 0, zone)
-        val dayEnd = Time.at(Graph.today().plusDays(1), 0, zone)
+        val dayEnd = Time.at(Graph.today().plusDays(1L + com.maven.notafraud.core.plan.Planning.WEEK_DAYS), 0, zone)
         val cr = ctx.contentResolver
         val existing = HashMap<String, Long>()
         cr.query(

@@ -113,14 +113,36 @@ object PhoneCalendar {
         return out.sortedWith(compareBy({ !it.name.contains("fraud", ignoreCase = true) }, { it.name.lowercase() }))
     }
 
+    /** How a calendar's entries are used. Canvas-like names default to deadlines. */
+    fun modeFor(cal: Cal, settings: com.maven.notafraud.core.model.Settings): com.maven.notafraud.core.model.CalMode {
+        settings.calendarModes[cal.id]?.let { return it }
+        if (cal.id in settings.excludedCalendarIds || cal.id == settings.outputCalendarId) return com.maven.notafraud.core.model.CalMode.IGNORE
+        val n = (cal.name + " " + (cal.account ?: "")).lowercase()
+        return if (listOf("canvas", "instructure", "assignment", "coursework").any { it in n }) com.maven.notafraud.core.model.CalMode.DEADLINES
+        else com.maven.notafraud.core.model.CalMode.EVENTS
+    }
+
+    data class Split(val events: List<CalEvent>, val deadlines: List<CalEvent>)
+
+    /** Reads every calendar once and splits by mode: events to plan around, deadlines to turn into tasks. */
+    fun readSplit(ctx: Context): Split? {
+        val all = read(ctx, daysAhead = 60) ?: return null
+        val settings = Graph.data.settings
+        val modes = calendars(ctx).associate { it.id to modeFor(it, settings) }
+        val events = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.EVENTS }
+        val deadlines = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.DEADLINES }
+            .map { it.copy(uid = it.uid.substringBeforeLast('-')) } // one task per event, not per instance
+        return Split(events, deadlines)
+    }
+
     /**
-     * Events from every visible calendar except the app's own output calendar and any the user unticked.
-     * Everything read here is a fixed event the planner works around.
+     * Raw instances from every visible calendar except the app's own output calendar.
+     * [readSplit] decides what each one is.
      */
     fun read(ctx: Context, daysBack: Int = 1, daysAhead: Int = 35): List<CalEvent>? {
         if (!Perms.calendar(ctx)) return null
         val settings = Graph.data.settings
-        val skip = settings.excludedCalendarIds + listOfNotNull(settings.outputCalendarId)
+        val skip = listOfNotNull(settings.outputCalendarId)
         val zone = Graph.zone
         val from = Time.at(Graph.today().minusDays(daysBack.toLong()), 0, zone)
         val to = Time.at(Graph.today().plusDays(daysAhead.toLong()), 0, zone)
@@ -156,6 +178,7 @@ object PhoneCalendar {
                         end = c.getLong(3),
                         source = SOURCE,
                         allDay = c.getInt(4) == 1,
+                        calendarId = c.getLong(7),
                     )
                 }
             }

@@ -65,7 +65,7 @@ import java.io.File
 private enum class Picker { BLOCKED, FOCUS, MIRRORED }
 
 @Composable
-fun SetupScreen(data: AppData, resumes: Long, onOpenInbox: () -> Unit = {}) {
+fun SetupScreen(data: AppData, resumes: Long) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var picker by remember { mutableStateOf<Picker?>(null) }
@@ -110,13 +110,6 @@ fun SetupScreen(data: AppData, resumes: Long, onOpenInbox: () -> Unit = {}) {
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Spacer(Modifier.height(8.dp)) }
         item {
-            val unread = data.messages.count { !it.read }
-            Panel(Modifier.clickable(onClick = onOpenInbox)) {
-                Text("Inbox" + if (unread > 0) " · $unread new" else "", style = MaterialTheme.typography.titleMedium, color = if (unread > 0) Palette.green else MaterialTheme.colorScheme.onSurface)
-                Text("Mirrored Snapchat messages", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-        item {
             val done = listOf(p.notifications, p.accessibility, p.usage, p.listener, healthGranted, p.calendar, p.exact, p.battery).count { it }
             Text("Setup · $done/8 done", style = MaterialTheme.typography.titleLarge)
             Text("Go top to bottom. Each one is a Settings screen only you can tap through.", color = Palette.textDim)
@@ -140,7 +133,7 @@ fun SetupScreen(data: AppData, resumes: Long, onOpenInbox: () -> Unit = {}) {
             }
         }
         item {
-            PermRow("4. Message mirror (Notification access)", p.listener, "Shows Snapchat messages in Inbox so Snapchat can stay blocked. Same restricted-settings note as the guard.") {
+            PermRow("4. Reply windows (Notification access)", p.listener, "Tapping a Snapchat notification opens it free for a few minutes, so Snapchat can stay blocked otherwise. Same restricted-settings note as the guard.") {
                 open(ctx, Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
             }
         }
@@ -190,8 +183,7 @@ fun SetupScreen(data: AppData, resumes: Long, onOpenInbox: () -> Unit = {}) {
                 TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.size})") }
                 TextButton(onClick = { editingSites = true }) { Text("Blocked websites (${data.rules.blockedSites.size})") }
                 TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.size})") }
-                TextButton(onClick = { picker = Picker.MIRRORED }) { Text("Mirrored into Inbox (${data.rules.mirrored.size})") }
-            }
+                            }
         }
 
         item { SectionLabel("Credits") }

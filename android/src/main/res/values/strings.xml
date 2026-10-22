@@ -3,5 +3,5 @@
     <string name="app_name">Not a Fraud</string>
     <string name="guard_label">Not a Fraud guard</string>
     <string name="guard_description">Watches which app is in front so Not a Fraud can block time-sink apps, earn credits from focus apps, and keep the notification bar current. It reads which app is open and, only inside web browsers, the web address in the address bar, so blocked sites like instagram.com can be blocked too. It never reads page content, messages or passwords.</string>
-    <string name="mirror_label">Not a Fraud message mirror</string>
+    <string name="mirror_label">Not a Fraud reply windows</string>
 </resources>

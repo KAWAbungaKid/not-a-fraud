@@ -103,13 +103,6 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
 
-        val unread = data.messages.count { !it.read }
-        if (unread > 0) item {
-            Panel(Modifier.clickable { onOpenTab(MainActivity.TAB_INBOX) }) {
-                Text("$unread new message${if (unread == 1) "" else "s"} in Inbox", color = Palette.green)
-            }
-        }
-
         val exams = Generated.examCandidates(data, now)
         if (exams.isNotEmpty()) item {
             val e = exams.first()

@@ -10,6 +10,8 @@ import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
+import android.media.AudioManager
 import com.maven.notafraud.Graph
 import com.maven.notafraud.core.guard.Credits
 import com.maven.notafraud.core.guard.GuardAction
@@ -20,6 +22,7 @@ import com.maven.notafraud.core.plan.Time
 import com.maven.notafraud.notify.Notifier
 import com.maven.notafraud.notify.RoutineAlerts
 import com.maven.notafraud.sense.AppLabels
+import com.maven.notafraud.core.store.Actions
 
 /**
  * The persistent host (STATE.md section 5). The system keeps accessibility services alive, so this
@@ -39,7 +42,6 @@ class GuardService : AccessibilityService() {
     private var enteredAt = 0L
     private var currentAction = GuardAction.IGNORE
     private val pending = mutableListOf<Runnable>()
-    private var listeningToContent = false
     private var lastUrlCheck = 0L
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -50,7 +52,11 @@ class GuardService : AccessibilityService() {
                     bedtimeCheck()
                 }
                 Intent.ACTION_POWER_CONNECTED -> bedtimeCheck()
-                Intent.ACTION_USER_PRESENT -> rootInActiveWindow?.packageName?.toString()?.let { onForeground(it) }
+                Intent.ACTION_USER_PRESENT -> {
+                    val n = System.currentTimeMillis()
+                    Graph.update { d -> Actions.autoFromHealth(Actions.recordFirstUnlock(d, n), Graph.today()) }
+                    rootInActiveWindow?.packageName?.toString()?.let { onForeground(it) }
+                }
             }
         }
     }
@@ -71,9 +77,21 @@ class GuardService : AccessibilityService() {
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_POWER_CONNECTED)
         })
+        audio = getSystemService(AudioManager::class.java)
+        runCatching { audio?.addOnModeChangedListener(mainExecutor, modeListener) }
         Notifier.cancelAlert(this)
         Notifier.forgetLast()
         Graph.refresh(this)
+    }
+
+    private var audio: AudioManager? = null
+    private val modeListener = AudioManager.OnModeChangedListener { reevaluate() }
+
+    /** On any call (phone, Snapchat, FaceTime-style, WhatsApp): never block, never nudge. */
+    private fun inCall(): Boolean {
+        val m = audio?.mode ?: return false
+        return m == AudioManager.MODE_IN_CALL || m == AudioManager.MODE_IN_COMMUNICATION || m == AudioManager.MODE_RINGTONE ||
+            m == AudioManager.MODE_CALL_SCREENING
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -82,9 +100,11 @@ class GuardService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 lastEventAt = System.currentTimeMillis()
+                if (pkg in KEYBOARDS) onTyping()
                 onForeground(pkg)
             }
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> if (pkg == foregroundPkg && pkg in Sites.BROWSERS) checkUrl(pkg)
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> if (keyboardUp()) onTyping()
         }
     }
 
@@ -92,7 +112,8 @@ class GuardService : AccessibilityService() {
         if (pkg in TRANSPARENT) return
         if (pkg == foregroundPkg) return
         foregroundPkg = pkg
-        setContentListening(pkg in Sites.BROWSERS)
+        browserInFront = pkg in Sites.BROWSERS
+        updateEvents()
         if (pkg in Sites.BROWSERS) {
             // Judge the browser itself until the address bar says otherwise.
             switchTo(pkg)
@@ -132,14 +153,43 @@ class GuardService : AccessibilityService() {
         return null
     }
 
-    private fun setContentListening(on: Boolean) {
-        if (on == listeningToContent) return
-        listeningToContent = on
+    private var browserInFront = false
+    private var watchingKeyboard = false
+    private var appliedEvents = -1
+
+    /**
+     * Extra events only while needed: content changes while a browser is in front (address bar),
+     * window changes while a free window is open (keyboard up = still texting). Otherwise just app switches.
+     */
+    private fun updateEvents() {
+        val types = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+            (if (browserInFront) AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED else 0) or
+            (if (watchingKeyboard) AccessibilityEvent.TYPE_WINDOWS_CHANGED else 0)
+        if (types == appliedEvents) return
+        appliedEvents = types
         val info = serviceInfo ?: return
-        info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or (if (on) AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED else 0)
-        info.flags = info.flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
-        info.notificationTimeout = if (on) 400 else 250
+        info.eventTypes = types
+        info.flags = info.flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        info.notificationTimeout = if (browserInFront) 400 else 250
         serviceInfo = info
+    }
+
+    private fun keyboardUp(): Boolean = runCatching { windows.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } }.getOrDefault(false)
+
+    /** Typing inside a free window keeps it open. */
+    private fun onTyping() {
+        val pkg = currentPkg ?: return
+        val d = Graph.data
+        if (!d.rules.profile(pkg).extendWhileTyping) return
+        val until = d.ledger.freeWindowUntil[pkg] ?: return
+        val now = System.currentTimeMillis()
+        if (until < now) return
+        val after = Graph.update { x -> x.copy(ledger = Credits.extendWhileTyping(x.ledger, pkg, now)) }
+        val newUntil = after.ledger.freeWindowUntil[pkg] ?: until
+        if (newUntil > until) {
+            cancelPending()
+            post(newUntil - now + 500) { if (currentPkg == pkg) reevaluate() }
+        }
     }
 
     /** Re-check the app in front (after an unlock expires, or credits change). */
@@ -151,12 +201,24 @@ class GuardService : AccessibilityService() {
 
     private fun evaluate(pkg: String) {
         val now = System.currentTimeMillis()
+        val inFreeWindow = (Graph.data.ledger.freeWindowUntil[pkg] ?: 0) > now
+        watchingKeyboard = inFreeWindow
+        updateEvents()
+        if (inCall()) { currentAction = GuardAction.IGNORE; Notifier.cancelNag(this); return }
         val decision = GuardPolicy.decide(pkg, Graph.data, now, packageName.removeSuffix(".dev"))
         currentAction = decision.action
         when (decision.action) {
-            GuardAction.BLOCK -> block(pkg)
+            GuardAction.BLOCK -> {
+                // Still typing when the window runs out: keep it open instead of cutting the conversation.
+                if (Graph.data.ledger.freeWindowUntil[pkg]?.let { now - it < 60_000 } == true && keyboardUp() && Graph.data.rules.profile(pkg).extendWhileTyping) {
+                    Graph.update { x -> x.copy(ledger = Credits.freeWindow(x.ledger, pkg, 2, now, "Still typing")) }
+                    reevaluate()
+                    return
+                }
+                block(pkg)
+            }
             GuardAction.UNLOCKED -> {
-                scheduleNags(pkg)
+                if (!inFreeWindow) scheduleNags(pkg)
                 post(maxOf(1_000L, decision.unlockedUntil - now + 500)) { if (currentPkg == pkg) reevaluate() }
             }
             GuardAction.EARN, GuardAction.IGNORE -> Unit
@@ -165,6 +227,16 @@ class GuardService : AccessibilityService() {
 
     private fun block(pkg: String) {
         Notifier.cancelNag(this)
+        // Give a notification tap a moment to open its reply window first (the two arrive together).
+        post(700) {
+            if (currentPkg != pkg) return@post
+            val d = GuardPolicy.decide(pkg, Graph.data, System.currentTimeMillis(), packageName.removeSuffix(".dev"))
+            if (d.action != GuardAction.BLOCK || inCall()) { evaluate(pkg); return@post }
+            showBlock(pkg)
+        }
+    }
+
+    private fun showBlock(pkg: String) {
         // For a site, step the browser back off the page so it isn't sitting there behind the block screen.
         if (pkg.startsWith(Sites.PREFIX)) performGlobalAction(GLOBAL_ACTION_BACK)
         startActivity(
@@ -201,7 +273,7 @@ class GuardService : AccessibilityService() {
         val since = System.currentTimeMillis() - enteredAt
         NagPolicy.offsetsMin(rough).forEachIndexed { level, offset ->
             post(offset * Time.MIN - since) {
-                if (currentPkg != pkg) return@post
+                if (currentPkg != pkg || inCall()) return@post
                 val st = Graph.nowState()
                 if (st.protected) return@post
                 val mins = ((System.currentTimeMillis() - enteredAt) / Time.MIN).toInt()
@@ -225,6 +297,7 @@ class GuardService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        runCatching { audio?.removeOnModeChangedListener(modeListener) }
         leave()
         runCatching { unregisterReceiver(screenReceiver) }
         if (instance === this) instance = null
@@ -236,6 +309,8 @@ class GuardService : AccessibilityService() {
             private set
         @Volatile var lastEventAt = 0L
         @Volatile var lastConnectedAt = 0L
+
+        val KEYBOARDS = setOf("com.samsung.android.honeyboard", "com.google.android.inputmethod.latin", "com.touchtype.swiftkey")
 
         /** Windows that float over the app without replacing it. */
         private val TRANSPARENT = setOf(

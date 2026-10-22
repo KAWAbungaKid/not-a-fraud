@@ -107,6 +107,7 @@ object Actions {
             steps = ctx.steps ?: existing.steps,
             workoutMin = ctx.workoutMin ?: existing.workoutMin,
             markedRough = ctx.markedRough || existing.markedRough,
+            naps = if (ctx.naps.isNotEmpty()) ctx.naps else existing.naps,
         )
         return d.copy(days = d.days.filterNot { it.date == ctx.date } + merged)
     }

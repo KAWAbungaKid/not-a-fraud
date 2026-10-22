@@ -78,7 +78,6 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
             if (!Perms.notifications(ctx)) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        val unread = data.messages.count { !it.read }
 
         Scaffold(
             bottomBar = {
@@ -96,9 +95,9 @@ class MainActivity : ComponentActivity() {
                     )
                     tabItem(TAB_TASKS, "Tasks", Icons.Filled.AccountTree)
                     NavigationBarItem(
-                        selected = tab == TAB_SETUP || tab == TAB_INBOX,
+                        selected = tab == TAB_SETUP,
                         onClick = { tab = TAB_SETUP },
-                        icon = { BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) { Icon(Icons.Filled.Settings, null) } },
+                        icon = { Icon(Icons.Filled.Settings, null) },
                         label = { Text("More") },
                     )
                 }
@@ -110,8 +109,7 @@ class MainActivity : ComponentActivity() {
                     TAB_PLAN -> PlanScreen(data, now)
                     TAB_ROUTINE -> RoutineScreen(data, now)
                     TAB_TASKS -> TasksScreen(data, now)
-                    TAB_INBOX -> InboxScreen(data)
-                    TAB_SETUP -> SetupScreen(data, resumes, onOpenInbox = { tab = TAB_INBOX })
+                    TAB_SETUP -> SetupScreen(data, resumes)
                 }
             }
         }
@@ -133,7 +131,6 @@ class MainActivity : ComponentActivity() {
         const val TAB_PLAN = "plan"
         const val TAB_TASKS = "tasks"
         const val TAB_ROUTINE = "routine"
-        const val TAB_INBOX = "inbox"
         const val TAB_SETUP = "setup"
     }
 }

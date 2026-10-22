@@ -100,6 +100,8 @@ object RoutineAlerts {
         val alerts = com.maven.notafraud.core.routine.RoutinePolicy.alertsDue(Graph.data, now, bedtime)
         if (alerts.isEmpty()) return
         alerts.forEach { Notifier.postRoutine(ctx, it) }
+        val loud = alerts.any { it.item.trigger == com.maven.notafraud.core.model.RoutineTrigger.BEDTIME || it.item.category == com.maven.notafraud.core.model.RoutineCategory.SLEEP }
+        if (loud && Graph.data.settings.bedtimeSound) Sounds.bedtime(ctx)
         Graph.update { Actions.markAlerted(it, alerts.map { a -> a.item.id }, now) }
     }
 }

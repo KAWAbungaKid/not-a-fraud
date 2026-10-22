@@ -97,8 +97,10 @@ class BlockActivity : ComponentActivity() {
         val data by Graph.store.state.collectAsState()
         val label = remember(pkg) { AppLabels.label(this, pkg) }
         val now = remember(data) { Graph.nowState() }
+        val profile = data.rules.profile(pkg)
         val balance = data.ledger.balanceMin
-        var emergency by remember { mutableStateOf(false) }
+        val stillTexting = remember(data) { Credits.canStillTexting(data.ledger, pkg, Graph.now()) }
+        var paying by remember { mutableIntStateOf(0) }
 
         Column(
             Modifier
@@ -113,7 +115,19 @@ class BlockActivity : ComponentActivity() {
             Text("$label is locked", style = MaterialTheme.typography.headlineSmall)
             Text(data.settings.creed, color = Palette.textDim)
 
-            Panel(highlight = true) {
+            if (stillTexting) {
+                Panel(highlight = true) {
+                    SectionLabel("Your window ended")
+                    Button(onClick = {
+                        val n = Graph.now()
+                        Graph.update { d -> d.copy(ledger = Credits.freeWindow(d.ledger, pkg, 3, n, "Still texting: $label")) }
+                        openTarget()
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Still texting: 3 more minutes") }
+                    Text("Typing keeps the window open on its own. This is for when you were reading or about to reply.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            Panel(highlight = !stillTexting) {
                 SectionLabel("Right now")
                 Text(now.headline, style = MaterialTheme.typography.titleLarge)
                 if (now.detail.isNotBlank()) Text(now.detail, color = Palette.textDim)
@@ -126,27 +140,36 @@ class BlockActivity : ComponentActivity() {
 
             Panel {
                 SectionLabel("Credits")
-                Text("${balance.toInt()} min banked", style = MaterialTheme.typography.displaySmall, color = Palette.green)
-                Text("Earn 1:1 by reading in focus apps or logging task time.", color = Palette.textDim)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (m in listOf(5, 10, 15, 30)) {
-                        FilledTonalButton(
-                            onClick = {
-                                val n = Graph.now()
-                                Graph.update { d -> Credits.spend(d.ledger, pkg, m, label, n)?.let { d.copy(ledger = it) } ?: d }
-                                openTarget()
-                            },
-                            enabled = Credits.canSpend(data.ledger, m),
-                        ) { Text("${m}m") }
+                if (paying > 0) {
+                    PayCountdown(profile.creditWaitSec, onCancel = { paying = 0 }) {
+                        val n = Graph.now()
+                        Graph.update { d -> Credits.spend(d.ledger, pkg, paying, label, n)?.let { d.copy(ledger = it) } ?: d }
+                        openTarget()
+                    }
+                } else {
+                    Text("${balance.toInt()} min banked", style = MaterialTheme.typography.displaySmall, color = Palette.green)
+                    Text("Earn 1:1 by reading in focus apps or logging task time. Spending waits ${profile.creditWaitSec}s.", color = Palette.textDim)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (m in listOf(5, 10, 15, 30)) {
+                            FilledTonalButton(onClick = { paying = m }, enabled = Credits.canSpend(data.ledger, m)) { Text("${m}m") }
+                        }
                     }
                 }
             }
 
-            if (!emergency) {
-                TextButton(onClick = { emergency = true }) { Text("Emergency unlock", color = Palette.textDim) }
-            } else {
-                EmergencyPanel(pkg, label)
-            }
+            val usedToday = Credits.emergencyUsesToday(data.ledger, Graph.startOfToday())
+            val left = profile.emergencyPerDay - usedToday
+            OutlinedButton(
+                onClick = {
+                    val n = Graph.now()
+                    Graph.update { d ->
+                        Credits.emergencyInstant(d.ledger, d.settings, profile, pkg, label, n, Graph.startOfToday())?.let { d.copy(ledger = it) } ?: d
+                    }
+                    openTarget()
+                },
+                enabled = left > 0,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (left > 0) "Emergency: open now (${data.settings.emergencyUnlockMin} min · $left left today)" else "No emergency unlocks left today") }
             TextButton(onClick = { goHome() }) { Text("Go home") }
         }
     }
@@ -158,40 +181,17 @@ class BlockActivity : ComponentActivity() {
         goHome()
     }
 
+    /** The wait before banked credits unlock: staring at a countdown kills the urge to scroll. */
     @Composable
-    private fun EmergencyPanel(pkg: String, label: String) {
-        val s = Graph.data.settings
-        val usedToday = Credits.emergencyUsesToday(Graph.data.ledger, Graph.startOfToday())
-        val left = s.emergencyDailyLimit - usedToday
-        var seconds by remember { mutableIntStateOf(s.emergencyWaitSec) }
-        var typed by remember { mutableStateOf("") }
-        LaunchedEffect(Unit) { while (seconds > 0) { delay(1000); seconds-- } }
-
-        Panel {
-            SectionLabel("Emergency unlock")
-            if (left <= 0) {
-                Text("No emergency unlocks left today (${s.emergencyDailyLimit} per day).", color = Palette.amber)
-                return@Panel
-            }
-            Text("${s.emergencyUnlockMin} free minutes. $left left today. Logged.", color = Palette.textDim)
-            if (seconds > 0) {
-                Text("Wait $seconds s", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            } else {
-                Text("Type: \"${s.emergencyPhrase}\"", color = Palette.textDim)
-                OutlinedTextField(value = typed, onValueChange = { typed = it }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Button(
-                    onClick = {
-                        val n = Graph.now()
-                        Graph.update { d ->
-                            Credits.emergency(d.ledger, d.settings, pkg, label, n, Graph.startOfToday())?.let { d.copy(ledger = it) } ?: d
-                        }
-                        openTarget()
-                    },
-                    enabled = typed.trim().equals(s.emergencyPhrase, ignoreCase = true),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Unlock $label for ${s.emergencyUnlockMin} min") }
-            }
+    private fun PayCountdown(seconds: Int, onCancel: () -> Unit, onDone: () -> Unit) {
+        var left by remember { mutableIntStateOf(seconds) }
+        LaunchedEffect(Unit) {
+            while (left > 0) { delay(1000); left-- }
+            onDone()
         }
+        Text("Opening in $left s", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        Text("Still want it? Or start something instead.", color = Palette.textDim)
+        TextButton(onClick = onCancel) { Text("Never mind") }
     }
 
     companion object {

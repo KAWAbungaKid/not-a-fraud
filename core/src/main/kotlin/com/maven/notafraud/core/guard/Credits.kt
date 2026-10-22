@@ -126,7 +126,7 @@ object Credits {
      * Reply window: opening the app within [withinMin] of a new message (by tapping the notification or
      * any other way) is free for the profile's reply minutes, once per new message.
      */
-    fun replyWindowIfMessage(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, now: Long, withinMin: Int = 15): Ledger? {
+    fun replyWindowIfMessage(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, now: Long, withinMin: Int = 10): Ledger? {
         if (profile.replyWindowMin <= 0) return null
         val msg = ledger.lastMessageAt[pkg] ?: return null
         if (now - msg > withinMin * Time.MIN) return null

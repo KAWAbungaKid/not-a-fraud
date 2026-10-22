@@ -125,8 +125,35 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
 
+        val plan = withPlan.todayPlan
+        if (plan != null && (plan.dropped.isNotEmpty() || plan.atRisk.isNotEmpty())) item {
+            Panel {
+                if (plan.dropped.isNotEmpty()) {
+                    SectionLabel("Moved off today")
+                    Text(plan.dropped.joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                    Text("A block slipped by, so the rest of the day was re-planned. These are in the coming days.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
+                if (plan.atRisk.isNotEmpty()) {
+                    SectionLabel("Won't fit this week")
+                    Text(plan.atRisk.joinToString(" · "), color = Palette.amber, style = MaterialTheme.typography.bodySmall)
+                    Text("Due within 7 days, more work than the week has room for. Cut scope, ask for time, or bump it.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        val week = com.maven.notafraud.core.plan.Practice.weekStart(today)
+        val checkedIn = data.checkIns.any { it.weekStart == week.toString() }
+        if (!checkedIn && (today.dayOfWeek == java.time.DayOfWeek.SUNDAY || today.dayOfWeek == java.time.DayOfWeek.SATURDAY)) item {
+            var open by remember { mutableStateOf(false) }
+            Panel(Modifier.clickable { open = true }) {
+                Text("Weekly check-in", style = MaterialTheme.typography.titleMedium)
+                Text("Four taps: people, faith, calm, happiness. Feeds your stats.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+            if (open) CheckInDialog(data, now) { open = false }
+        }
+
         item {
-            var asking by remember { mutableStateOf(false) }
+            var asking by remember { mutableStateOf(Graph.lowPromptPending.also { Graph.lowPromptPending = false }) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val mode = dayCtx?.mode
                 FilterChip(
@@ -294,6 +321,11 @@ fun HowsToday(data: AppData, now: Long, onDismiss: () -> Unit) {
                 Panel(highlight = true) {
                     SectionLabel("Suggestion: " + modeName(advice.mode))
                     Text(advice.reason)
+                }
+                val signals = remember { com.maven.notafraud.core.stats.Burnout.signals(data, now) }
+                if (signals.isNotEmpty()) {
+                    SectionLabel("Signs of running low")
+                    for (sg in signals) Text("· $sg", color = Palette.amber, style = MaterialTheme.typography.bodySmall)
                 }
                 ModeOption("Push", "Keep the plan. 25-minute blocks with 5-minute breaks, easiest win first.", advice.mode == com.maven.notafraud.core.model.DayMode.PUSH) { choose(com.maven.notafraud.core.model.DayMode.PUSH) }
                 ModeOption("Recharge, then push", "Nap or walk first, then a lighter plan (50-minute blocks, 4 h focus cap).", advice.mode == com.maven.notafraud.core.model.DayMode.RECHARGE) { choose(com.maven.notafraud.core.model.DayMode.RECHARGE) }

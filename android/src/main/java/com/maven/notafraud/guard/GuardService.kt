@@ -70,6 +70,8 @@ class GuardService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Graph.init(this)
+        GuardLog.init(this)
+        GuardLog.add("Guard", "started")
         instance = this
         lastConnectedAt = System.currentTimeMillis()
         registerReceiver(screenReceiver, IntentFilter().apply {
@@ -87,11 +89,19 @@ class GuardService : AccessibilityService() {
     private var audio: AudioManager? = null
     private val modeListener = AudioManager.OnModeChangedListener { reevaluate() }
 
-    /** On any call (phone, Snapchat, FaceTime-style, WhatsApp): never block, never nudge. */
+    /**
+     * On any call (phone, Snapchat, FaceTime-style, WhatsApp): never block, never nudge.
+     * v0.3 trusted the audio mode alone; some apps leave it in "communication" after a call (or use it
+     * for voice notes and the camera), which silently switched blocking off. Now a VoIP call only counts
+     * while the microphone is actually in use.
+     */
     private fun inCall(): Boolean {
-        val m = audio?.mode ?: return false
-        return m == AudioManager.MODE_IN_CALL || m == AudioManager.MODE_IN_COMMUNICATION || m == AudioManager.MODE_RINGTONE ||
-            m == AudioManager.MODE_CALL_SCREENING
+        val a = audio ?: return false
+        return when (a.mode) {
+            AudioManager.MODE_IN_CALL, AudioManager.MODE_CALL_SCREENING, AudioManager.MODE_RINGTONE -> true
+            AudioManager.MODE_IN_COMMUNICATION -> runCatching { a.activeRecordingConfigurations.isNotEmpty() }.getOrDefault(false)
+            else -> false
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -192,6 +202,9 @@ class GuardService : AccessibilityService() {
         }
     }
 
+    private fun isWatched(pkg: String) = pkg.startsWith(Sites.PREFIX) || pkg in Graph.data.rules.blocked
+    private fun label(pkg: String) = AppLabels.label(this, pkg)
+
     /** Re-check the app in front (after an unlock expires, or credits change). */
     fun reevaluate() {
         val pkg = currentPkg ?: return
@@ -204,9 +217,22 @@ class GuardService : AccessibilityService() {
         val inFreeWindow = (Graph.data.ledger.freeWindowUntil[pkg] ?: 0) > now
         watchingKeyboard = inFreeWindow
         updateEvents()
-        if (inCall()) { currentAction = GuardAction.IGNORE; Notifier.cancelNag(this); return }
+        if (inCall()) {
+            currentAction = GuardAction.IGNORE; Notifier.cancelNag(this)
+            if (isWatched(pkg)) GuardLog.add(label(pkg), "allowed: on a call")
+            return
+        }
         val decision = GuardPolicy.decide(pkg, Graph.data, now, packageName.removeSuffix(".dev"))
         currentAction = decision.action
+        if (isWatched(pkg)) GuardLog.add(label(pkg), when (decision.action) {
+            GuardAction.BLOCK -> "blocked"
+            GuardAction.UNLOCKED -> (if (inFreeWindow) "free window" else "unlocked") + " until ${java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(java.util.Date(decision.unlockedUntil))}" +
+                (Graph.data.ledger.entries.lastOrNull { it.reason.endsWith(label(pkg)) }?.reason?.let { " ($it)" } ?: "")
+            GuardAction.EARN -> "earning credits"
+            GuardAction.IGNORE -> if (!Graph.data.rules.blockingEnabled) "allowed: blocking is switched off" else "allowed"
+        })
+        if (decision.action == GuardAction.UNLOCKED && inFreeWindow) com.maven.notafraud.notify.Notifier.postWindow(this, label(pkg), decision.unlockedUntil)
+        else com.maven.notafraud.notify.Notifier.cancelWindow(this)
         when (decision.action) {
             GuardAction.BLOCK -> {
                 // Someone messaged in the last few minutes: this open is a reply. Free window, once per message.
@@ -263,7 +289,7 @@ class GuardService : AccessibilityService() {
                 }
             }
         }
-        if (currentAction == GuardAction.UNLOCKED) Notifier.cancelNag(this)
+        if (currentAction == GuardAction.UNLOCKED) { Notifier.cancelNag(this); Notifier.cancelWindow(this) }
         cancelPending()
         currentAction = GuardAction.IGNORE
     }

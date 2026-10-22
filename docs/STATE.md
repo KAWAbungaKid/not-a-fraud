@@ -5,7 +5,9 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-21, v0.3.0)
+## 0. Where things stand (2026-10-21, v0.4.0)
+
+v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
 
 v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
@@ -18,7 +20,7 @@ v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0**
 | 5 | Routine | Built. v0.3: on-time grading, wake from watch or first unlock, naps split from night sleep, bedtime sound on the alarm stream (gets through DND), sport counts after 3 standard workouts |
 | 6 | Google Calendar | Built. v0.3: per-calendar Events / Deadlines / Ignore (Canvas → deadline tasks synced by event id), auto exam study tasks, 7 days written (future = "(draft)") |
 | 7 | Catch-up study | Practice item per class, 3 h/week; research area importance 5, research tasks pinned hot; old web-app tasks in a review queue |
-| 8 | Stats, skill tree, learning session lengths, burnout signals, hourly re-plan | v0.4 (section 11 split) |
+| 8 | Stats, skill tree, learning session lengths, burnout signals, hourly re-plan | Built in v0.4 (section 13) |
 
 ### How work happens
 Claude writes all code and pushes to `main`; GitHub Actions is the compiler (the Claude sandbox
@@ -304,3 +306,16 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 - **Toward an app for other people:** the remaining Maven-specific seed (anchors, routine times, web-app tasks, goals/areas) should become an onboarding flow with neutral defaults. Not started; keep new features calendar- and settings-driven, not hard-coded.
 - Block screen was slower in v0.3 (a 700 ms wait for notification taps) — removed; the block screen now closes itself if a reply window opens after it.
 - Snapchat reply window "not working all the time": notification-tap detection depends on the app removing its notification on click. Added the robust rule: opening a blocked app within 15 min of a new message notification (category message/social/call, not story/streak) is a free reply window, once per message.
+
+
+## 13. v0.4.0 (2026-10-21)
+
+Built overnight on Maven's request ("add features discussed previously"); rollback = reinstall 0.3.1.
+- **Stats v1** (`core/stats/Stats.kt`): Body (sleep, workouts, steps, meals), Mind (school+mind area minutes vs practice targets), Work (research/PT/career minutes vs 6 h/week), Hygiene, Discipline (worked ÷ planned task minutes per day), Social + Spirit (weekly 1–5 check-in). 7-day window, previous week for trend. Stat < 4 → +1 importance for its areas (`Stats.AREAS`), task override wins (setting `statsDriveImportance`). Area mapping still uses the seeded area ids — needs to become user-mappable for other people.
+- **Skill trees** (`SkillTree`, `Skill`; migration v5 seeds Athletics/Climbing/Music/Magic). Time = sessions on the skill's practice task + manual minutes. Levels 1/5/15/40/100 h; child unlocks at parent level 1. Sport tree: 20+ min session checks the workout routine ("Sport" note).
+- **Learning**: practice blocks capped at ~1.2× the median of the last 10 sessions (≥3 sessions).
+- **Auto re-plan** (`Planning.autoReplan`, setting `autoReplan`): a TASK block that ended unworked after the plan was made → re-plan; dropped titles kept in `DayPlan.dropped`. `atRisk` = due ≤7 days and doesn't fit the week.
+- **Burnout** (`Burnout.signals/shouldPrompt`): ≥2 signals after 8am, no mode chosen → one notification + How's today opens.
+- **Guard**: VoIP calls count only with an active recording (fixes "in communication" false positives — prime suspect for Snapchat not blocking). Guard decision log (`guard/GuardLog.kt`, filesDir/guardlog.txt, 200 entries) shown in More. Free-window countdown notification. Message window 10 min.
+- **UI**: bottom tab "You" = Routine | Stats | Skills; accent colors (`Settings.accent`); recharge ideas editor.
+- Open: confirm Snapchat with the log; onboarding with neutral defaults for other users; text-brightness option.

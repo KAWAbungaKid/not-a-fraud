@@ -50,6 +50,9 @@ object Graph {
         return com.maven.notafraud.core.plan.NowResolver.resolve(d.todayPlan!!, d, n)
     }
 
+    /** Set when the burnout nudge fired; the Now tab opens "How's today?" once. */
+    @Volatile var lowPromptPending = false
+
     fun replan() {
         val n = now()
         store.update { Planning.replan(it, n) }
@@ -57,6 +60,15 @@ object Graph {
 
     /** Re-post the notification and re-arm the next block-boundary alarm. Cheap; call after any change. */
     fun refresh(ctx: Context) {
+        // A block slipped by: re-plan the rest of the day (drops what no longer fits).
+        val n = now()
+        store.update { Planning.autoReplan(Planning.ensureToday(it, n), n) }
+        // Two or more signs of running low: one nudge a day toward "How's today?".
+        if (com.maven.notafraud.core.stats.Burnout.shouldPrompt(data, n)) {
+            Notifier.postLow(ctx, com.maven.notafraud.core.stats.Burnout.signals(data, n))
+            store.update { com.maven.notafraud.core.store.Actions.markPrompted(it, today(), n) }
+            lowPromptPending = true
+        }
         Notifier.postNow(ctx, nowState())
         com.maven.notafraud.notify.RoutineAlerts.check(ctx)
         Alarms.scheduleNext(ctx)

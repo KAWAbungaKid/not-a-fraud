@@ -216,6 +216,39 @@ fun SetupScreen(data: AppData, resumes: Long) {
             }
         }
 
+        item { SectionLabel("Why wasn't I blocked?") }
+        item { GuardLogPanel() }
+
+        item { SectionLabel("Planning") }
+        item {
+            var ideas by remember { mutableStateOf(false) }
+            Panel {
+                SwitchRow("Re-plan when a block slips by", data.settings.autoReplan) { on -> Graph.update { it.copy(settings = it.settings.copy(autoReplan = on)) } }
+                SwitchRow("Low stats raise their areas' importance", data.settings.statsDriveImportance) { on -> Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(statsDriveImportance = on)) } }
+                TextButton(onClick = { ideas = true }) { Text("Recharge ideas: " + data.settings.rechargeIdeas.joinToString(", ").ifBlank { "none" }) }
+            }
+            if (ideas) ListDialog("Recharge ideas", "One per line. Recharge blocks suggest these.", data.settings.rechargeIdeas, { ideas = false }) { l ->
+                Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(rechargeIdeas = l)) }; ideas = false
+            }
+        }
+
+        item { SectionLabel("Look") }
+        item {
+            Panel {
+                Text("Accent color", style = MaterialTheme.typography.titleSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    for ((name, c) in ACCENTS) {
+                        Box(
+                            Modifier.size(36.dp).clip(CircleShape).background(c.first)
+                                .then(if (data.settings.accent == name) Modifier.background(c.first) else Modifier)
+                                .clickable { Graph.update { it.copy(settings = it.settings.copy(accent = name)) } },
+                            contentAlignment = Alignment.Center,
+                        ) { if (data.settings.accent == name) Text("✓", color = Palette.bg) }
+                    }
+                }
+            }
+        }
+
         item { SectionLabel("Google Calendar") }
         item { CalendarPanel(data, resumes) }
 
@@ -444,7 +477,7 @@ private fun AnchorEditor(initial: Anchor, data: AppData, isNew: Boolean, onDismi
 }
 
 @Composable
-private fun ListDialog(title: String, hint: String, initial: List<String>, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
+fun ListDialog(title: String, hint: String, initial: List<String>, onDismiss: () -> Unit, onSave: (List<String>) -> Unit) {
     var text by remember { mutableStateOf(initial.joinToString("\n")) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -631,4 +664,23 @@ private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model
             }
         },
     )
+}
+
+
+@Composable
+private fun GuardLogPanel() {
+    var open by remember { mutableStateOf(false) }
+    Panel(Modifier.clickable { open = !open }) {
+        Text(if (open) "Recent blocking decisions (newest first)" else "Tap to see the last blocking decisions", style = MaterialTheme.typography.titleSmall)
+        if (open) {
+            val c = LocalContext.current
+            val entries = remember { com.maven.notafraud.guard.GuardLog.init(c); com.maven.notafraud.guard.GuardLog.recent().take(60) }
+            if (entries.isEmpty()) Text("Nothing yet. Open a blocked app and come back.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            for (e in entries) Row(Modifier.fillMaxWidth()) {
+                Text(com.maven.notafraud.guard.GuardLog.time(e.at), style = Mono.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize), color = Palette.textDim, modifier = Modifier.padding(end = 8.dp))
+                Text("${e.subject}: ${e.decision}", style = MaterialTheme.typography.bodySmall,
+                    color = if (e.decision.startsWith("allowed")) Palette.amber else Palette.text)
+            }
+        }
+    }
 }

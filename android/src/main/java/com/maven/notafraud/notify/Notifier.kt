@@ -144,4 +144,38 @@ object Notifier {
     }
 
     fun cancelAlert(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_ALERT)
+
+    const val ID_WINDOW = 4
+
+    /** While a blocked app is open for free (reply window, Quick Snap, still texting): say so, and until when. */
+    fun postWindow(ctx: Context, label: String, until: Long) {
+        if (!canPost(ctx)) return
+        val b = NotificationCompat.Builder(ctx, CH_NOW)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle("$label is open for free")
+            .setContentText("Reply window until ${java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(java.util.Date(until))}. Typing keeps it open.")
+            .setOngoing(true)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setWhen(until)
+            .setUsesChronometer(true)
+            .setChronometerCountDown(true)
+            .setTimeoutAfter((until - System.currentTimeMillis()).coerceAtLeast(1000) + 60_000)
+        runCatching { NotificationManagerCompat.from(ctx).notify(ID_WINDOW, b.build()) }
+    }
+
+    fun cancelWindow(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(ID_WINDOW)
+
+    /** Signs of running low: once a day, opens "How's today?". */
+    fun postLow(ctx: Context, signals: List<String>) {
+        if (!canPost(ctx)) return
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle("Running low? Pick how today goes")
+            .setContentText(signals.joinToString(" · "))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(signals.joinToString(" · ")))
+            .setAutoCancel(true)
+            .setContentIntent(openApp(ctx, MainActivity.TAB_NOW, req = 13))
+        runCatching { NotificationManagerCompat.from(ctx).notify(5, b.build()) }
+    }
 }

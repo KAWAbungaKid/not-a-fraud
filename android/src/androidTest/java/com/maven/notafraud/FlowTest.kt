@@ -86,9 +86,19 @@ class FlowTest {
         }
         ActivityScenario.launch(MainActivity::class.java).use {
             rule.waitForIdle()
-            rule.onNodeWithText("Routine").performClick()
+            rule.onNodeWithText("You").performClick()
             rule.waitForIdle()
             assertTrue(rule.onAllNodesWithText("Wake up").fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithText("Stats").performClick()
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Last 7 days", substring = true).fetchSemanticsNodes().isNotEmpty())
+            rule.onNodeWithText("Skills").performClick()
+            rule.waitForIdle()
+            rule.onNodeWithText("Climbing", substring = true).performClick()
+            rule.waitForIdle()
+            rule.onNodeWithText("Bouldering").performClick()
+            rule.waitForIdle()
+            assertTrue(rule.onAllNodesWithText("Plan practice").fetchSemanticsNodes().isNotEmpty())
         }
     }
 }

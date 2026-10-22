@@ -293,6 +293,11 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                 if (!isNew) {
                     val left = Scorer.minutesLeft(t)
                     Text("Logged ${t.loggedMin}m · $left m left", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                    val pushed = t.deferrals.count { it > System.currentTimeMillis() - 14 * Time.DAY }
+                    if (pushed > 0) Text("Pushed back $pushed× in 14 days", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                    com.maven.notafraud.core.stats.Learning.typicalMin(data, t.id)?.let {
+                        Text("You usually last ~${it}m on this; blocks are sized to match", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                    }
                 }
             }
         },

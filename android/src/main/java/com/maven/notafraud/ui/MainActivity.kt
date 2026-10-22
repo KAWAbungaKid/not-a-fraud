@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountTree
-import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewTimeline
@@ -53,7 +53,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         Graph.init(this)
         intent?.getStringExtra(EXTRA_TAB)?.let { tab = it }
-        setContent { NafTheme { App() } }
+        setContent {
+            val d by Graph.store.state.collectAsState()
+            NafTheme(d.settings.accent) { App() }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,8 +93,8 @@ class MainActivity : ComponentActivity() {
                     NavigationBarItem(
                         selected = tab == TAB_ROUTINE,
                         onClick = { tab = TAB_ROUTINE },
-                        icon = { BadgedBox(badge = { if (angry > 0) Badge { Text("$angry") } }) { Icon(Icons.Filled.Restaurant, null) } },
-                        label = { Text("Routine") },
+                        icon = { BadgedBox(badge = { if (angry > 0) Badge { Text("$angry") } }) { Icon(Icons.Filled.Person, null) } },
+                        label = { Text("You") },
                     )
                     tabItem(TAB_TASKS, "Tasks", Icons.Filled.AccountTree)
                     NavigationBarItem(
@@ -107,7 +110,7 @@ class MainActivity : ComponentActivity() {
                 when (tab) {
                     TAB_NOW -> NowScreen(data, now, onOpenTab = { tab = it })
                     TAB_PLAN -> PlanScreen(data, now)
-                    TAB_ROUTINE -> RoutineScreen(data, now)
+                    TAB_ROUTINE -> YouScreen(data, now)
                     TAB_TASKS -> TasksScreen(data, now)
                     TAB_SETUP -> SetupScreen(data, resumes)
                 }

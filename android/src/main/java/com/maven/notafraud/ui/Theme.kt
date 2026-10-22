@@ -15,6 +15,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -26,19 +29,30 @@ object Palette {
     val bg = Color(0xFF0D110D)
     val surface = Color(0xFF151B15)
     val surfaceHigh = Color(0xFF1E261E)
-    val green = Color(0xFF8CFF6E)
-    val greenDim = Color(0xFF6FB85E)
+    /** The accent ("green" by default; Setup → Look). Backed by state so a change repaints everything. */
+    var green by androidx.compose.runtime.mutableStateOf(Color(0xFF8CFF6E))
+    var greenDim by androidx.compose.runtime.mutableStateOf(Color(0xFF6FB85E))
     val amber = Color(0xFFFFC857)
     val red = Color(0xFFFF6B6B)
     val text = Color(0xFFE4EDE1)
     val textDim = Color(0xFFBCC8B8)
 }
 
-private val scheme = darkColorScheme(
-    primary = Palette.green,
+/** Accent name -> (bright, dim). */
+val ACCENTS = linkedMapOf(
+    "green" to (Color(0xFF8CFF6E) to Color(0xFF6FB85E)),
+    "cyan" to (Color(0xFF6EE7FF) to Color(0xFF4FA9BD)),
+    "violet" to (Color(0xFFC3A8FF) to Color(0xFF8E7BC4)),
+    "pink" to (Color(0xFFFF8AD8) to Color(0xFFC46AA6)),
+    "orange" to (Color(0xFFFFA65C) to Color(0xFFC07C42)),
+    "white" to (Color(0xFFF2F2F2) to Color(0xFFB4B4B4)),
+)
+
+private fun scheme(accent: Color) = darkColorScheme(
+    primary = accent,
     onPrimary = Color(0xFF0B1A08),
-    primaryContainer = Color(0xFF24401C),
-    onPrimaryContainer = Palette.green,
+    primaryContainer = accent.copy(alpha = 0.22f).compositeOver(Palette.bg),
+    onPrimaryContainer = accent,
     secondary = Palette.amber,
     onSecondary = Color(0xFF231A00),
     background = Palette.bg,
@@ -66,8 +80,12 @@ private val typography = Typography().run {
 }
 
 @Composable
-fun NafTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = scheme, typography = typography, content = content)
+fun NafTheme(accent: String = "green", content: @Composable () -> Unit) {
+    val (bright, dim) = ACCENTS[accent] ?: ACCENTS.getValue("green")
+    Palette.green = bright
+    Palette.greenDim = dim
+    val cs = androidx.compose.runtime.remember(bright) { scheme(bright) }
+    MaterialTheme(colorScheme = cs, typography = typography, content = content)
 }
 
 val Mono = TextStyle(fontFamily = mono)

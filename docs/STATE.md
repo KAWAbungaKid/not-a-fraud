@@ -262,3 +262,38 @@ Nearly every cell is a placeholder `10` or `#N/A`. Roughly 100 metrics, almost a
 - Stats weigh in on planning and **auto-assign** what to work on.
 - **Re-plan every hour** when things haven't been done: re-evaluate when to do things, and **drop what there's no longer time for** ("lost that privilege").
 - **"Pick 3" the evening before:** choose the three things that matter most tomorrow; the planner protects them.
+
+---
+
+## 11. v0.3 design conversation (2026-10-21)
+
+**Confirmed working on the phone (v0.2):** site blocking, plan written into Google Calendar. Nothing reported annoying; Maven retimed some routine items. Inbox not useful (Snap notifications don't carry text) — remove it; opening the app from its notifications is good. Windows app and easier updates: not for a while.
+
+**Sleep / wake:** Galaxy Watch → Samsung Health → Health Connect. Sleep showed no value because the watch wasn't worn. Split night sleep from naps (v0.2 sums them). "Wake up" should record the actual wake time; 5:30–6:00 is good, later is bad.
+
+**Bedtime trigger** liked; wants an audible nudge too.
+
+**Kinds of work (all "A"):**
+- Multi-step tasks with attended and unattended phases (laundry; research prep → run → test). Planner books only attended minutes, fills the gaps, reminds when a run ends. Each step can be checked, or the whole thing marked done at once.
+- Plan **7 days ahead**, not just today.
+- Practice items (skills): weekly time target, min/max block, sprinkled into gaps; later learns real session lengths (15 min of magic tricks vs an hour of piano).
+- **Skill tree, Skyrim-style**, user-editable: trees (Athletics, Magic, Music, Climbing, sports…) → skills (backflip, flair…) → time spent / progress. Sports and climbing can replace a workout, but only after the standard 3 workouts that week.
+- Also: errands, waiting-on-someone, low-brain filler — liked.
+
+**Priority:** ultimately driven by Stats (a low stat raises its area's baseline), with task-level override (option C). Until stats exist: manual area baseline + task override + bump.
+
+**Do later / Not today / pick a day / something came up:** in the app only, not on the notification (misclicks). Neutral for now; **track the pattern** (what gets pushed, how often) for later.
+
+**Skip + make up, generalized:** like ME 3411 for trading, any class or block can be skipped with "make up later", which creates a make-up task.
+
+**Burnout:** nap rule liked (20 min before 3pm when sleep < 6h and energy low; walk/light task after 3pm). Recharge activities that work: walk, gym; maybe being bored to let things process, maybe art. Wants clearer options for "push vs reset".
+
+**Blocking (Snapchat etc.):**
+- Reply window from a notification: 5 minutes.
+- Needs a way to pull Snap up instantly to record and send something.
+- Never block or nudge during any call (the FaceTime-in-Snap block may have been a bug).
+- "Still texting?" after the window, but longer real conversations must not get cut off.
+- Emergency = instant, no passphrase. Credits keep the 60 s wait (it kills the urge to scroll).
+- Wants all of this customizable so he can try different setups.
+
+**Future:** own workout and diet apps (with his Excel workout math) talking to this app; meal timing and food choice; catch-up / sneak-in workouts on busy weeks.

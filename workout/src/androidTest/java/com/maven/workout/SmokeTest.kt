@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -57,19 +58,19 @@ class SmokeTest {
 
         rule.onNodeWithText("Program").performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("Edit program").performClick()
+        rule.onNodeWithText("Edit program").performScrollTo().performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Weeks per block").assertExists()
         back()
         rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Bench (main)"))
-        rule.onNodeWithText("Bench (main)").performClick()
+        rule.onNodeWithText("Bench (main)").performScrollTo().performClick()
         rule.waitForIdle()
         rule.onAllNodesWithText("Week 1").onFirst().assertExists()
         back()
 
         rule.onNodeWithText("Settings").performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("Daily check when the minimum is at risk").assertExists()
+        rule.onNodeWithText("Daily check when the minimum is at risk").performScrollTo().assertIsDisplayed()
     }
 
     @Test

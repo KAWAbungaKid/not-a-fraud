@@ -1,6 +1,6 @@
 # Not a Fraud (formerly Project Max) — state of the build
 
-Living doc. Read this first in any new chat about the app. Last updated 2026-10-20 (after first install).
+Living doc. Read this first in any new chat about the app. Last updated 2026-10-26 (workout app added — § 16 and `docs/workout/STATE.md`).
 Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notafraud`.
 
 ---
@@ -363,3 +363,53 @@ Built overnight on Maven's request ("add features discussed previously"); rollba
 - `Actions.blockSuggestions` (≥ `suggestBlockMin` avg/day over 7 days), `Settings.notSuggest`. App lists show installed apps only.
 
 **Ideas raised with Maven (not built):** purpose answers could feed a weekly "what YouTube was for" review; the lock could also cover deleting tasks/routine items; the homework meter could feed Discipline/Work stats; Snap reply-window length vs extra emergencies (maybe the reply window should be longer instead).
+
+
+## 16. Workout app + what Not a Fraud must do with it (2026-10-26)
+
+A separate workout app now lives in this repo: `workout-core/` + `workout/`, app ID `com.maven.workout`,
+same signing key. Full doc: **`docs/workout/STATE.md`**. It replaces Hevy and Maven's workout spreadsheet
+(PPL, RPE-chart weights from e1RM, 12-week block cycle) and **owns the split and the days per week**.
+
+**Maven's decisions (2026-10-26):**
+- Consistency first: **minimum 3 workouts/week**, full week 6. Days 1–3 Push / Pull / Legs (the minimum split),
+  days 4–6 Chest & Back / Shoulders & Arms / Legs 2 — so climbing and other sports can be scheduled around
+  smaller muscle days.
+- The workout app decides the split and how many days; **Not a Fraud gets it pushed** and must pick it up.
+- Not a Fraud **plans the full week (target, 6)** but **freaks out when the minimum (3) hasn't been or is
+  projected not to be met** — e.g. Thursday with nothing done means Thu, Fri and Sat/Sun each need one; Not a
+  Fraud must escalate when it's cutting that close.
+
+**Contract (read it, don't re-derive it):** `content://com.maven.workout.sync/status` → JSON with `minPerWeek`,
+`targetPerWeek`, `doneThisWeek`, `doneDates`, `trainedToday`, `daysLeft`, `needed`, `slack`, `risk`
+(`MET` / `ON_TRACK` / `TIGHT` / `MUST_TODAY` / `MISSED`), `message`, `suggestedToday`, `inProgress`, `lastWorkoutDate`,
+`injured`… and `/sessions?since=DATE`. Broadcast `com.maven.workout.CHANGED` (explicit to Not a Fraud's package)
+when it changes. Guarded by signature permission `com.maven.permission.SYNC`. Details: workout doc § 5.
+
+**Not a Fraud changes to build (next, in the Not a Fraud chat):**
+1. Manifest: declare `<permission android:name="com.maven.permission.SYNC" android:protectionLevel="signature"/>`,
+   `<uses-permission>` it, add `<queries><package android:name="com.maven.workout"/></queries>` (+ `.dev` for the
+   debug pairing: NaF dev ↔ Workout dev, NaF ↔ Workout), and a manifest receiver for `com.maven.workout.CHANGED`
+   with `android:permission="com.maven.permission.SYNC"`.
+2. A `WorkoutLink` reader (Android side; parse into a `:core` model so the planner stays pure): read `/status` on
+   app open, in the hourly worker, and on the broadcast. Store the last status in `AppData` (works offline;
+   missing app = feature hidden).
+3. **Planner:** replace the hard-coded lift anchors (Mon/Tue/Wed 5–6) with `targetPerWeek` workout blocks spread
+   over the week (respecting class/anchors; workout length ~60 min, settable). Label each block with the
+   workout app's suggestion for that day when known. Don't plan a workout block on a day already in `doneDates`.
+4. **Minimum guard ("freak out"):** drive escalation from `risk` / `slack`:
+   - `TIGHT` → a workout block is protected today (can't be pushed by "do later" without the settings-lock style
+     confirmation); Now card turns amber.
+   - `MUST_TODAY` → top of Now, nag ladder like time-sink nags (action = "Start workout" opens the workout app,
+     Short mode is fine), routine-style "anger" escalation through the evening; earn-to-unlock credits could be
+     paused until it's done (Maven to decide).
+   - `MISSED` → one honest notification, no further nagging this week; counts against Discipline.
+   - `inProgress` → treat as working (no nags, block shows "in progress").
+5. **Routine auto-check:** the WORKOUT routine item (`RoutineItem.autoCheck = WORKOUT`) ticks from
+   `trainedToday` instead of Health Connect guesses. The "sport counts after 3 standard workouts" rule should read
+   `doneThisWeek` from here.
+6. **Stats:** Body/Strength can read `/sessions` (count, minutes) and `streakWeeks`.
+7. "Start workout" actions open the workout app (`com.maven.workout/.ui.MainActivity`).
+
+**Open questions for Maven:** do climbing / other sports count toward the minimum of 3? (Currently no.) Should a
+missed minimum lock credits/apps, or only nag?

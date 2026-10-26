@@ -5,9 +5,9 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-22, v0.5.0)
+## 0. Where things stand (2026-10-25, v0.6.0)
 
-v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
+v0.6.0: to-do list, homework calendars with work-ahead, settings lock, purpose mode, typed extra emergencies, block suggestions (section 15). v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
 
 v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
@@ -348,3 +348,18 @@ Built overnight on Maven's request ("add features discussed previously"); rollba
 - Three ways to schedule recurring practice: a Habit weekly block, a PRACTICE task with a weekly target, a skill's "Plan practice". Could merge into one.
 - "Pin as hot" vs "Bump for a week": both push a task up.
 - "Capture an idea" on Now vs adding a task.
+
+
+## 15. v0.6.0 (2026-10-25)
+
+**Asked (Maven):** general to-do with levels (ASAP / set day / within days / try eventually); homework calendar (Canvas is mostly homework): 2 h default, mark longer ones from the weekly plan, auto-schedule, split big ones over days, **help get ahead and stay ahead** (he's not ahead now); drop non-installed default blocked apps from lists; block suggestions from usage (not built before); **settings lock**: urges to loosen a setting get tabled to the next morning with "are you sure"; YouTube-for-a-how-to problem: a "what are you doing?" prompt every ~5 min so writing "scrolling" makes the guilt land (not a phrase unlock, a report); running out of emergencies texting on Snap → more emergencies, but each needs the "I am choosing…" phrase typed; keep everything customizable.
+
+**Built:**
+- `Task.horizon` (ASAP / ON_DAY / WITHIN / SOMEDAY). ON_DAY/WITHIN use notBefore + dueAt; SOMEDAY excluded by `liveTasks()`; ASAP boosted in the planner. To-do page (`ui/TodoScreen.kt`).
+- `CalMode.HOMEWORK`, `plan/Homework.kt`: sync (sourceKey `homework:uid`, est = `homeworkMin`, HIGH = firm, `targetAt` = due − `homeworkAheadDays`, `dailyCapMin`, notBefore = due − `homeworkLeadDays`), `Homework.ahead` meter. Scorer urgency = max(due, target). Planner per-day cap = max(cap, ceil(left / days to target)). Plan page "Due this day" + HowLong dialog. Migration v7 converts DEADLINES calendars and deadline: tasks.
+- `store/Lock.kt` + `AppData.pending` (`PendingChange`, `ChangeKind`): loosening changes queued to `lockReleaseMin` next morning (≥6 h away); strict parts of a profile edit apply now. Now card + notification to confirm/keep.
+- `BlockProfile.askPurpose / purposeCheckMin / purposeDailyMin`, `Ledger.purposeLog`, `Credits.purpose`; block-screen PurposePanel with today's answers. YouTube default on (migration).
+- `BlockProfile.extraEmergencyPerDay`, `Credits.emergencyWithPhrase` / `phraseMatches`.
+- `Actions.blockSuggestions` (≥ `suggestBlockMin` avg/day over 7 days), `Settings.notSuggest`. App lists show installed apps only.
+
+**Ideas raised with Maven (not built):** purpose answers could feed a weekly "what YouTube was for" review; the lock could also cover deleting tasks/routine items; the homework meter could feed Discipline/Work stats; Snap reply-window length vs extra emergencies (maybe the reply window should be longer instead).

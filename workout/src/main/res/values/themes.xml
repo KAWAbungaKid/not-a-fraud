@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Workout" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF100E0B</item>
+        <item name="android:statusBarColor">#FF100E0B</item>
+        <item name="android:navigationBarColor">#FF100E0B</item>
+    </style>
+</resources>

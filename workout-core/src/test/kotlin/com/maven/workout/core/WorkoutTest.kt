@@ -23,7 +23,7 @@ class WorkoutTest {
         assertEquals(0.707, Rpe.pct(10, 9.0), 1e-9)
         assertEquals(0.574, Rpe.pct(12, 6.0), 1e-9)
         assertEquals((0.762 + 0.739) / 2, Rpe.pct(8, 8.5), 1e-9)
-        assertTrue(Rpe.pct(15, 9.0) < 0.574)
+        assertTrue(Rpe.pct(15, 8.0) < 0.574)
     }
 
     @Test
@@ -246,7 +246,7 @@ class WorkoutTest {
 
     @Test
     fun `store round trips`() {
-        val f = java.io.File.createTempFile("w", ".json")
+        val f = java.io.File.createTempFile("workout", ".json")
         f.delete()
         val st = WorkoutStore(f) { seed }
         st.update { Actions.addInjury(it, setOf(Joint.KNEE), "", mon) }

@@ -2,7 +2,7 @@ name: ci
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', '**.md']
+    paths-ignore: ['docs/**', '**.md', 'workout/**', 'workout-core/**', '.github/workflows/workout-*.yml']
   workflow_dispatch:
 permissions:
   contents: write

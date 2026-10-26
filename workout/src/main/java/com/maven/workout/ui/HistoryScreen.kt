@@ -63,7 +63,7 @@ private fun SessionRow(d: WorkoutData, s: Session, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(s.name, style = MaterialTheme.typography.titleMedium)
                 Dim(LocalDate.parse(s.date).format(DateTimeFormatter.ofPattern("EEE MMM d")) +
-                    " · ${s.doneSets} sets · ${minutes(s)} min" + if (s.mode != Mode.NORMAL) " · ${s.mode.label.lowercase()}" else "")
+                    " · ${s.doneSets} set${if (s.doneSets == 1) "" else "s"} · ${minutes(s)} min" + if (s.mode != Mode.NORMAL) " · ${s.mode.label.lowercase()}" else "")
             }
             if (prs.isNotEmpty()) Text("${prs.size} PR", color = Palette.green, style = Mono)
         }
@@ -83,7 +83,7 @@ fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
             Panel(highlight = prs.isNotEmpty()) {
                 Text(s.name, style = MaterialTheme.typography.headlineSmall)
                 Dim("${s.date} · Week ${s.week} Block ${s.block} · ${minutes(s)} min · ${s.mode.label}")
-                Text("${s.doneSets} sets · volume ${Rpe.fmt(Rpe.round(Strength.volume(s), 1.0))} ${d.settings.unit}", style = Mono)
+                Text("${s.doneSets} set${if (s.doneSets == 1) "" else "s"} · volume ${Rpe.fmt(Rpe.round(Strength.volume(s), 1.0))} ${d.settings.unit}", style = Mono)
                 if (prs.isNotEmpty()) {
                     SectionLabel("Personal records")
                     for (p in prs) Text("★ ${p.label}", color = Palette.green)

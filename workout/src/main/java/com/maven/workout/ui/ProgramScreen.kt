@@ -62,7 +62,7 @@ fun ProgramScreen(d: WorkoutData, onOpen: (Route) -> Unit) {
                 Text(Cycle.label(d.cycle, p), style = Mono)
                 Stepper("Week", d.cycle.week, 1..p.weeksPerBlock) { w -> Graph.update { Actions.setCycle(it, w, it.cycle.block) } }
                 Stepper("Block", d.cycle.block, 1..p.blocks) { b -> Graph.update { Actions.setCycle(it, it.cycle.week, b) } }
-                Dim("Moves on by itself: ${d.settings.advance.label.lowercase()} (Settings). Cycles finished: ${d.cycle.cyclesDone}.")
+                Dim("Moves on by itself: \"${d.settings.advance.label}\" (Settings). Cycles finished: ${d.cycle.cyclesDone}.")
                 SectionLabel("Days (first ${p.coreDays} = your minimum split)")
                 for ((i, t) in p.days.withIndex()) Row(
                     Modifier.fillMaxWidth().clickable { onOpen(Route.DayEdit(p.id, t.id)) }.padding(vertical = 4.dp),

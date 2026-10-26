@@ -111,7 +111,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, style = MaterialTheme.typography.titleLarge)
-                        Dim("Week ${s.week} · Block ${s.block} · ${Fmt.secs(((now - s.startedAt) / 1000).toInt())} · ${s.doneSets} sets")
+                        Dim("Week ${s.week} · Block ${s.block} · ${Fmt.secs(((now - s.startedAt) / 1000).toInt())} · ${s.doneSets} set${if (s.doneSets == 1) "" else "s"}")
                     }
                     TextButton(onClick = onClose) { Text("Hide") }
                     Button(onClick = { confirmFinish = true }) { Text("Finish") }

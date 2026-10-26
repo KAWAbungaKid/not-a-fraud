@@ -73,7 +73,7 @@ Type editor text format per week: `3x4 @7 top3`, `3x10 @9`, `3x1 @10 top1 test`,
 - Weight = chart%(reps, RPE) × **training max**, rounded to the exercise's increment (5; cables 2.5).
 - **Training max** = best e1RM in the last 42 days (setting) across typed maxes and every finished workout's best
   set; falls back to the latest point after a long layoff. Injured-mode workouts are shown but never count.
-- Logged RPE is optional; a blank RPE counts as 10 (the conservative reading).
+- Ticking a set fills any blank field (weight, reps, RPE) from the target. A set with no RPE and no target counts as RPE 10 (the conservative reading).
 - Top set (main lifts) before the back-off sets; test week = "work up to a max single", suggested at the e1RM.
 - Exercises with no type: planned as a repeat of last time.
 - Timed / bodyweight: "to failure" sets with **your best as the number to beat**; PRs tracked.

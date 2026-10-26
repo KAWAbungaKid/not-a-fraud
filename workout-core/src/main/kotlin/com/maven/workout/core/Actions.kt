@@ -44,7 +44,7 @@ object Actions {
         if (si !in e.sets.indices) e else e.copy(sets = e.sets.mapIndexed { i, s -> if (i == si) f(s) else s })
     }
 
-    /** Tick a set. Empty fields take the target values (like Hevy's checkmark). */
+    /** Tick a set. Empty fields (weight, reps, time, RPE) take the target values — ticking means "did what was prescribed". */
     fun completeSet(d: WorkoutData, ei: Int, si: Int, now: Long): WorkoutData = editSet(d, ei, si) { s ->
         if (s.done) s.copy(done = false, doneAt = null)
         else s.copy(
@@ -52,7 +52,7 @@ object Actions {
             weight = s.weight ?: s.targetWeight,
             reps = s.reps ?: s.targetReps,
             seconds = s.seconds ?: s.targetSeconds,
-            rpe = s.rpe,
+            rpe = s.rpe ?: s.targetRpe,
         )
     }
 

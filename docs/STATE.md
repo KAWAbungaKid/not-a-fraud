@@ -5,9 +5,9 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-25, v0.6.0)
+## 0. Where things stand (2026-10-26, v0.7.0)
 
-v0.6.0: to-do list, homework calendars with work-ahead, settings lock, purpose mode, typed extra emergencies, block suggestions (section 15). v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
+v0.7.0: homework read fix, one priority per task, Tasks tabs Map/Projects/To-do with tap/hold/+ map, workout app link (section 17). v0.6.0: to-do list, homework calendars with work-ahead, settings lock, purpose mode, typed extra emergencies, block suggestions (section 15). v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
 
 v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
@@ -413,3 +413,36 @@ when it changes. Guarded by signature permission `com.maven.permission.SYNC`. De
 
 **Open questions for Maven:** do climbing / other sports count toward the minimum of 3? (Currently no.) Should a
 missed minimum lock credits/apps, or only nag?
+
+
+## 17. v0.7.0 (2026-10-26)
+
+**Maven:** homework not appearing in the plan. Wants one priority level on every task instead of importance + pin hot + bump, Pick 3 above them; drop "capture an idea"; map: hold to modify, tap expands, "+" on every expansion to add project/task; "+ Project / + Task" at the top of the list view; To-do as a tab on the Tasks page instead of under More; rename "List". Discuss what's tailored to him and what was guessed. Backlog: draw your own skill constellation. Integrate the workout app.
+
+**Decisions (asked 2026-10-26):** priority = 4 named levels (Must/High/Normal/Low; stored as importance 5/4/3/2); sports do **not** count toward the workout minimum; when the minimum needs today's workout → **pause credit unlocks** until it's started (emergencies etc. still work).
+
+**Homework bug:** the planner was fine (HomeworkPlanTest on seed-shaped data). The calendar reader dropped entries with availability FREE and calendars with VISIBLE=0 for every mode. Now only Events calendars filter those. All-day due date used the local date of UTC midnight (a day early). Calendar page shows per-calendar counts / sync state.
+
+**Built:** `Importance` levels + `apply()` weights (Must ×2+30, High ×1.4+8, Low ×0.55; Pick 3 ×2+150); migration v8 (hot/bump → +1 level, ideas → SOMEDAY to-dos); `PriorityChips`; map `NodeType.ADD`, combinedClickable, expansion at every level; Tasks segmented tabs; `core/workout/WorkoutLink.kt` (`WorkoutStatus`, `mustToday`, `creditsPaused`, `receive` ticks the WORKOUT routine), `sense/WorkoutSync.kt` + `WorkoutChangedReceiver` (signature permission `com.maven.permission.SYNC`), workout Now card, hourly must-day nags, MISSED note, block-screen credit pause, planner workout label / skip trained days. `ChangeKind.WORKOUT_PAUSE`.
+
+### What's tailored to Maven (must become onboarding / neutral defaults for other people)
+- **Seed:** 6 goals, 14 areas with levels (research Must, school High) and stat mapping; weekly blocks (trading 8:30 weekdays, craft Fri 2–5 / Sat 8–12, date night Fri, Sunday review / CSWE / scout manual / off from 5); Fall 2026 classes + Thanksgiving; research session dates with biosensor templates; routine items and times; web-app tasks + review queue; catch-up study per class; starter skill trees; creed and emergency phrase; America/Chicago.
+- **Name heuristics:** area guessing from project names (`Seed.areaFor`), course-number matching ("ME 3525"), Canvas / test calendar name guesses.
+- **Apps:** default blocked list (Instagram, TikTok, X, Reddit, YouTube, Snapchat, Facebook…), focus apps (Kindle, Books, Anki, Libby, Acrobat, Samsung Notes), Snapchat quick-open and YouTube purpose profiles, desktop title keywords.
+- **Fixed lists:** routine types (meal/hygiene/body/sleep/other), workout notes and sport names, stat names.
+
+### What Claude guessed (Maven never set a number) — all adjustable unless noted
+- Planner: day 7:00–21:30, blocks ≤ 90 min, 10-min breaks, rough day < 6 h sleep with a focus cap, Push 25/5, Recharge 50-min blocks / 4 h cap, priority weights. *(day hours, chunk and break have no editor yet)*
+- Credits: start 15, 1 focus minute = 1 credit, max balance; emergency 5 min. *(no editor for start/max/emergency length)*
+- Windows: still-texting 3 min, message window 10 min, quick-open 5 min × 6/day.
+- Nudges: routine "angry" every 30 min, nag ladder timing, workout nags hourly from noon and louder after 6 pm.
+- Stats: weights, targets (work 6 h/week, mind ≥ 5 h), "low" < 4, burnout thresholds. *(no editor)*
+- Skills: levels at 1/5/15/40/100 h, sport counts at 20+ min. *(no editor)*
+- Homework: 2 days ahead, 2 h/day cap, 10-day lead, 90-min blocks (2 h default was Maven's). Tests: 6 h study, 10-day lead.
+- Lock release 7:00 (≥ 6 h away); purpose 5 min / 60 min a day; 5 typed extra emergencies; suggest blocking at 20+ min/day.
+
+### Backlog (Maven, 2026-10-26)
+- **Draw your own constellation:** a simple grid to sketch a shape per skill tree; it fills in denser as more skills are earned (stars = earned skills placed on the drawn lines).
+- Onboarding with neutral templates (replaces the seed above); editors for the "no editor" items.
+- User-defined routine types with a "counts as" mapping.
+- Workout: "climbing tomorrow" planning via the workout app's muscle data; Body stat from `/sessions`.

@@ -304,7 +304,12 @@ object Actions {
 
     // ---- Importance ----------------------------------------------------------------------
 
-    fun bump(d: AppData, id: String, now: Long) = d.copy(tasks = d.tasks.map { if (it.id == id) it.copy(bumpUntil = now + 7 * Time.DAY) else it })
+    /** One priority level up (v0.7: permanent, no more week-long bumps). */
+    fun bump(d: AppData, id: String, now: Long) = d.copy(tasks = d.tasks.map {
+        if (it.id == id) it.copy(importance = (com.maven.notafraud.core.plan.Importance.level(it, d, now) + 1).coerceAtMost(5), bumpUntil = null) else it
+    })
+
+    fun setLevel(d: AppData, id: String, level: Int?) = d.copy(tasks = d.tasks.map { if (it.id == id) it.copy(importance = level, hot = false, bumpUntil = null) else it })
 
     // ---- Steps ---------------------------------------------------------------------------
 

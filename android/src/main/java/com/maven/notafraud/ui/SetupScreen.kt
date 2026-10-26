@@ -586,6 +586,20 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
         cals.filter { it.id != data.settings.outputCalendarId }.forEach { c ->
             val mode = com.maven.notafraud.sense.PhoneCalendar.modeFor(c, data.settings)
             Text(c.name, maxLines = 1)
+            run {
+                val n = com.maven.notafraud.sense.PhoneCalendar.lastCounts[c.id] ?: 0
+                val made = when (mode) {
+                    com.maven.notafraud.core.model.CalMode.HOMEWORK -> data.tasks.count { it.sourceKey?.startsWith("homework:") == true && it.status == com.maven.notafraud.core.model.TaskStatus.TODO }
+                    else -> null
+                }
+                val flags = listOfNotNull(if (!c.visible) "hidden in Google Calendar" else null, if (!c.synced) "NOT SYNCING to this phone" else null)
+                Text(
+                    "$n entries in the next 60 days" + (made?.let { " · $it open homework tasks" } ?: "") + (if (flags.isNotEmpty()) " · " + flags.joinToString() else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (!c.synced || (mode != com.maven.notafraud.core.model.CalMode.IGNORE && n == 0)) Palette.amber else Palette.textDim,
+                )
+                if (!c.synced) Text("Google Calendar app → Settings → this calendar → turn Sync on.", style = MaterialTheme.typography.bodySmall, color = Palette.amber)
+            }
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (m in com.maven.notafraud.core.model.CalMode.entries) {
                     androidx.compose.material3.FilterChip(mode == m, {

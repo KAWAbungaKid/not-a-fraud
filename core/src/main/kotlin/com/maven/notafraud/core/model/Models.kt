@@ -470,6 +470,10 @@ data class Settings(
     val suggestBlockMin: Int = 20,
     /** Apps you said not to suggest again. */
     val notSuggest: Set<String> = emptySet(),
+    /** Workout app: when the weekly minimum needs today's workout, credits can't open blocked apps until it's started. */
+    val workoutPausesCredits: Boolean = true,
+    /** Workout nags start at this time on a must-work-out day. */
+    val workoutNagFromMin: Int = 12 * 60,
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
@@ -583,6 +587,8 @@ data class AppData(
     val skills: List<Skill> = emptyList(),
     val checkIns: List<CheckIn> = emptyList(),
     val semester: Semester? = null,
+    /** Last status from the workout app (null = not installed / never read). */
+    val workout: com.maven.notafraud.core.workout.WorkoutStatus? = null,
     /** Loosening changes waiting for the morning (settings lock). */
     val pending: List<PendingChange> = emptyList(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */

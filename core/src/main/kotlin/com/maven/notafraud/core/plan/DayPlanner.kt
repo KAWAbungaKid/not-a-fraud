@@ -92,19 +92,37 @@ object RoughDay {
 }
 
 /** Importance 1–5 → score multiplier. Task overrides area; a bump adds one for a week. */
+/**
+ * Priority (v0.7): one level per task — Must / High / Normal / Low — stored as importance 5 / 4 / 3 / 2
+ * (1 still reads as Low). A task without its own level takes its area's (a low stat lifts the area one level).
+ * Replaces 0.6's importance + "pin as hot" + "bump for a week". Pick 3 sits above all of it for that day;
+ * a firm deadline still rises on its own as it closes in.
+ */
 object Importance {
-    private val MULT = doubleArrayOf(0.6, 0.8, 1.0, 1.3, 1.6)
+    const val MUST = 5
+    const val HIGH = 4
+    const val NORMAL = 3
+    const val LOW = 2
+    val LEVELS = listOf(MUST, HIGH, NORMAL, LOW)
 
-    /** [lowStatAreas]: areas whose stat is low get +1 (STATE.md section 11: stats set the baseline, tasks override). */
+    fun name(level: Int) = when { level >= 5 -> "Must"; level == 4 -> "High"; level == 3 -> "Normal"; else -> "Low" }
+
+    /** [lowStatAreas]: areas whose stat is low get +1 (stats set the baseline, tasks override). */
     fun level(task: Task, d: AppData, now: Long, lowStatAreas: Set<String> = emptySet()): Int {
         val areaId = d.projects.firstOrNull { it.id == task.projectId }?.areaId
         val area = areaId?.let { a -> d.areas.firstOrNull { it.id == a } }
         val base = task.importance ?: ((area?.importance ?: 3) + if (areaId != null && areaId in lowStatAreas) 1 else 0)
-        val bump = if ((task.bumpUntil ?: 0) > now) 1 else 0
-        return (base + bump).coerceIn(1, 5)
+        return base.coerceIn(1, 5)
     }
 
-    fun mult(task: Task, d: AppData, now: Long, lowStatAreas: Set<String> = emptySet()) = MULT[level(task, d, now, lowStatAreas) - 1]
+    /** Must: planned before anything without a deadline. Low: only when nothing else fits. */
+    fun apply(score: Double, task: Task, d: AppData, now: Long, lowStatAreas: Set<String> = emptySet()): Double = when (level(task, d, now, lowStatAreas)) {
+        5 -> score * 2.0 + 30
+        4 -> score * 1.4 + 8
+        3 -> score
+        2 -> score * 0.55
+        else -> score * 0.4
+    }
 }
 
 /** Practice items: time-in toward a weekly target. */
@@ -197,14 +215,20 @@ class DayPlanner(
                 anchorId = a.id,
             )
         }
+        val wk = data.workout
         for (r in data.routine) {
             if (r.reserveMin <= 0 || !r.enabled || date.dayOfWeek.value !in r.days) continue
-            if ((soft || mode == DayMode.WRITEOFF) && r.weeklyTarget != null) continue
+            val isWorkout = r.autoCheck == com.maven.notafraud.core.model.AutoCheck.WORKOUT && wk != null
+            // Workout app: no block on a day already trained; on a must-day it stays even on a soft day.
+            if (isWorkout && com.maven.notafraud.core.workout.WorkoutLink.trainedOn(data, date)) continue
+            val must = isWorkout && date == Time.dateOf(now, zone) && com.maven.notafraud.core.workout.WorkoutLink.mustToday(data, now)
+            if ((soft || mode == DayMode.WRITEOFF) && r.weeklyTarget != null && !must) continue
+            val label = if (isWorkout && date == Time.dateOf(now, zone)) wk?.suggestedToday?.let { "Workout: $it" } else null
             fixed += PlanBlock(
                 start = Time.at(date, r.startMin, zone),
                 end = Time.at(date, r.startMin + r.reserveMin, zone),
                 kind = BlockKind.ANCHOR,
-                title = r.title,
+                title = label ?: r.title,
                 anchorKind = AnchorKind.ROUTINE,
                 mode = AnchorMode.HABIT,
                 routineId = r.id,
@@ -292,10 +316,9 @@ class DayPlanner(
                 val virtual = task.copy(loggedMin = task.loggedMin + (carried[task.id] ?: 0) + (allotted[task.id] ?: 0))
                 Scorer.score(virtual, t, w, e)
             }
-            sc *= Importance.mult(task, data, now, lowStat)
+            sc = Importance.apply(sc, task, data, now, lowStat)
             if (task.kind == TaskKind.FILLER) sc *= if (e == Energy.LOW || w < 30 || Time.minuteOfDay(t, zone) >= 20 * 60) 1.4 else 0.8
             if (task.id in picks) sc = sc * 2 + 40
-            if (task.hot) sc *= 1.5
             if (task.horizon == com.maven.notafraud.core.model.Horizon.ASAP) sc = sc * 1.6 + 25
             if (Heat.deadlineHot(task, t)) sc *= 1.3
             return sc
@@ -303,7 +326,7 @@ class DayPlanner(
         fun block(t: Long, len: Int, task: Task, title: String = task.title, stepId: String? = null) = PlanBlock(
             start = t, end = t + len * Time.MIN, kind = BlockKind.TASK, title = title,
             taskId = task.id, projectId = task.projectId, picked = task.id in picks,
-            hot = task.hot || Heat.deadlineHot(task, t), stepId = stepId,
+            hot = Heat.deadlineHot(task, t), stepId = stepId,
         )
 
         // ---- STEPS chains (attended steps, unattended waits) ----

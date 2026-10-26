@@ -197,7 +197,7 @@ object Seed {
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 7
+    const val CURRENT = 8
 
     /** Seeded routine items that tick themselves (v0.5 replaced the hard-coded ids with RoutineItem.autoCheck). */
     val AUTO_CHECK = mapOf(
@@ -214,7 +214,24 @@ object Migration {
         if (x.schema < 5) x = toV5(x)
         if (x.schema < 6) x = toV6(x)
         if (x.schema < 7) x = toV7(x)
+        if (x.schema < 8) x = toV8(x, now)
         return x
+    }
+
+    /**
+     * v0.7: one priority per task. "Pinned hot" and an active week-long bump each become one level up (stored);
+     * captured ideas become "try eventually" to-dos.
+     */
+    private fun toV8(d: AppData, now: Long): AppData {
+        val tasks = d.tasks.map { t ->
+            val lift = (if (t.hot) 1 else 0) + (if ((t.bumpUntil ?: 0) > now) 1 else 0)
+            if (lift == 0) t.copy(hot = false, bumpUntil = null)
+            else t.copy(importance = (com.maven.notafraud.core.plan.Importance.level(t, d, now) + lift).coerceAtMost(5), hot = false, bumpUntil = null)
+        }
+        val fromIdeas = d.ideas.filter { it.promotedTaskId == null }.map {
+            com.maven.notafraud.core.model.Task(title = it.text, estMin = 60, createdAt = it.createdAt, horizon = com.maven.notafraud.core.model.Horizon.SOMEDAY)
+        }
+        return d.copy(schema = 8, tasks = tasks + fromIdeas, ideas = emptyList(), todayPlan = null, weekPlan = emptyList())
     }
 
     const val YOUTUBE = "com.google.android.youtube"

@@ -86,7 +86,7 @@ object UsageReader {
 object PhoneCalendar {
     const val SOURCE = "phone"
 
-    data class Cal(val id: Long, val name: String, val account: String?, val writable: Boolean)
+    data class Cal(val id: Long, val name: String, val account: String?, val writable: Boolean, val visible: Boolean = true, val synced: Boolean = true)
 
     fun calendars(ctx: Context): List<Cal> {
         if (!Perms.calendar(ctx)) return emptyList()
@@ -96,6 +96,7 @@ object PhoneCalendar {
             CalendarContract.Calendars.ACCOUNT_NAME,
             CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
             CalendarContract.Calendars.VISIBLE,
+            CalendarContract.Calendars.SYNC_EVENTS,
         )
         val out = mutableListOf<Cal>()
         runCatching {
@@ -106,6 +107,8 @@ object PhoneCalendar {
                         name = c.getString(1) ?: "(calendar)",
                         account = c.getString(2),
                         writable = c.getInt(3) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                        visible = c.getInt(4) == 1,
+                        synced = c.getInt(5) == 1,
                     )
                 }
             }
@@ -129,9 +132,17 @@ object PhoneCalendar {
 
     /** Reads every calendar once and splits by mode: events to plan around, deadlines to turn into tasks. */
     fun readSplit(ctx: Context): Split? {
-        val all = read(ctx, daysAhead = 60) ?: return null
         val settings = Graph.data.settings
         val modes = calendars(ctx).associate { it.id to modeFor(it, settings) }
+        // Events calendars: only what's shown and busy. Homework / deadlines / tests: every entry, even from a calendar
+        // hidden in Google Calendar or marked "free" (Canvas entries often are) — 0.6 dropped those, so no homework.
+        val raw = readRaw(ctx, daysAhead = 60) ?: return null
+        val all = raw.filter { r ->
+            val m = modes[r.ev.calendarId]
+            if (m == com.maven.notafraud.core.model.CalMode.EVENTS || m == null) r.visible && !r.free && !r.declined else !r.declined
+        }.map { it.ev }
+        lastCounts = all.groupingBy { it.calendarId ?: -1L }.eachCount()
+        lastReadAt = System.currentTimeMillis()
         val tests = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.TESTS }
         // Tests are fixed time too: they block the plan like any event.
         val events = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.EVENTS } + tests
@@ -146,7 +157,16 @@ object PhoneCalendar {
      * Raw instances from every visible calendar except the app's own output calendar.
      * [readSplit] decides what each one is.
      */
-    fun read(ctx: Context, daysBack: Int = 1, daysAhead: Int = 35): List<CalEvent>? {
+    /** Entries per calendar from the last read (next 60 days), for the Calendar page. */
+    @Volatile var lastCounts: Map<Long, Int> = emptyMap()
+    @Volatile var lastReadAt = 0L
+
+    data class Raw(val ev: CalEvent, val visible: Boolean, val free: Boolean, val declined: Boolean)
+
+    fun read(ctx: Context, daysBack: Int = 1, daysAhead: Int = 35): List<CalEvent>? =
+        readRaw(ctx, daysBack, daysAhead)?.filter { it.visible && !it.free && !it.declined }?.map { it.ev }
+
+    fun readRaw(ctx: Context, daysBack: Int = 1, daysAhead: Int = 35): List<Raw>? {
         if (!Perms.calendar(ctx)) return null
         val settings = Graph.data.settings
         val skip = listOfNotNull(settings.outputCalendarId)
@@ -168,17 +188,17 @@ object PhoneCalendar {
             CalendarContract.Instances.CALENDAR_ID,
             CalendarContract.Instances.DESCRIPTION,
         )
-        val out = mutableListOf<CalEvent>()
+        val out = mutableListOf<Raw>()
         runCatching {
-            ctx.contentResolver.query(uri, proj, "${CalendarContract.Instances.VISIBLE} = 1", null, null)?.use { c ->
+            ctx.contentResolver.query(uri, proj + CalendarContract.Instances.VISIBLE, null, null, null)?.use { c ->
                 while (c.moveToNext()) {
                     if (c.getLong(7) in skip) continue
                     if ((c.getString(8) ?: "").contains(CalendarWriter.MARKER)) continue
-                    val status = c.getInt(5)
-                    if (status == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
-                    if (c.getInt(6) == CalendarContract.Instances.AVAILABILITY_FREE) continue
+                    val declined = c.getInt(5) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED
+                    val free = c.getInt(6) == CalendarContract.Instances.AVAILABILITY_FREE
+                    val visible = c.getInt(9) == 1
                     val begin = c.getLong(2)
-                    out += CalEvent(
+                    out += Raw(CalEvent(
                         uid = "phone-${c.getLong(0)}-$begin",
                         title = c.getString(1) ?: "(busy)",
                         start = begin,
@@ -186,7 +206,7 @@ object PhoneCalendar {
                         source = SOURCE,
                         allDay = c.getInt(4) == 1,
                         calendarId = c.getLong(7),
-                    )
+                    ), visible, free, declined)
                 }
             }
         }

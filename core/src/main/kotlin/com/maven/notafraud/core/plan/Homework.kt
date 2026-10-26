@@ -22,7 +22,7 @@ object Homework {
 
     private fun due(d: AppData, e: CalEvent): Long {
         val zone = Time.zone(d.settings.zoneId)
-        return if (e.allDay) Time.at(Time.dateOf(e.start, zone), 23 * 60 + 59, zone) else e.start
+        return if (e.allDay) Time.at(java.time.Instant.ofEpochMilli(e.start).atZone(java.time.ZoneOffset.UTC).toLocalDate(), 23 * 60 + 59, zone) else e.start
     }
 
     fun target(d: AppData, due: Long) = due - d.settings.homeworkAheadDays * Time.DAY

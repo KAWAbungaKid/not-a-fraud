@@ -210,7 +210,7 @@ object Generated {
     fun syncDeadlines(d: AppData, deadlines: List<CalEvent>, now: Long): AppData {
         val zone = Time.zone(d.settings.zoneId)
         fun key(e: CalEvent) = "deadline:" + e.uid
-        fun due(e: CalEvent) = if (e.allDay) Time.at(Time.dateOf(e.start, zone), 23 * 60 + 59, zone) else e.start
+        fun due(e: CalEvent) = if (e.allDay) Time.at(java.time.Instant.ofEpochMilli(e.start).atZone(java.time.ZoneOffset.UTC).toLocalDate(), 23 * 60 + 59, zone) else e.start
         val byKey = deadlines.associateBy(::key)
         var tasks = d.tasks.mapNotNull { t ->
             val k = t.sourceKey ?: return@mapNotNull t

@@ -236,7 +236,7 @@ class V3Test {
         assertEquals(5, v3.areas.first { it.id == "a-research" }.importance)
         assertTrue(v3.tasks.count { it.kind == TaskKind.PRACTICE && it.title.startsWith("Catch up:") } >= 4)
         assertTrue(v3.reviewTaskIds.isNotEmpty())
-        assertTrue(v3.tasks.filter { t -> v3.projects.first { it.id == t.projectId }.areaId == "a-research" && t.status == TaskStatus.TODO }.all { it.hot })
+        assertTrue(v3.tasks.filter { t -> v3.projects.first { it.id == t.projectId }.areaId == "a-research" && t.status == TaskStatus.TODO }.all { it.hot || (it.importance ?: 0) >= 5 })
         assertEquals(v3, Migration.apply(v3))
     }
 

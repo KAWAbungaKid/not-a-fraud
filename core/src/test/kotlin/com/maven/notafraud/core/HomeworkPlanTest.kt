@@ -37,6 +37,6 @@ class HomeworkPlanTest {
         for (t in hw) assertTrue(plans.any { p -> p.blocks.any { it.taskId == t.id } }, "${t.title} not planned all week:\n" + lines.joinToString("\n") +
             "\nall today: " + d.todayPlan!!.blocks.joinToString { "${Time.clock(it.start, zone)} ${it.title}" })
         val quiz = hw.first { it.title.startsWith("Quiz") }
-        assertTrue(Time.dateOf(quiz.dueAt!!, zone) == mon.plusDays(3), "all-day due date: ${Time.dateOf(quiz.dueAt!!, zone)}")
+        assertTrue(Time.dateOf(quiz.dueAt ?: 0, zone) == mon.plusDays(3), "all-day due date: ${Time.dateOf(quiz.dueAt ?: 0, zone)}")
     }
 }

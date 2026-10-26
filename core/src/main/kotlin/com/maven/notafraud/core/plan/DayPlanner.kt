@@ -318,7 +318,7 @@ class DayPlanner(
             }
             sc = Importance.apply(sc, task, data, now, lowStat)
             if (task.kind == TaskKind.FILLER) sc *= if (e == Energy.LOW || w < 30 || Time.minuteOfDay(t, zone) >= 20 * 60) 1.4 else 0.8
-            if (task.id in picks) sc = sc * 2 + 40
+            if (task.id in picks) sc = sc * 2 + 150  // Pick 3: top of that day, above Must
             if (task.horizon == com.maven.notafraud.core.model.Horizon.ASAP) sc = sc * 1.6 + 25
             if (Heat.deadlineHot(task, t)) sc *= 1.3
             return sc

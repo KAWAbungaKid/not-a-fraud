@@ -56,7 +56,6 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
     val focusToday = data.sessions.filter { it.start >= startToday }.sumOf { it.minutes } +
         (data.active?.let { ((now - it.start) / Time.MIN).toInt() } ?: 0)
     val ranked = remember(data, now / 60_000) { Scorer.rank(data.liveTasks(), now, 60, withPlan.todayPlan!!.energy).take(5) }
-    var idea by rememberSaveable { mutableStateOf("") }
 
     val hidden = data.settings.nowHidden
     fun act(fn: (AppData) -> AppData) { Graph.update(fn); Graph.refresh(ctx) }
@@ -103,6 +102,32 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                         }
                     }
                 }
+            }
+        }
+
+        val wk = com.maven.notafraud.core.workout.WorkoutLink.today(data, now)
+        if (wk != null && "workout" !in hidden) item {
+            val must = com.maven.notafraud.core.workout.WorkoutLink.mustToday(data, now)
+            val tight = com.maven.notafraud.core.workout.WorkoutLink.tight(data, now)
+            val col = when { must -> Palette.red; tight -> Palette.amber; wk.risk == com.maven.notafraud.core.workout.WorkoutLink.MISSED -> Palette.textDim; else -> Palette.green }
+            Panel(highlight = must) {
+                SectionLabel("Workouts · ${wk.doneThisWeek} of ${wk.minPerWeek} minimum (${wk.targetPerWeek} planned)")
+                Text(
+                    when {
+                        wk.inProgress -> "In progress: ${wk.inProgressName ?: "workout"}"
+                        wk.trainedToday -> "Done today."
+                        must -> "Today has to be a workout."
+                        tight -> "One spare day left this week."
+                        else -> wk.message
+                    },
+                    style = MaterialTheme.typography.titleMedium, color = col,
+                )
+                if (!wk.trainedToday && !wk.inProgress) {
+                    Text(wk.message, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    if (must && data.settings.workoutPausesCredits) Text("Credits are paused until it's started.", color = Palette.red, style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = { com.maven.notafraud.sense.WorkoutSync.open(ctx) }) { Text("Start workout" + (wk.suggestedToday?.let { ": $it" } ?: "")) }
+                }
+                if (wk.injured.isNotEmpty()) Text("Injured: " + wk.injured.joinToString { it.lowercase().replace('_', ' ') }, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
             }
         }
 
@@ -229,16 +254,6 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
         if ("upnext" !in hidden && ranked.isEmpty()) item { Text("No open tasks. Add some in Tasks.", color = Palette.textDim) }
-
-        if ("idea" !in hidden) item { SectionLabel("Capture an idea (waits for Friday)") }
-        if ("idea" !in hidden) item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(idea, { idea = it }, Modifier.weight(1f), singleLine = true, placeholder = { Text("Side project idea…") })
-                TextButton(onClick = {
-                    if (idea.isNotBlank()) { act { Actions.captureIdea(it, idea.trim(), Graph.now()) }; idea = "" }
-                }) { Text("Save") }
-            }
-        }
 
         item { Spacer(Modifier.padding(bottom = 24.dp)) }
     }

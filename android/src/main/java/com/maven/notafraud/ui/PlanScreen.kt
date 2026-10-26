@@ -148,7 +148,13 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
                 }
                 TextButton(onClick = { pickDay = true }) { Text("Pick a day…") }
                 if (task.dueAt != null) TextButton(onClick = { sizingTask = true }) { Text("How long will this take? (${Time.durationText(task.estMin)})") }
-                TextButton(onClick = { done { Actions.bump(it, task.id, Graph.now()) } }) { Text("Bump importance for a week") }
+                androidx.compose.foundation.layout.FlowRow {
+                    Text("Priority", color = Palette.textDim, modifier = Modifier.padding(end = 8.dp, top = 14.dp))
+                    for (lvl in com.maven.notafraud.core.plan.Importance.LEVELS) {
+                        val cur = com.maven.notafraud.core.plan.Importance.level(task, d, Graph.now())
+                        FilterChip(cur == lvl || (lvl == 2 && cur < 2), { done { Actions.setLevel(it, task.id, lvl) } }, { Text(com.maven.notafraud.core.plan.Importance.name(lvl)) }, modifier = Modifier.padding(end = 4.dp))
+                    }
+                }
             } else if (anchor != null && !anchor.protected) {
                 TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = true, now = Graph.now()) } }) { Text("Skip it and make it up later") }
                 TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = false, now = Graph.now()) } }) { Text("Skip it (no make-up)") }

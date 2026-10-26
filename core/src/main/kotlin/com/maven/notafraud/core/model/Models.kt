@@ -284,7 +284,7 @@ data class PendingChange(
 )
 
 @Serializable
-enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME }
+enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME, WORKOUT_PAUSE }
 
 /** A school term: class blocks run between [start] and [end], except [offDates] (breaks). */
 @Serializable

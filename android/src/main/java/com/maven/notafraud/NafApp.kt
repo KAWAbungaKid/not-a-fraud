@@ -50,6 +50,39 @@ object Graph {
         return com.maven.notafraud.core.plan.NowResolver.resolve(d.todayPlan!!, d, n)
     }
 
+    /**
+     * Weekly workout minimum (from the workout app). MUST_TODAY: from settings.workoutNagFromMin, a nudge every
+     * hour that gets louder after 6pm, until it's started or done. MISSED: one honest note per week, then quiet.
+     */
+    private fun workoutNag(ctx: Context, n: Long) {
+        val d = data
+        val s = com.maven.notafraud.core.workout.WorkoutLink.today(d, n) ?: return
+        val prefs = ctx.getSharedPreferences("workout_nag", Context.MODE_PRIVATE)
+        val minute = Time.minuteOfDay(n, zone)
+        when {
+            com.maven.notafraud.core.workout.WorkoutLink.mustToday(d, n) && minute >= d.settings.workoutNagFromMin -> {
+                if (n - prefs.getLong("last", 0) < 60 * Time.MIN) return
+                prefs.edit().putLong("last", n).apply()
+                val late = minute >= 18 * 60
+                Notifier.postWorkout(
+                    ctx,
+                    if (late) "Workout. Today. It's the only way the week holds." else "Today's workout keeps your minimum",
+                    s.message + (s.suggestedToday?.let { " Suggested: $it." } ?: "") +
+                        (if (d.settings.workoutPausesCredits) " Credits are paused until it's started." else "") + " Short mode counts.",
+                    loud = late,
+                )
+            }
+            s.risk == com.maven.notafraud.core.workout.WorkoutLink.MISSED && prefs.getString("missed", null) != s.weekStart -> {
+                prefs.edit().putString("missed", s.weekStart).apply()
+                Notifier.postWorkout(ctx, "This week's minimum is gone", s.message + " No more nagging this week. Next week starts clean.", loud = false)
+            }
+            s.trainedToday || s.inProgress -> Notifier.cancelWorkout(ctx)
+        }
+    }
+
+    /** Open the Tasks page on its To-do tab once. */
+    @Volatile var openTodo = false
+
     /** Set when the burnout nudge fired; the Now tab opens "How's today?" once. */
     @Volatile var lowPromptPending = false
 
@@ -75,6 +108,7 @@ object Graph {
             Notifier.postPending(ctx, ready.map { it.label })
             store.update { com.maven.notafraud.core.store.Lock.markNotified(it, ready.map { c -> c.id }.toSet()) }
         }
+        workoutNag(ctx, n)
         Notifier.postNow(ctx, nowState())
         com.maven.notafraud.notify.RoutineAlerts.check(ctx)
         Alarms.scheduleNext(ctx)

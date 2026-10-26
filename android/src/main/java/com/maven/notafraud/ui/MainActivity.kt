@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         Graph.init(this)
         intent?.getStringExtra(EXTRA_TAB)?.let { tab = it }
+        if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
         setContent {
             val d by Graph.store.state.collectAsState()
             NafTheme(d.settings.accent) { App() }
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.getStringExtra(EXTRA_TAB)?.let { tab = it }
+        if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
     }
 
     override fun onResume() {
@@ -131,7 +133,7 @@ class MainActivity : ComponentActivity() {
                             "stats" -> StatsScreen(data, now)
                             "skills" -> SkillsScreen(data)
                             "classes" -> ClassesScreen(data, now)
-                            "todo" -> TodoScreen(data, now)
+
                             TAB_MORE -> MoreScreen(data) { tab = it }
                             else -> SetupScreen(data, resumes, section = tab)
                         }

@@ -68,7 +68,9 @@ import java.util.Locale
 fun TasksScreen(data: AppData, now: Long) {
     val ctx = LocalContext.current
     val zone = Time.zone(data.settings.zoneId)
-    var mapMode by rememberSaveable { mutableStateOf(true) }
+    var tab by rememberSaveable { mutableStateOf(if (Graph.openTodo) 2 else 0) }
+    Graph.openTodo = false
+    var addingProject by remember { mutableStateOf(false) }
     var showDone by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var editing by remember { mutableStateOf<Task?>(null) }
@@ -80,15 +82,25 @@ fun TasksScreen(data: AppData, now: Long) {
     val projectOrder = data.projects.map { it.id } + listOf(null)
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = mapMode, onClick = { mapMode = true }, label = { Text("Map") })
-            FilterChip(selected = !mapMode, onClick = { mapMode = false }, label = { Text("List") })
+        androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+            listOf("Map", "Projects", "To-do").forEachIndexed { i, label ->
+                androidx.compose.material3.SegmentedButton(
+                    selected = tab == i, onClick = { tab = i },
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, 3),
+                ) { Text(label) }
+            }
         }
-        if (mapMode) {
+        if (tab == 0) {
             MapView(data, now, onEditTask = { editing = it }, onNewTask = { pid -> editing = Task(title = "", projectId = pid, createdAt = Graph.now()) })
+        } else if (tab == 2) {
+            TodoScreen(data, now)
         } else Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 6.dp)) {
+                    androidx.compose.material3.Button(onClick = { editing = Task(title = "", createdAt = Graph.now()) }) { Text("+ Task") }
+                    androidx.compose.material3.OutlinedButton(onClick = { addingProject = true }) { Text("+ Project") }
+                }
                 OutlinedTextField(
                     query, { query = it }, singleLine = true, placeholder = { Text("Search tasks and projects") },
                     modifier = Modifier.fillMaxWidth(),
@@ -96,20 +108,6 @@ fun TasksScreen(data: AppData, now: Long) {
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = !showDone, onClick = { showDone = false }, label = { Text("Open (${data.tasks.count { it.status == TaskStatus.TODO }})") })
                     FilterChip(selected = showDone, onClick = { showDone = true }, label = { Text("Done") })
-                }
-            }
-
-            val ideas = data.ideas.filter { it.promotedTaskId == null }
-            if (!showDone && q.isEmpty() && ideas.isNotEmpty()) {
-                item { SectionLabel("Ideas waiting for Friday") }
-                items(ideas, key = { "idea-" + it.id }) { idea ->
-                    Panel {
-                        Text(idea.text)
-                        Row {
-                            TextButton(onClick = { Graph.changeAndReplan(ctx) { Actions.promoteIdea(it, idea.id, Graph.now()) } }) { Text("Schedule for craft block") }
-                            TextButton(onClick = { Graph.update { Actions.deleteIdea(it, idea.id) } }) { Text("Drop", color = Palette.textDim) }
-                        }
-                    }
                 }
             }
 
@@ -124,11 +122,12 @@ fun TasksScreen(data: AppData, now: Long) {
             if (tasks.isEmpty()) item { Text(if (q.isNotEmpty()) "Nothing matches." else if (showDone) "Nothing done yet." else "No open tasks.", color = Palette.textDim) }
             item { Spacer(Modifier.height(88.dp)) }
         }
-        FloatingActionButton(
-            onClick = { editing = Task(title = "", createdAt = Graph.now()) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        ) { Icon(Icons.Filled.Add, "Add task") }
         }
+    }
+
+    if (addingProject) ProjectDialog(data, onDismiss = { addingProject = false }) { name, areaId ->
+        Graph.changeAndReplan(ctx) { Actions.upsertProject(it, com.maven.notafraud.core.model.Project(name = name, kind = com.maven.notafraud.core.model.ProjectKind.PROJECT, areaId = areaId)) }
+        addingProject = false
     }
 
     editing?.let { t ->
@@ -158,7 +157,7 @@ private fun TaskRow(t: Task, now: Long, zone: java.time.ZoneId, onToggle: (Boole
                     "${t.loggedMin}/${t.estMin}m",
                     t.dueAt?.let { "due " + dueText(it, now, zone) },
                     if (t.priority == Priority.HIGH && t.dueAt != null) "firm deadline" else null,
-                    if (t.hot) "hot" else null,
+                    t.importance?.let { com.maven.notafraud.core.plan.Importance.name(it) }?.takeIf { it != "Normal" },
                     t.notBefore?.takeIf { it > now }?.let { "from " + Time.dateOf(it, zone).format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US)) },
                 )
                 Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
@@ -268,19 +267,7 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                     Text("Firm deadline (pushed hard as it closes in)", Modifier.weight(1f))
                     androidx.compose.material3.Switch(checked = t.priority == Priority.HIGH, onCheckedChange = { t = t.copy(priority = if (it) Priority.HIGH else Priority.NORMAL) })
                 }
-                SectionLabel("Importance (\"area\" = the area's level)")
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(t.importance == null, { t = t.copy(importance = null) }, { Text("area") })
-                    for (i in 1..5) FilterChip(t.importance == i, { t = t.copy(importance = i) }, { Text("$i") })
-                }
-                val bumped = (t.bumpUntil ?: 0) > System.currentTimeMillis()
-                TextButton(onClick = { t = t.copy(bumpUntil = if (bumped) null else System.currentTimeMillis() + 7 * Time.DAY) }) {
-                    Text(if (bumped) "Bumped for this week (tap to undo)" else "Bump: +1 importance for a week")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Pin as hot (planner pushes it up)", Modifier.weight(1f))
-                    androidx.compose.material3.Switch(checked = t.hot, onCheckedChange = { t = t.copy(hot = it) })
-                }
+                PriorityChips(t, data) { lvl -> t = t.copy(importance = lvl, hot = false, bumpUntil = null) }
                 SectionLabel("Energy it takes")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (e in Energy.entries) FilterChip(t.energy == e, { t = t.copy(energy = e) }, { Text(e.name.lowercase()) })
@@ -370,4 +357,42 @@ private fun StepsEditor(steps: List<com.maven.notafraud.core.model.TaskStep>, on
         }
     }
     TextButton(onClick = { onChange(steps + com.maven.notafraud.core.model.TaskStep(title = "", min = 10, waitBeforeMin = if (steps.isEmpty()) 0 else 30)) }) { Text("Add step") }
+}
+
+
+/** Must / High / Normal / Low, or the area's level. Pick 3 always beats these for that day. */
+@Composable
+fun PriorityChips(t: Task, data: AppData, onPick: (Int?) -> Unit) {
+    val areaLevel = com.maven.notafraud.core.plan.Importance.level(t.copy(importance = null), data, System.currentTimeMillis())
+    SectionLabel("Priority")
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FilterChip(t.importance == null, { onPick(null) }, { Text("Area (${com.maven.notafraud.core.plan.Importance.name(areaLevel)})") })
+        for (lvl in com.maven.notafraud.core.plan.Importance.LEVELS) {
+            val sel = t.importance?.let { if (it <= 2) 2 else it } == lvl
+            FilterChip(sel, { onPick(lvl) }, { Text(com.maven.notafraud.core.plan.Importance.name(lvl)) })
+        }
+    }
+}
+
+
+@Composable
+private fun ProjectDialog(data: AppData, onDismiss: () -> Unit, onSave: (String, String?) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var area by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New project") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+                SectionLabel("Area")
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(area == null, { area = null }, { Text("None") })
+                    for (a in data.areas.filter { !it.archived }.sortedBy { it.order }) FilterChip(area == a.id, { area = a.id }, { Text(a.name) })
+                }
+            }
+        },
+        confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { onSave(name.trim(), area) }) { Text("Create") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

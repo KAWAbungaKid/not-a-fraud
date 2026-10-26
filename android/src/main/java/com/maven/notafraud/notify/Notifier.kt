@@ -192,4 +192,26 @@ object Notifier {
             .setContentIntent(openApp(ctx, MainActivity.TAB_NOW, req = 14))
         runCatching { NotificationManagerCompat.from(ctx).notify(6, b.build()) }
     }
+
+    /** Workout app says today's workout is needed for the weekly minimum. Tap opens the workout app. */
+    fun postWorkout(ctx: Context, title: String, text: String, loud: Boolean) {
+        if (!canPost(ctx)) return
+        val open = ctx.packageManager.getLaunchIntentForPackage(com.maven.notafraud.sense.WorkoutSync.workoutPackage(ctx))
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?.let { PendingIntent.getActivity(ctx, 15, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(if (loud) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
+            .setColor(if (loud) 0xFFFF6B6B.toInt() else 0xFFFFC857.toInt())
+            .setContentIntent(open ?: openApp(ctx, MainActivity.TAB_NOW, req = 16))
+        if (open != null) b.addAction(0, "Start workout", open)
+        runCatching { NotificationManagerCompat.from(ctx).notify(7, b.build()) }
+    }
+
+    fun cancelWorkout(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(7)
 }

@@ -54,6 +54,8 @@ object Workers {
             // Bad sleep came in after the plan was made: soften the rest of the day.
             if (nowRough != wasRough) Graph.replan()
         }
+        // Workout app: done / started / at-risk changes re-plan the day.
+        if (runCatching { com.maven.notafraud.sense.WorkoutSync.sync(ctx) }.getOrDefault(false)) Graph.replan()
         Graph.update { Planning.ensureToday(it, Graph.now()) }
         Graph.refresh(ctx)
     }

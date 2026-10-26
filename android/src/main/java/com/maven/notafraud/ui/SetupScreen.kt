@@ -278,6 +278,22 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 TextButton(onClick = { ideas = true }) { Text("Recharge ideas: " + data.settings.rechargeIdeas.joinToString(", ").ifBlank { "none" }) }
             }
             Panel {
+                Text("Workout app", style = MaterialTheme.typography.titleSmall)
+                SwitchRow("When today's workout is needed for the weekly minimum, pause credits until it's started", data.settings.workoutPausesCredits) { on ->
+                    val n = Graph.now()
+                    Graph.update {
+                        if (on) it.copy(settings = it.settings.copy(workoutPausesCredits = true))
+                        else com.maven.notafraud.core.store.Lock.request(it, com.maven.notafraud.core.model.PendingChange(kind = com.maven.notafraud.core.model.ChangeKind.WORKOUT_PAUSE, label = "Stop pausing credits on workout days", createdAt = n, applyAfter = n, flag = false), n)
+                    }
+                }
+                Text("Nudges on a must-work-out day start at ${hm(data.settings.workoutNagFromMin)}", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (h in listOf(9, 12, 15, 17)) androidx.compose.material3.FilterChip(data.settings.workoutNagFromMin == h * 60, { Graph.update { it.copy(settings = it.settings.copy(workoutNagFromMin = h * 60)) } }, { Text(hm(h * 60)) })
+                }
+                Text(data.workout?.let { "Connected: ${it.program ?: "program"} · week ${it.week}, block ${it.block}" } ?: "Install the Workout app to connect it. The split and days per week come from there.",
+                    color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+            Panel {
                 Text("Homework (Homework calendars)", style = MaterialTheme.typography.titleSmall)
                 @Composable
                 fun chips(label: String, values: List<Int>, cur: Int, fmt: (Int) -> String, set: (com.maven.notafraud.core.model.Settings, Int) -> com.maven.notafraud.core.model.Settings) {

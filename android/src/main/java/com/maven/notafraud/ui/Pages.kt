@@ -50,8 +50,7 @@ data class PageDef(val id: String, val label: String, val icon: ImageVector, val
 val PAGES = listOf(
     PageDef("now", "Now", Icons.Filled.PlayArrow, false, "What to do right now, today's 3"),
     PageDef("plan", "Plan", Icons.Filled.ViewTimeline, false, "Today and the next 6 days"),
-    PageDef("tasks", "Tasks", Icons.Filled.AccountTree, false, "Goal map and task list"),
-    PageDef("todo", "To-do", Icons.Filled.TaskAlt, false, "ASAP, on a day, within dates, someday"),
+    PageDef("tasks", "Tasks", Icons.Filled.AccountTree, false, "Map, projects and to-do list"),
     PageDef("routine", "Routine", Icons.Filled.Restaurant, false, "Daily habits that get angry"),
     PageDef("stats", "Stats", Icons.Filled.Insights, false, "Scores from sleep, workouts, focus"),
     PageDef("skills", "Skills", Icons.Filled.AutoAwesome, false, "Skill constellations"),
@@ -106,9 +105,9 @@ val NOW_CARDS = listOf(
     "numbers" to "Credits · sleep · focus · phone",
     "moved" to "Moved off today / won't fit this week",
     "homework" to "Homework: how far ahead you are",
+    "workout" to "Workouts: this week's minimum",
     "today" to "How's today?",
     "upnext" to "Up next (top tasks)",
-    "idea" to "Capture an idea",
 )
 
 @Composable

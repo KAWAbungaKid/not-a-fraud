@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,7 +79,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 
-enum class NodeType { ROOT, GOAL, AREA, PROJECT, TASK }
+enum class NodeType { ROOT, GOAL, AREA, PROJECT, TASK, ADD }
 
 /** One box on the map. [x]/[y] are dp from the map centre. */
 data class MapNode(
@@ -129,11 +130,15 @@ object MapLayout {
         fun add(n: MapNode) { children.getOrPut(n.parent ?: "") { mutableListOf() } += n }
 
         add(MapNode("root", NodeType.ROOT, "You", "", null))
+        /** A "+" under an opened node: adds the next level down. */
+        fun plus(parentKey: String, label: String, refId: String?) = add(MapNode("add:$parentKey", NodeType.ADD, label, "", parentKey, refId = refId))
         for (g in goals) {
             val n = areas.count { g.id in it.goalIds }
             add(MapNode("goal:${g.id}", NodeType.GOAL, g.name, "$n area${if (n == 1) "" else "s"}", "root", refId = g.id))
         }
-        if (needsNoGoal) add(MapNode(NO_GOAL, NodeType.GOAL, "Not linked to a goal", "tap to sort", "root", pseudo = true))
+        if (needsNoGoal) add(MapNode(NO_GOAL, NodeType.GOAL, "Not linked to a goal", "tap to open", "root", pseudo = true))
+        plus("root", "+ Goal", null)
+        for (g in goals) if ("goal:${g.id}" in expanded) plus("goal:${g.id}", "+ Area", g.id)
 
         fun projectNode(p: Project?, parentKey: String) {
             val key = if (p == null) NO_PROJECT else "project:${p.id}"
@@ -146,18 +151,20 @@ object MapLayout {
             add(
                 MapNode(
                     key, NodeType.PROJECT, p?.name ?: "No project", sub, parentKey, refId = p?.id, pseudo = p == null,
-                    hot = list.any { it.hot || Heat.deadlineHot(it, now) },
+                    hot = list.any { Heat.deadlineHot(it, now) },
                 )
             )
+            if (key in expanded && p != null) plus(key, "+ Task", p.id)
             if (key in expanded) for (t in list.sortedBy { it.dueAt ?: Long.MAX_VALUE }) {
                 val tsub = listOfNotNull("${t.estMin - t.loggedMin.coerceAtMost(t.estMin)}m", t.dueAt?.let { dueText(it, now, zone) }).joinToString(" · ")
-                add(MapNode("task:${t.id}", NodeType.TASK, t.title, tsub, key, refId = t.id, hot = t.hot || Heat.deadlineHot(t, now), picked = t.id in todayPicks))
+                add(MapNode("task:${t.id}", NodeType.TASK, t.title, tsub, key, refId = t.id, hot = Heat.deadlineHot(t, now), picked = t.id in todayPicks))
             }
         }
 
         for (a in areas) {
             val pk = primaryGoal[a.id]!!
             val parent = if (pk == NO_GOAL) NO_GOAL else "goal:$pk"
+            if (parent !in expanded) continue
             val ps = projectsByArea[a.id].orEmpty()
             val openCount = ps.sumOf { tasksByProject[it.id]?.size ?: 0 }
             add(
@@ -166,12 +173,16 @@ object MapLayout {
                     extraParents = a.goalIds.filter { it != pk && it in goalIds }.map { "goal:$it" }, refId = a.id,
                 )
             )
+            if ("area:${a.id}" !in expanded) continue
+            plus("area:${a.id}", "+ Project", a.id)
             for (p in ps.sortedBy { it.name }) projectNode(p, "area:${a.id}")
         }
-        if (needsNoArea) {
+        if (needsNoArea && NO_GOAL in expanded) {
             add(MapNode(NO_AREA, NodeType.AREA, "No area", "projects to sort", NO_GOAL, pseudo = true))
-            for (p in projectsByArea[NO_AREA].orEmpty()) projectNode(p, NO_AREA)
-            if (tasksByProject.containsKey(NO_PROJECT)) projectNode(null, NO_AREA)
+            if (NO_AREA in expanded) {
+                for (p in projectsByArea[NO_AREA].orEmpty()) projectNode(p, NO_AREA)
+                if (tasksByProject.containsKey(NO_PROJECT)) projectNode(null, NO_AREA)
+            }
         }
 
         // Weights = leaves under each node, so busy branches get more room.
@@ -204,6 +215,7 @@ private fun nodeWidth(t: NodeType): Dp = when (t) {
     NodeType.AREA -> 150.dp
     NodeType.PROJECT -> 150.dp
     NodeType.TASK -> 150.dp
+    NodeType.ADD -> 110.dp
 }
 
 private fun nodeColor(n: MapNode): Color = when {
@@ -212,15 +224,26 @@ private fun nodeColor(n: MapNode): Color = when {
     n.type == NodeType.GOAL -> Palette.amber
     n.type == NodeType.AREA -> Color(0xFF6EC8FF)
     n.type == NodeType.PROJECT -> Palette.green
+    n.type == NodeType.ADD -> Palette.textDim
     else -> Palette.text
 }
 
 private const val CANVAS_DP = 2600f
 
+/** Is [key] somewhere below [ancestor] on the map? */
+private fun isUnder(key: String, ancestor: String, byKey: Map<String, MapNode>): Boolean {
+    var p = byKey[key]?.parent
+    while (p != null) { if (p == ancestor) return true; p = byKey[p]?.parent }
+    return false
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MapView(data: AppData, now: Long, onEditTask: (Task) -> Unit, onNewTask: (projectId: String?) -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(setOf<String>()) }
     var selected by remember { mutableStateOf<String?>(null) }
+    var addingUnder by remember { mutableStateOf<MapNode?>(null) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val today = Time.dateOf(now, Time.zone(data.settings.zoneId))
     val nodes = remember(data, expanded, now / 60_000) { MapLayout.build(data, expanded, now, data.picks[today.toString()].orEmpty().toSet()) }
     val byKey = nodes.associateBy { it.key }
@@ -288,10 +311,18 @@ fun MapView(data: AppData, now: Long, onEditTask: (Task) -> Unit, onNewTask: (pr
                             .width(w)
                             .background(if (selected == n.key) Palette.surfaceHigh else Palette.surface, RoundedCornerShape(12.dp))
                             .border(BorderStroke(if (n.hot) 2.dp else 1.dp, if (n.hot) Palette.red else col.copy(alpha = 0.7f)), RoundedCornerShape(12.dp))
-                            .clickable {
-                                selected = n.key
-                                if (n.type == NodeType.PROJECT) expanded = if (n.key in expanded) expanded - n.key else expanded + n.key
-                            }
+                            .combinedClickable(
+                                onClick = {
+                                    when (n.type) {
+                                        NodeType.ADD -> addingUnder = n
+                                        NodeType.TASK -> data.tasks.firstOrNull { it.id == n.refId }?.let(onEditTask)
+                                        NodeType.ROOT -> selected = n.key
+                                        // Tap opens / closes; closing also closes everything under it.
+                                        else -> expanded = if (n.key in expanded) expanded.filterNot { k -> k == n.key || isUnder(k, n.key, byKey) }.toSet() else expanded + n.key
+                                    }
+                                },
+                                onLongClick = { if (n.type != NodeType.ADD) selected = n.key },
+                            )
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -312,10 +343,25 @@ fun MapView(data: AppData, now: Long, onEditTask: (Task) -> Unit, onNewTask: (pr
             SmallFloatingActionButton(onClick = { scale = 0.45f; offset = null }) { Text("⌂") }
         }
         Text(
-            "Pinch to zoom · tap a project to open its tasks · dashed = area feeds that goal too",
+            "Tap to open · hold to edit · + adds · pinch to zoom",
             style = MaterialTheme.typography.labelSmall, color = Palette.textDim,
             modifier = Modifier.align(Alignment.TopCenter).padding(8.dp),
         )
+
+        addingUnder?.let { plus ->
+            val parent = plus.parent?.let(byKey::get)
+            when (parent?.type) {
+                NodeType.ROOT -> NameDialog("New goal", "", onDismiss = { addingUnder = null }) { name ->
+                    Graph.changeAndReplan(ctx) { Actions.upsertGoal(it, Goal(name = name)) }; addingUnder = null
+                }
+                NodeType.GOAL -> AddAreaDialog(data, plus.refId!!, onDismiss = { addingUnder = null }) { addingUnder = null }
+                NodeType.AREA -> NameDialog("New project in ${parent.label}", "", onDismiss = { addingUnder = null }) { name ->
+                    Graph.changeAndReplan(ctx) { Actions.upsertProject(it, Project(name = name, kind = ProjectKind.PROJECT, areaId = plus.refId)) }; addingUnder = null
+                }
+                NodeType.PROJECT -> { addingUnder = null; onNewTask(plus.refId) }
+                else -> addingUnder = null
+            }
+        }
 
         selected?.let { key ->
             byKey[key]?.let { n ->
@@ -390,9 +436,12 @@ private fun NodeSheet(
                                 Text(g.name, maxLines = 2)
                             }
                         }
-                        SectionLabel("Importance (everything in this area starts here)")
+                        SectionLabel("Priority (every task in this area starts here)")
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            for (i in 1..5) androidx.compose.material3.FilterChip(area.importance == i, { change { Actions.upsertArea(it, area.copy(importance = i)) } }, { Text("$i") })
+                            for (lvl in com.maven.notafraud.core.plan.Importance.LEVELS) androidx.compose.material3.FilterChip(
+                                area.importance == lvl || (lvl == 2 && area.importance < 2), { change { Actions.upsertArea(it, area.copy(importance = lvl)) } },
+                                { Text(com.maven.notafraud.core.plan.Importance.name(lvl)) },
+                            )
                         }
                         SectionLabel("Counts toward stat")
                         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -443,10 +492,11 @@ private fun NodeSheet(
                     }
                 }
 
+                NodeType.ADD -> Unit
                 NodeType.TASK -> {
                     val t = d.tasks.firstOrNull { it.id == n.refId }
                     if (t != null) {
-                        Text(listOfNotNull("${t.loggedMin}/${t.estMin} min", if (t.priority == com.maven.notafraud.core.model.Priority.HIGH && t.dueAt != null) "firm deadline" else null, t.importance?.let { "importance $it" }, if (t.hot) "pinned hot" else null).joinToString(" · "), color = Palette.textDim)
+                        Text(listOfNotNull("${t.loggedMin}/${t.estMin} min", if (t.priority == com.maven.notafraud.core.model.Priority.HIGH && t.dueAt != null) "firm deadline" else null, "priority " + com.maven.notafraud.core.plan.Importance.name(com.maven.notafraud.core.plan.Importance.level(t, d, now))).joinToString(" · "), color = Palette.textDim)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { onEditTask(t) }) { Text("Edit") }
                             OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) }; onDismiss() }) { Text("Done") }

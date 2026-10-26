@@ -147,7 +147,15 @@ class BlockActivity : ComponentActivity() {
                 OutlinedButton(onClick = { startTaskWalk() }, modifier = Modifier.fillMaxWidth()) { Text("Walk 5 minutes instead") }
             }
 
-            Panel {
+            val paused = com.maven.notafraud.core.workout.WorkoutLink.creditsPaused(data, Graph.now())
+            if (paused) Panel(highlight = true) {
+                SectionLabel("Credits are paused")
+                Text("Today's workout is what keeps this week's minimum. " + (data.workout?.message ?: ""), color = Palette.textDim)
+                Button(onClick = { com.maven.notafraud.sense.WorkoutSync.open(this@BlockActivity); finish() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Start workout" + (data.workout?.suggestedToday?.let { ": $it" } ?: ""))
+                }
+                Text("Starting it (Short mode is fine) turns credits back on. Emergencies still work.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            } else Panel {
                 SectionLabel("Credits")
                 if (paying > 0) {
                     PayCountdown(profile.creditWaitSec, onCancel = { paying = 0 }) {

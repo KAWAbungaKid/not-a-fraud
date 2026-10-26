@@ -56,6 +56,7 @@ object Lock {
         ChangeKind.EMERGENCY_PHRASE -> d.copy(settings = d.settings.copy(emergencyPhrase = c.text ?: d.settings.emergencyPhrase))
         ChangeKind.LOCK -> d.copy(settings = d.settings.copy(settingsLock = c.flag ?: true))
         ChangeKind.LOCK_TIME -> d.copy(settings = d.settings.copy(lockReleaseMin = c.number ?: d.settings.lockReleaseMin))
+        ChangeKind.WORKOUT_PAUSE -> d.copy(settings = d.settings.copy(workoutPausesCredits = c.flag ?: true))
     }
 
     /** Does [new] give more access than [old]? */

@@ -20,8 +20,18 @@
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 
+    <!-- Shared with the workout app (same signing key): reading its status and receiving its change broadcast.
+         Both apps declare it so install order doesn't matter. -->
+    <permission
+        android:name="com.maven.permission.SYNC"
+        android:label="Maven app sync"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.maven.permission.SYNC" />
+
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.maven.workout" />
+        <package android:name="com.maven.workout.dev" />
     </queries>
 
     <application
@@ -106,6 +116,16 @@
         <receiver
             android:name=".notify.ActionReceiver"
             android:exported="false" />
+
+        <!-- The workout app says something changed (workout done, started, risk moved). -->
+        <receiver
+            android:name=".sense.WorkoutChangedReceiver"
+            android:exported="true"
+            android:permission="com.maven.permission.SYNC">
+            <intent-filter>
+                <action android:name="com.maven.workout.CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".notify.BootReceiver"

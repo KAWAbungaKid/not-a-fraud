@@ -89,8 +89,18 @@ jobs:
           adb shell input keyevent 82
           gradle :workout:connectedDebugAndroidTest --console=plain >> emu.log 2>&1
           st=$?
+          mkdir -p shots && adb pull /sdcard/Android/data/com.maven.workout.dev/files/shots shots >> emu.log 2>&1
           adb logcat -d AndroidRuntime:E TestRunner:I '*:S' >> emu.log
           exit $st
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: workout-emulator, file: emu.log }
+      - name: Push screenshots to ci-logs/workout-shots
+        if: always()
+        run: |
+          set +e
+          [ -d shots ] || exit 0
+          cd shots; find . -name '*.png' | head
+          git init -q -b main; git config user.name ci; git config user.email ci@localhost
+          git add -A; git commit -qm "shots ${{ github.sha }}"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/workout-shots

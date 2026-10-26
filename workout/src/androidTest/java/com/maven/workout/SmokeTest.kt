@@ -1,7 +1,9 @@
 package com.maven.workout
 
 import android.net.Uri
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -31,6 +33,16 @@ class SmokeTest {
     @get:Rule(order = 1)
     val rule = createAndroidComposeRule<MainActivity>()
 
+    /** Saves a screenshot to the app's external files dir; CI pulls them to branch ci-logs/workout-shots. */
+    private fun shot(name: String) {
+        rule.waitForIdle()
+        runCatching {
+            val bmp = rule.onAllNodes(androidx.compose.ui.test.isRoot()).onFirst().captureToImage().asAndroidBitmap()
+            val dir = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "shots").apply { mkdirs() }
+            java.io.FileOutputStream(java.io.File(dir, "$name.png")).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        }
+    }
+
     private fun back() {
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()
@@ -39,25 +51,35 @@ class SmokeTest {
     @Test
     fun everyScreenOpens() {
         rule.waitForIdle()
+        shot("01-today")
         rule.onAllNodesWithText("Start", substring = true).onFirst().assertIsDisplayed().performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Bench").assertExists()
+        shot("02-workout")
+        rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("Done")).onFirst().performClick()
+        shot("03-workout-ticked")
         rule.onAllNodesWithText("Finish").onFirst().performClick()
         rule.waitForIdle()
         rule.onNode(hasText("Finish") and hasAnyAncestor(isDialog())).performClick()
         rule.waitForIdle()
+        shot("04-summary")
+        back()
+        shot("05-today-after")
 
         rule.onNodeWithText("History").performClick()
-        rule.waitForIdle()
+        shot("06-history")
         rule.onNodeWithText("Exercises").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Bench").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Archived (hidden from pickers)").assertExists()
+        shot("07-exercise")
+        rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Training max", substring = true))
+        shot("08-exercise-strength")
         back()
 
         rule.onNodeWithText("Program").performClick()
-        rule.waitForIdle()
+        shot("09-program")
         rule.onNodeWithText("Edit program").performScrollTo().performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Weeks per block").assertExists()
@@ -66,11 +88,13 @@ class SmokeTest {
         rule.onNodeWithText("Bench (main)").performScrollTo().performClick()
         rule.waitForIdle()
         rule.onAllNodesWithText("Week 1").onFirst().assertExists()
+        shot("10-type")
         back()
 
         rule.onNodeWithText("Settings").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Daily check when the minimum is at risk").performScrollTo().assertIsDisplayed()
+        shot("11-settings")
     }
 
     @Test

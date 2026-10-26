@@ -87,7 +87,7 @@ jobs:
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
           adb shell input keyevent 82
-          gradle :workout:connectedDebugAndroidTest --console=plain >> emu.log 2>&1
+          gradle :workout:connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain >> emu.log 2>&1
           st=$?
           mkdir -p shots && adb pull /sdcard/Android/data/com.maven.workout.dev/files/shots shots >> emu.log 2>&1
           adb logcat -d AndroidRuntime:E TestRunner:I '*:S' >> emu.log

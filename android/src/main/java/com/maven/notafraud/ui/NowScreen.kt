@@ -106,6 +106,46 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             }
         }
 
+        val ready = com.maven.notafraud.core.store.Lock.due(data, now)
+        if (ready.isNotEmpty()) item {
+            Panel(highlight = true) {
+                SectionLabel("You asked for these yesterday. Still want them?")
+                for (c in ready) {
+                    Text(c.label, style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { act { com.maven.notafraud.core.store.Lock.confirm(it, c.id) } }) { Text("Yes, change it") }
+                        Button(onClick = { act { com.maven.notafraud.core.store.Lock.discard(it, c.id) } }) { Text("No, keep it") }
+                    }
+                }
+            }
+        }
+
+        if ("homework" !in hidden) {
+            val ahead = com.maven.notafraud.core.plan.Homework.ahead(data, now)
+            if (ahead.openCount > 0) item {
+                Panel {
+                    SectionLabel("Homework")
+                    val d = ahead.days
+                    Text(
+                        when {
+                            d == null -> "Nothing due in the next 2 weeks"
+                            d < 0 -> "Overdue: ${ahead.next?.title}"
+                            else -> "Next unfinished is due in " + (if (d < 1) "${(d * 24).toInt()} h" else "%.1f days".format(d)) + " · goal: ${ahead.goalDays} days ahead"
+                        },
+                        style = MaterialTheme.typography.titleSmall, color = if (ahead.onTrack) Palette.green else Palette.amber,
+                    )
+                    if (!ahead.onTrack) Text(
+                        "To get ${ahead.goalDays} days ahead: ${Time.durationText(ahead.behindMin)} of homework due before " +
+                            Time.dateOf(now + ahead.goalDays * Time.DAY, zone).format(DateTimeFormatter.ofPattern("EEE", Locale.US)) +
+                            " is left. The plan works it in first; finishing early is what builds the cushion.",
+                        color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+                    )
+                    else Text("You're ahead. The plan keeps working ${ahead.goalDays} days out so it stays that way.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    ahead.next?.let { t -> Text("Next: ${t.title} · ${Time.durationText(com.maven.notafraud.core.score.Scorer.minutesLeft(t))} left", style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        }
+
         if (data.reviewTaskIds.isNotEmpty()) item {
             var open by remember { mutableStateOf(false) }
             Panel(Modifier.clickable { open = true }, highlight = true) {

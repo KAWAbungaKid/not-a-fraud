@@ -197,7 +197,7 @@ object Seed {
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 6
+    const val CURRENT = 7
 
     /** Seeded routine items that tick themselves (v0.5 replaced the hard-coded ids with RoutineItem.autoCheck). */
     val AUTO_CHECK = mapOf(
@@ -213,7 +213,36 @@ object Migration {
         if (x.schema < 4) x = toV4(x)
         if (x.schema < 5) x = toV5(x)
         if (x.schema < 6) x = toV6(x)
+        if (x.schema < 7) x = toV7(x)
         return x
+    }
+
+    const val YOUTUBE = "com.google.android.youtube"
+
+    /**
+     * v0.6: Canvas-style Deadlines calendars become Homework (2 h default, spread over days, aimed 2 days early),
+     * their existing tasks move over; YouTube asks "what are you doing?" instead of only credits.
+     */
+    private fun toV7(d: AppData): AppData {
+        val s = d.settings
+        val modes = s.calendarModes.mapValues { (_, m) -> if (m == com.maven.notafraud.core.model.CalMode.DEADLINES) com.maven.notafraud.core.model.CalMode.HOMEWORK else m }
+        val tasks = d.tasks.map { t ->
+            val k = t.sourceKey ?: return@map t
+            if (!k.startsWith("deadline:")) return@map t
+            val due = t.dueAt
+            t.copy(
+                sourceKey = com.maven.notafraud.core.plan.Homework.PREFIX + k.removePrefix("deadline:"),
+                estMin = if (t.loggedMin == 0 && t.estMin == 60) s.homeworkMin else t.estMin,
+                priority = Priority.HIGH,
+                targetAt = due?.let { it - s.homeworkAheadDays * com.maven.notafraud.core.plan.Time.DAY },
+                dailyCapMin = s.homeworkDailyMaxMin,
+                maxBlockMin = t.maxBlockMin ?: 90,
+                notBefore = due?.let { it - s.homeworkLeadDays * com.maven.notafraud.core.plan.Time.DAY } ?: t.notBefore,
+            )
+        }
+        val rules = if (YOUTUBE in d.rules.blocked && YOUTUBE !in d.rules.profiles)
+            d.rules.copy(profiles = d.rules.profiles + (YOUTUBE to d.rules.defaultProfile.copy(askPurpose = true, replyWindowMin = 0))) else d.rules
+        return d.copy(schema = 7, settings = s.copy(calendarModes = modes), tasks = tasks, rules = rules, todayPlan = null, weekPlan = emptyList())
     }
 
     /**

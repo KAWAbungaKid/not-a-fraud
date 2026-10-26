@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Insights
@@ -50,6 +51,7 @@ val PAGES = listOf(
     PageDef("now", "Now", Icons.Filled.PlayArrow, false, "What to do right now, today's 3"),
     PageDef("plan", "Plan", Icons.Filled.ViewTimeline, false, "Today and the next 6 days"),
     PageDef("tasks", "Tasks", Icons.Filled.AccountTree, false, "Goal map and task list"),
+    PageDef("todo", "To-do", Icons.Filled.TaskAlt, false, "ASAP, on a day, within dates, someday"),
     PageDef("routine", "Routine", Icons.Filled.Restaurant, false, "Daily habits that get angry"),
     PageDef("stats", "Stats", Icons.Filled.Insights, false, "Scores from sleep, workouts, focus"),
     PageDef("skills", "Skills", Icons.Filled.AutoAwesome, false, "Skill constellations"),
@@ -103,6 +105,7 @@ val NOW_CARDS = listOf(
     "pick3" to "Today's / tomorrow's 3",
     "numbers" to "Credits · sleep · focus · phone",
     "moved" to "Moved off today / won't fit this week",
+    "homework" to "Homework: how far ahead you are",
     "today" to "How's today?",
     "upnext" to "Up next (top tasks)",
     "idea" to "Capture an idea",

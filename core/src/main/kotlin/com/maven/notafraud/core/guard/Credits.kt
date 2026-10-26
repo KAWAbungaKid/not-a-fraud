@@ -119,6 +119,44 @@ object Credits {
         )
     }
 
+    /** Phrase matching ignores case, spacing and end punctuation, not the words. */
+    fun phraseMatches(typed: String, phrase: String): Boolean {
+        fun norm(x: String) = x.lowercase().replace(Regex("[^a-z0-9 ]"), "").replace(Regex("\\s+"), " ").trim()
+        return phrase.isNotBlank() && norm(typed) == norm(phrase)
+    }
+
+    /** Extra emergencies left today (after the instant ones): each needs the phrase typed out. */
+    fun extraEmergencyLeft(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, startOfToday: Long): Int {
+        val used = emergencyUsesToday(ledger, startOfToday)
+        return (profile.emergencyPerDay + profile.extraEmergencyPerDay - maxOf(used, profile.emergencyPerDay)).coerceAtLeast(0)
+    }
+
+    fun emergencyWithPhrase(ledger: Ledger, settings: Settings, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, typed: String, now: Long, startOfToday: Long): Ledger? {
+        if (emergencyUsesToday(ledger, startOfToday) < profile.emergencyPerDay) return emergencyInstant(ledger, settings, profile, pkg, label, now, startOfToday)
+        if (extraEmergencyLeft(ledger, profile, startOfToday) <= 0 || !phraseMatches(typed, settings.emergencyPhrase)) return null
+        return ledger.copy(
+            unlockedUntil = ledger.unlockedUntil + (pkg to now + settings.emergencyUnlockMin * Time.MIN),
+            emergencyUses = (ledger.emergencyUses + now).filter { it > now - 2 * Time.DAY },
+            entries = (ledger.entries + LedgerEntry(now, 0.0, "Extra emergency (typed it out): $label")).takeLast(MAX_ENTRIES),
+        )
+    }
+
+    /** Purpose minutes used today on [pkg] ("What are you doing?" answers × check interval). */
+    fun purposeUsedMin(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, startOfToday: Long) =
+        ledger.purposeLog.count { it.pkg == pkg && it.at >= startOfToday } * profile.purposeCheckMin
+
+    /** "What are you doing?": opens for [BlockProfile.purposeCheckMin], then asks again. Free, within the daily budget. */
+    fun purpose(ledger: Ledger, profile: com.maven.notafraud.core.model.BlockProfile, pkg: String, label: String, what: String, now: Long, startOfToday: Long): Ledger? {
+        if (!profile.askPurpose || what.trim().length < 3) return null
+        if (purposeUsedMin(ledger, profile, pkg, startOfToday) + profile.purposeCheckMin > profile.purposeDailyMin) return null
+        val until = now + profile.purposeCheckMin * Time.MIN
+        return ledger.copy(
+            unlockedUntil = ledger.unlockedUntil + (pkg to maxOf(until, ledger.unlockedUntil[pkg] ?: 0)),
+            purposeLog = (ledger.purposeLog + com.maven.notafraud.core.model.PurposeEntry(now, pkg, what.trim())).filter { it.at > now - 2 * Time.DAY },
+            entries = (ledger.entries + LedgerEntry(now, 0.0, "$label: ${what.trim()}")).takeLast(MAX_ENTRIES),
+        )
+    }
+
     /** A message notification arrived for [pkg] (someone wrote to you). */
     fun messageArrived(ledger: Ledger, pkg: String, at: Long) = ledger.copy(lastMessageAt = ledger.lastMessageAt + (pkg to at))
 

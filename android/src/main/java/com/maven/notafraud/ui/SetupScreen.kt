@@ -70,6 +70,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
     var toast by remember { mutableStateOf<String?>(null) }
 
     val p = remember(resumes) { PermSnapshot.read(ctx) }
+    val installed = remember(resumes) { AppLabels.launchable(ctx).map { it.pkg }.toSet() }
     val healthGranted by produceState(false, resumes) { value = runCatching { Health.granted(ctx) }.getOrDefault(false) }
     val healthStatus = remember(resumes) { HealthConnectClient.getSdkStatus(ctx) }
 
@@ -163,20 +164,71 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
         if (section == "blocking") {
         item {
             Panel {
-                SwitchRow("Blocking on", data.rules.blockingEnabled) { on -> Graph.update { it.copy(rules = it.rules.copy(blockingEnabled = on)) } }
-                SwitchRow("Nudges on", data.settings.nagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(nagsEnabled = on)) } }
-                SwitchRow("Routine nudges on", data.settings.routineNagsEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(routineNagsEnabled = on)) } }
+                SwitchRow("Blocking on", data.rules.blockingEnabled) { on -> Graph.update { com.maven.notafraud.core.store.Lock.setSwitch(it, com.maven.notafraud.core.model.ChangeKind.BLOCKING, on, "Turn blocking off", Graph.now()) } }
+                SwitchRow("Nudges on", data.settings.nagsEnabled) { on -> Graph.update { com.maven.notafraud.core.store.Lock.setSwitch(it, com.maven.notafraud.core.model.ChangeKind.NAGS, on, "Turn nudges off", Graph.now()) } }
+                SwitchRow("Routine nudges on", data.settings.routineNagsEnabled) { on -> Graph.update { com.maven.notafraud.core.store.Lock.setSwitch(it, com.maven.notafraud.core.model.ChangeKind.ROUTINE_NAGS, on, "Turn routine nudges off", Graph.now()) } }
                 SwitchRow("Bedtime nudges make a sound (through Do Not Disturb)", data.settings.bedtimeSound) { on -> Graph.update { it.copy(settings = it.settings.copy(bedtimeSound = on)) } }
-                TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.size})") }
+                TextButton(onClick = { picker = Picker.BLOCKED }) { Text("Blocked apps (${data.rules.blocked.count { it in installed }})") }
                 TextButton(onClick = { editingSites = true }) { Text("Blocked websites (${data.rules.blockedSites.size})") }
-                for (pkg in data.rules.blocked.sortedBy { AppLabels.label(ctx, it) }) {
+                for (pkg in data.rules.blocked.filter { it in installed }.sortedBy { AppLabels.label(ctx, it) }) {
                     val custom = pkg in data.rules.profiles
                     TextButton(onClick = { editingProfile = pkg }) { Text("${AppLabels.label(ctx, pkg)} rules" + if (custom) " (own rules)" else " (default rules)") }
                 }
                 TextButton(onClick = { editingProfile = "" }) { Text("Default rules for blocked apps (reply window, typing, still texting)") }
                 Text("Quick Snap: pull down twice → pencil/edit → drag the \"Quick Snap\" tile into your quick settings.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.size})") }
-                            }
+                TextButton(onClick = { picker = Picker.FOCUS }) { Text("Focus apps that earn credits (${data.rules.focus.count { it in installed }})") }
+            }
+        }
+
+        val suggestions = Actions.blockSuggestions(data, Graph.today(), setOf(ctx.packageName, ctx.packageName.removeSuffix(".dev")))
+            .filter { it.first in installed && !it.first.contains("launcher") }
+        if (suggestions.isNotEmpty()) {
+            item { SectionLabel("Suggested to block (your usage this week)") }
+            item {
+                Panel {
+                    for ((pkg, label, avg) in suggestions.take(6)) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(AppLabels.label(ctx, pkg).ifBlank { label })
+                            Text("~${Time.durationText(avg)} a day", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { Graph.update { it.copy(rules = it.rules.copy(blocked = it.rules.blocked + pkg, focus = it.rules.focus - pkg)) } }) { Text("Block") }
+                        TextButton(onClick = { Graph.update { it.copy(settings = it.settings.copy(notSuggest = it.settings.notSuggest + pkg)) } }) { Text("Not this", color = Palette.textDim) }
+                    }
+                    Text("Apps averaging ${data.settings.suggestBlockMin}+ min a day that aren't blocked.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        item { SectionLabel("Settings lock") }
+        item {
+            var pickingTime by remember { mutableStateOf(false) }
+            Panel {
+                SwitchRow("Loosening a setting waits until morning", data.settings.settingsLock) { on ->
+                    Graph.update { com.maven.notafraud.core.store.Lock.setSwitch(it, com.maven.notafraud.core.model.ChangeKind.LOCK, on, "Turn the settings lock off", Graph.now()) }
+                }
+                Text("Turning blocking or nudges off, unblocking an app or site, longer windows, more emergencies, a new focus app, an easier phrase: held until ${hm(data.settings.lockReleaseMin)} the next morning, then it asks if you still want it. Tightening applies right away.",
+                    color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { pickingTime = true }) { Text("Morning release: ${hm(data.settings.lockReleaseMin)}") }
+                if (data.pending.isNotEmpty()) {
+                    SectionLabel("Waiting")
+                    val fmt = java.text.SimpleDateFormat("EEE h:mm a", java.util.Locale.US)
+                    for (c in data.pending) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(c.label)
+                            Text("asks you ${fmt.format(java.util.Date(c.applyAfter))}", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                        }
+                        TextButton(onClick = { Graph.update { com.maven.notafraud.core.store.Lock.discard(it, c.id) } }) { Text("Cancel") }
+                    }
+                }
+            }
+            if (pickingTime) TimeDialog(data.settings.lockReleaseMin, onDismiss = { pickingTime = false }) { m ->
+                val n = Graph.now()
+                Graph.update {
+                    val c = com.maven.notafraud.core.model.PendingChange(kind = com.maven.notafraud.core.model.ChangeKind.LOCK_TIME, label = "Morning release at ${hm(m)}", createdAt = n, applyAfter = n, number = m)
+                    if (m < it.settings.lockReleaseMin) com.maven.notafraud.core.store.Lock.apply(it, c) else com.maven.notafraud.core.store.Lock.request(it, c, n)
+                }
+                pickingTime = false
+            }
         }
 
         item { SectionLabel("Credits") }
@@ -198,7 +250,14 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 var creed by remember(data.settings.creed) { mutableStateOf(data.settings.creed) }
                 OutlinedTextField(creed, { creed = it }, label = { Text("Creed (shown on the block screen)") }, modifier = Modifier.fillMaxWidth())
                 TextButton(
-                    onClick = { Graph.update { it.copy(settings = it.settings.copy(emergencyPhrase = phrase.trim(), creed = creed.trim())) } },
+                    onClick = {
+                        val n = Graph.now()
+                        Graph.update {
+                            val x = it.copy(settings = it.settings.copy(creed = creed.trim()))
+                            if (phrase.trim() == x.settings.emergencyPhrase) x
+                            else com.maven.notafraud.core.store.Lock.request(x, com.maven.notafraud.core.model.PendingChange(kind = com.maven.notafraud.core.model.ChangeKind.EMERGENCY_PHRASE, label = "New emergency phrase: \"${phrase.trim()}\"", createdAt = n, applyAfter = n, text = phrase.trim()), n)
+                        }
+                    },
                     enabled = phrase.isNotBlank() && (phrase != data.settings.emergencyPhrase || creed != data.settings.creed),
                 ) { Text("Save") }
             }
@@ -210,7 +269,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
         }
 
         if (section == "planning") {
-        item {
+        item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             var ideas by remember { mutableStateOf(false) }
             Panel {
                 SwitchRow("Re-plan when a block slips by", data.settings.autoReplan) { on -> Graph.update { it.copy(settings = it.settings.copy(autoReplan = on)) } }
@@ -218,10 +277,25 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 SwitchRow("Weekly check-in (Social, Spirit stats)", data.settings.checkInEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(checkInEnabled = on)) } }
                 TextButton(onClick = { ideas = true }) { Text("Recharge ideas: " + data.settings.rechargeIdeas.joinToString(", ").ifBlank { "none" }) }
             }
+            Panel {
+                Text("Homework (Homework calendars)", style = MaterialTheme.typography.titleSmall)
+                @Composable
+                fun chips(label: String, values: List<Int>, cur: Int, fmt: (Int) -> String, set: (com.maven.notafraud.core.model.Settings, Int) -> com.maven.notafraud.core.model.Settings) {
+                    Text(label, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (v in values) androidx.compose.material3.FilterChip(cur == v, { Graph.changeAndReplan(ctx) { it.copy(settings = set(it.settings, v)) } }, { Text(fmt(v)) })
+                    }
+                }
+                chips("Default length of an assignment (new ones)", listOf(30, 60, 90, 120, 180), data.settings.homeworkMin, { Time.durationText(it) }) { st, v -> st.copy(homeworkMin = v) }
+                chips("Aim to be done this many days early", listOf(0, 1, 2, 3, 4, 5), data.settings.homeworkAheadDays, { if (it == 0) "on time" else "$it" }) { st, v -> st.copy(homeworkAheadDays = v) }
+                chips("Most per day on one assignment (bigger ones spread over days)", listOf(60, 90, 120, 180, 240), data.settings.homeworkDailyMaxMin, { Time.durationText(it) }) { st, v -> st.copy(homeworkDailyMaxMin = v) }
+                chips("May start this many days before it's due", listOf(5, 7, 10, 14), data.settings.homeworkLeadDays, { "$it" }) { st, v -> st.copy(homeworkLeadDays = v) }
+                Text("Change one assignment's length from the Plan (tap it, or the \"Due\" list) or in Tasks. The calendar sync keeps your number.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
             if (ideas) ListDialog("Recharge ideas", "One per line. Recharge blocks suggest these.", data.settings.rechargeIdeas, { ideas = false }) { l ->
                 Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(rechargeIdeas = l)) }; ideas = false
             }
-        }
+        } }
 
         }
 
@@ -294,17 +368,14 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
     editingProfile?.let { pkg ->
         val current = if (pkg.isEmpty()) data.rules.defaultProfile else data.rules.profile(pkg)
         ProfileEditor(if (pkg.isEmpty()) "Other blocked apps" else com.maven.notafraud.sense.AppLabels.label(ctx, pkg), current, onDismiss = { editingProfile = null }) { p ->
-            Graph.update {
-                if (pkg.isEmpty()) it.copy(rules = it.rules.copy(defaultProfile = p))
-                else it.copy(rules = it.rules.copy(profiles = it.rules.profiles + (pkg to p)))
-            }
+            Graph.update { com.maven.notafraud.core.store.Lock.setProfile(it, pkg, p, if (pkg.isEmpty()) "blocked apps" else AppLabels.label(ctx, pkg), Graph.now()) }
             editingProfile = null
         }
     }
     if (editingSites) {
         ListDialog("Blocked websites", "One per line, e.g. instagram.com. Subdomains are included.", data.rules.blockedSites.sorted(), onDismiss = { editingSites = false }) { list ->
             val clean = list.map { it.trim().lowercase().removePrefix("https://").removePrefix("http://").removePrefix("www.").substringBefore('/') }.filter { it.contains('.') }.toSet()
-            Graph.update { it.copy(rules = it.rules.copy(blockedSites = clean)) }
+            Graph.update { com.maven.notafraud.core.store.Lock.setSites(it, clean, Graph.now()) }
             editingSites = false
         }
     }
@@ -328,10 +399,17 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
             selected = current,
             onDismiss = { picker = null },
             onSave = { set ->
+                val n = Graph.now()
+                val lbl = { p: String -> AppLabels.label(ctx, p) }
                 Graph.update {
                     when (which) {
-                        Picker.BLOCKED -> it.copy(rules = it.rules.copy(blocked = set, focus = it.rules.focus - set))
-                        Picker.FOCUS -> it.copy(rules = it.rules.copy(focus = set, blocked = it.rules.blocked - set))
+                        // Apps that aren't installed just drop off the list; unblocking an installed one waits for the morning.
+                        Picker.BLOCKED -> com.maven.notafraud.core.store.Lock.setBlocked(
+                            it.copy(rules = it.rules.copy(blocked = it.rules.blocked.filter { p -> p in installed }.toSet(), focus = it.rules.focus - set)), set, n, lbl,
+                        )
+                        Picker.FOCUS -> com.maven.notafraud.core.store.Lock.setFocus(
+                            it.copy(rules = it.rules.copy(focus = it.rules.focus.filter { p -> p in installed }.toSet(), blocked = it.rules.blocked)), set - it.rules.blocked, n, lbl,
+                        )
                         Picker.MIRRORED -> it.copy(rules = it.rules.copy(mirrored = set))
                     }
                 }
@@ -504,11 +582,11 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
             }
         }
         SectionLabel("Each calendar is…")
-        Text("Events: fixed time the plan works around. Deadlines (Canvas): each entry becomes a task due then. Tests: fixed time plus a study task leading up to it. Ignore: skipped.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        Text("Events: fixed time the plan works around. Homework (Canvas): each entry is an assignment, ~2 h by default, spread over days and aimed to be done early. Deadlines: each entry is a task due then. Tests: fixed time plus a study task leading up to it. Ignore: skipped.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         cals.filter { it.id != data.settings.outputCalendarId }.forEach { c ->
             val mode = com.maven.notafraud.sense.PhoneCalendar.modeFor(c, data.settings)
             Text(c.name, maxLines = 1)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (m in com.maven.notafraud.core.model.CalMode.entries) {
                     androidx.compose.material3.FilterChip(mode == m, {
                         Graph.update { it.copy(settings = it.settings.copy(calendarModes = it.settings.calendarModes + (c.id to m), excludedCalendarIds = it.settings.excludedCalendarIds - c.id)) }
@@ -561,9 +639,8 @@ private fun AppPicker(title: String, selected: Set<String>, onDismiss: () -> Uni
     val apps = remember { AppLabels.launchable(ctx) }
     var chosen by remember { mutableStateOf(selected) }
     var query by remember { mutableStateOf("") }
-    // Selected apps that aren't installed still show, so they can be unticked.
-    val missing = selected.filter { s -> apps.none { it.pkg == s } }.map { AppLabels.Installed(it, AppLabels.label(ctx, it) + " (not installed)") }
-    val list = (missing + apps).filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
+    // Only installed apps are listed (0.5 showed defaults like TikTok as "not installed").
+    val list = apps.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
         .sortedWith(compareByDescending<AppLabels.Installed> { it.pkg in selected }.thenBy { it.label.lowercase() })
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -643,7 +720,14 @@ private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model
                     Chips("Quick-opens per day", listOf(3, 6, 10, 20), p.quickOpenPerDay, { "$it" }) { p = p.copy(quickOpenPerDay = it) }
                 }
                 Chips("Wait before credits unlock it", listOf(0, 15, 30, 60, 90), p.creditWaitSec, { "${it}s" }) { p = p.copy(creditWaitSec = it) }
-                Chips("Instant emergencies per day", listOf(1, 2, 3, 5), p.emergencyPerDay, { "$it" }) { p = p.copy(emergencyPerDay = it) }
+                Chips("Instant emergencies per day", listOf(0, 1, 2, 3, 5), p.emergencyPerDay, { "$it" }) { p = p.copy(emergencyPerDay = it) }
+                Chips("Then more, by typing your phrase", listOf(0, 2, 5, 10), p.extraEmergencyPerDay, { if (it == 0) "none" else "$it" }) { p = p.copy(extraEmergencyPerDay = it) }
+                SwitchRow("Ask \"what are you doing?\" (open it by saying what for)", p.askPurpose) { p = p.copy(askPurpose = it) }
+                if (p.askPurpose) {
+                    Chips("Ask again every", listOf(3, 5, 10, 15), p.purposeCheckMin, { "${it}m" }) { p = p.copy(purposeCheckMin = it) }
+                    Chips("Most per day this way", listOf(20, 30, 60, 90, 120), p.purposeDailyMin, { "${it}m" }) { p = p.copy(purposeDailyMin = it) }
+                }
+                Text("With the settings lock on, anything here that loosens waits until the morning.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 Text("Calls (phone, Snapchat, FaceTime-style) are never blocked.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
             }
         },

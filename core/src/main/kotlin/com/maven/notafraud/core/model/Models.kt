@@ -116,7 +116,26 @@ data class Task(
     val deferrals: List<Long> = emptyList(),
     /** WAITING: who or what it's waiting on. */
     val waitingOn: String = "",
+    /** To-do list level: ASAP / on a day / within dates / someday. Null = a normal project task. */
+    val horizon: Horizon? = null,
+    /** Aim to be done by this (homework: due minus the days-ahead goal). Urgency uses it; Heat still uses [dueAt]. */
+    val targetAt: Long? = null,
+    /** Most minutes per day the planner gives this task, so big assignments spread over days. */
+    val dailyCapMin: Int? = null,
 )
+
+/** To-do list levels. */
+@Serializable
+enum class Horizon {
+    /** As soon as possible: planned first, no date. */
+    ASAP,
+    /** On one day ([Task.notBefore] = that day's start, [Task.dueAt] = its end). */
+    ON_DAY,
+    /** Any time between [Task.notBefore] and [Task.dueAt]. */
+    WITHIN,
+    /** Something to try eventually: kept on the list, never planned. */
+    SOMEDAY,
+}
 
 @Serializable
 data class CalEvent(
@@ -247,6 +266,26 @@ enum class AutoCheck {
     PICK3,
 }
 
+/** A change that loosens blocking, held until the morning (settings lock). One kind per field it touches. */
+@Serializable
+data class PendingChange(
+    val id: String = newId(),
+    val kind: ChangeKind,
+    val label: String,
+    val createdAt: Long,
+    val applyAfter: Long,
+    val pkg: String? = null,
+    val items: Set<String> = emptySet(),
+    val flag: Boolean? = null,
+    val number: Int? = null,
+    val text: String? = null,
+    val profile: BlockProfile? = null,
+    val notified: Boolean = false,
+)
+
+@Serializable
+enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME }
+
 /** A school term: class blocks run between [start] and [end], except [offDates] (breaks). */
 @Serializable
 data class Semester(val name: String, val start: String, val end: String, val offDates: Set<String> = emptySet())
@@ -280,7 +319,10 @@ data class AppRules(
     /** Websites blocked inside browsers (matched against the address bar host and its parents). */
     val blockedSites: Set<String> = DEFAULT_SITES,
     /** Per-app blocking profiles; apps without one use [defaultProfile]. */
-    val profiles: Map<String, BlockProfile> = mapOf("com.snapchat.android" to BlockProfile(quickOpen = true)),
+    val profiles: Map<String, BlockProfile> = mapOf(
+        "com.snapchat.android" to BlockProfile(quickOpen = true),
+        "com.google.android.youtube" to BlockProfile(askPurpose = true, replyWindowMin = 0),
+    ),
     val defaultProfile: BlockProfile = BlockProfile(),
 ) {
     fun profile(pkg: String) = profiles[pkg] ?: defaultProfile
@@ -327,7 +369,17 @@ data class BlockProfile(
     val creditWaitSec: Int = 60,
     /** Instant emergency unlocks per day. */
     val emergencyPerDay: Int = 3,
+    /** After those run out: more, but only by typing the emergency phrase. 0 = none. */
+    val extraEmergencyPerDay: Int = 5,
+    /** "What are you doing?": open it by saying what for; asks again every [purposeCheckMin]. */
+    val askPurpose: Boolean = false,
+    val purposeCheckMin: Int = 5,
+    /** Most purpose minutes per day for this app; then only credits / emergency. */
+    val purposeDailyMin: Int = 60,
 )
+
+@Serializable
+data class PurposeEntry(val at: Long, val pkg: String, val what: String)
 
 @Serializable
 data class LedgerEntry(
@@ -350,6 +402,8 @@ data class Ledger(
     /** pkg -> when its newest message notification arrived, and the last one already used for a reply window. */
     val lastMessageAt: Map<String, Long> = emptyMap(),
     val messageWindowUsed: Map<String, Long> = emptyMap(),
+    /** "What are you doing?" answers (last 2 days). */
+    val purposeLog: List<PurposeEntry> = emptyList(),
 )
 
 @Serializable
@@ -404,6 +458,18 @@ data class Settings(
     val nowHidden: Set<String> = emptySet(),
     /** Weekly 1–5 check-in for the stats the phone can't measure (social, spirit). Off: tabled for now. */
     val checkInEnabled: Boolean = false,
+    /** Homework calendars: default minutes per assignment, most per day on one, days ahead to aim for, how early it may start. */
+    val homeworkMin: Int = 120,
+    val homeworkDailyMaxMin: Int = 120,
+    val homeworkAheadDays: Int = 2,
+    val homeworkLeadDays: Int = 10,
+    /** Settings lock: changes that loosen blocking wait until [lockReleaseMin] the next morning and ask again. */
+    val settingsLock: Boolean = true,
+    val lockReleaseMin: Int = 7 * 60,
+    /** Suggest blocking apps averaging at least this many minutes a day this week. */
+    val suggestBlockMin: Int = 20,
+    /** Apps you said not to suggest again. */
+    val notSuggest: Set<String> = emptySet(),
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
@@ -440,6 +506,8 @@ enum class CalMode {
     DEADLINES,
     /** Each entry is a test: fixed time to plan around, plus a study task leading up to it. */
     TESTS,
+    /** Each entry is homework due then: ~2 h by default, split over days, aimed to be done days early. */
+    HOMEWORK,
     IGNORE,
 }
 
@@ -515,6 +583,8 @@ data class AppData(
     val skills: List<Skill> = emptyList(),
     val checkIns: List<CheckIn> = emptyList(),
     val semester: Semester? = null,
+    /** Loosening changes waiting for the morning (settings lock). */
+    val pending: List<PendingChange> = emptyList(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),
@@ -539,7 +609,7 @@ data class AppData(
 /** Tasks that can be planned: not in an archived project (an ended semester's classes, a shelved project). */
 fun AppData.liveTasks(): List<Task> {
     val archived = projects.filter { it.archived }.map { it.id }.toSet()
-    return if (archived.isEmpty()) tasks else tasks.filter { it.projectId !in archived }
+    return tasks.filter { it.horizon != Horizon.SOMEDAY && (archived.isEmpty() || it.projectId !in archived) }
 }
 
 fun AppData.routineFor(a: AutoCheck): RoutineItem? = routine.firstOrNull { it.autoCheck == a && it.enabled } ?: routine.firstOrNull { it.autoCheck == a }

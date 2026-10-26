@@ -260,9 +260,21 @@ class DayPlanner(
         val taskBlocks = mutableListOf<PlanBlock>()
         val practicedToday = HashSet<String>()
 
+        /** Per-day cap (homework): at least the cap, more only if the target date needs it. */
+        fun capToday(task: Task): Int {
+            val cap = task.dailyCapMin ?: return Int.MAX_VALUE
+            val target = task.targetAt ?: task.dueAt ?: return cap
+            val daysLeft = java.time.temporal.ChronoUnit.DAYS.between(date, Time.dateOf(target, zone)).toInt().coerceAtLeast(0) + 1
+            val left = Scorer.minutesLeft(task) - (carried[task.id] ?: 0)
+            return maxOf(cap, (left + daysLeft - 1) / daysLeft)
+        }
+
         fun need(task: Task): Int = when (task.kind) {
             TaskKind.PRACTICE -> Practice.need(task, data, date, (carried[task.id] ?: 0) + (allotted[task.id] ?: 0))
-            else -> Scorer.minutesLeft(task) - (carried[task.id] ?: 0) - (allotted[task.id] ?: 0)
+            else -> minOf(
+                Scorer.minutesLeft(task) - (carried[task.id] ?: 0) - (allotted[task.id] ?: 0),
+                capToday(task) - (allotted[task.id] ?: 0),
+            )
         }
 
         fun allowedToday(task: Task, t: Long): Boolean {
@@ -284,6 +296,7 @@ class DayPlanner(
             if (task.kind == TaskKind.FILLER) sc *= if (e == Energy.LOW || w < 30 || Time.minuteOfDay(t, zone) >= 20 * 60) 1.4 else 0.8
             if (task.id in picks) sc = sc * 2 + 40
             if (task.hot) sc *= 1.5
+            if (task.horizon == com.maven.notafraud.core.model.Horizon.ASAP) sc = sc * 1.6 + 25
             if (Heat.deadlineHot(task, t)) sc *= 1.3
             return sc
         }

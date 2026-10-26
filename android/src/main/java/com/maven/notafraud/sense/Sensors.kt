@@ -119,13 +119,13 @@ object PhoneCalendar {
         if (cal.id in settings.excludedCalendarIds || cal.id == settings.outputCalendarId) return com.maven.notafraud.core.model.CalMode.IGNORE
         val n = (cal.name + " " + (cal.account ?: "")).lowercase()
         return when {
-            listOf("canvas", "instructure", "assignment", "coursework").any { it in n } -> com.maven.notafraud.core.model.CalMode.DEADLINES
+            listOf("canvas", "instructure", "assignment", "coursework", "homework").any { it in n } -> com.maven.notafraud.core.model.CalMode.HOMEWORK
             listOf("test", "exam").any { it in cal.name.lowercase() } -> com.maven.notafraud.core.model.CalMode.TESTS
             else -> com.maven.notafraud.core.model.CalMode.EVENTS
         }
     }
 
-    data class Split(val events: List<CalEvent>, val deadlines: List<CalEvent>, val tests: List<CalEvent>)
+    data class Split(val events: List<CalEvent>, val deadlines: List<CalEvent>, val tests: List<CalEvent>, val homework: List<CalEvent> = emptyList())
 
     /** Reads every calendar once and splits by mode: events to plan around, deadlines to turn into tasks. */
     fun readSplit(ctx: Context): Split? {
@@ -137,7 +137,9 @@ object PhoneCalendar {
         val events = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.EVENTS } + tests
         val deadlines = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.DEADLINES }
             .map { it.copy(uid = it.uid.substringBeforeLast('-')) } // one task per event, not per instance
-        return Split(events, deadlines, tests)
+        val homework = all.filter { modes[it.calendarId] == com.maven.notafraud.core.model.CalMode.HOMEWORK }
+            .map { it.copy(uid = it.uid.substringBeforeLast('-')) }
+        return Split(events, deadlines, tests, homework)
     }
 
     /**

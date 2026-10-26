@@ -69,6 +69,12 @@ object Graph {
             store.update { com.maven.notafraud.core.store.Actions.markPrompted(it, today(), n) }
             lowPromptPending = true
         }
+        // Settings lock: last night's changes are ready to confirm.
+        val ready = com.maven.notafraud.core.store.Lock.due(data, n).filter { !it.notified }
+        if (ready.isNotEmpty()) {
+            Notifier.postPending(ctx, ready.map { it.label })
+            store.update { com.maven.notafraud.core.store.Lock.markNotified(it, ready.map { c -> c.id }.toSet()) }
+        }
         Notifier.postNow(ctx, nowState())
         com.maven.notafraud.notify.RoutineAlerts.check(ctx)
         Alarms.scheduleNext(ctx)

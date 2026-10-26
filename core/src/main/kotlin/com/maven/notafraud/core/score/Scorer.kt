@@ -44,11 +44,13 @@ object Scorer {
 
     fun breakdown(task: Task, now: Long, freeWindowMin: Int, userEnergy: Energy): Breakdown {
         val left = minutesLeft(task)
-        val urgency = task.dueAt?.let { due ->
+        fun urg(due: Long): Double {
             val hoursUntilDue = (due - now) / 3_600_000.0
             val slack = hoursUntilDue - left / 60.0
-            if (slack > 0) 100.0 / (1 + slack / 12.0) else 100.0 / (1 + (-slack) / 36.0)
-        } ?: 8.0
+            return if (slack > 0) 100.0 / (1 + slack / 12.0) else 100.0 / (1 + (-slack) / 36.0)
+        }
+        // A "done by" target (homework: days early) pulls work forward; the real due date still counts.
+        val urgency = listOfNotNull(task.dueAt?.let(::urg), task.targetAt?.let(::urg)).maxOrNull() ?: 8.0
 
         val prio = when (task.priority) {
             Priority.HIGH -> 1.45

@@ -178,4 +178,18 @@ object Notifier {
             .setContentIntent(openApp(ctx, MainActivity.TAB_NOW, req = 13))
         runCatching { NotificationManagerCompat.from(ctx).notify(5, b.build()) }
     }
+
+    /** Settings lock: changes asked for last night, waiting for a yes. */
+    fun postPending(ctx: Context, labels: List<String>) {
+        if (!canPost(ctx)) return
+        val text = labels.joinToString(" · ")
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle("Still want these changes?")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text + "\nOpen the app to confirm or keep things as they are."))
+            .setAutoCancel(true)
+            .setContentIntent(openApp(ctx, MainActivity.TAB_NOW, req = 14))
+        runCatching { NotificationManagerCompat.from(ctx).notify(6, b.build()) }
+    }
 }

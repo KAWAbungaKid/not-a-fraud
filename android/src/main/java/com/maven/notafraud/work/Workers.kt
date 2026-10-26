@@ -35,13 +35,13 @@ object Workers {
         if (snapshot != null && snapshot.minutesByApp.isNotEmpty()) Graph.update { Actions.recordUsage(it, snapshot) }
 
         PhoneCalendar.readSplit(ctx)?.let { split ->
-            val before = Graph.data.let { d -> d.events.filter { it.source == PhoneCalendar.SOURCE }.toSet() to d.tasks.filter { it.sourceKey?.startsWith("deadline:") == true || it.sourceKey?.startsWith("test:") == true }.toSet() }
+            val before = Graph.data.let { d -> d.events.filter { it.source == PhoneCalendar.SOURCE }.toSet() to d.tasks.filter { it.sourceKey?.startsWith("deadline:") == true || it.sourceKey?.startsWith("test:") == true || it.sourceKey?.startsWith("homework:") == true }.toSet() }
             val n = Graph.now()
             Graph.update { d ->
                 val withEvents = Actions.replaceEvents(d, PhoneCalendar.SOURCE, split.events)
-                Generated.autoExams(Generated.syncTests(Generated.syncDeadlines(withEvents, split.deadlines, n), split.tests, n), n)
+                Generated.autoExams(com.maven.notafraud.core.plan.Homework.sync(Generated.syncTests(Generated.syncDeadlines(withEvents, split.deadlines, n), split.tests, n), split.homework, n), n)
             }
-            val after = Graph.data.let { d -> d.events.filter { it.source == PhoneCalendar.SOURCE }.toSet() to d.tasks.filter { it.sourceKey?.startsWith("deadline:") == true || it.sourceKey?.startsWith("test:") == true }.toSet() }
+            val after = Graph.data.let { d -> d.events.filter { it.source == PhoneCalendar.SOURCE }.toSet() to d.tasks.filter { it.sourceKey?.startsWith("deadline:") == true || it.sourceKey?.startsWith("test:") == true || it.sourceKey?.startsWith("homework:") == true }.toSet() }
             // Something moved in Google Calendar or Canvas: re-plan around it.
             if (after != before) Graph.replan()
         }

@@ -52,6 +52,7 @@ fun PlanScreen(data: AppData, now: Long) {
     val today = Time.dateOf(now, zone)
     var offset by rememberSaveable { mutableIntStateOf(0) }
     var acting by remember { mutableStateOf<PlanBlock?>(null) }
+    var sizing by remember { mutableStateOf<com.maven.notafraud.core.model.Task?>(null) }
     val date = today.plusDays(offset.toLong())
     val plan = remember(data, offset, now / 60_000) {
         val withPlan = Planning.ensureToday(data, now)
@@ -80,6 +81,20 @@ fun PlanScreen(data: AppData, now: Long) {
             }
             if (plan.note.isNotBlank()) Text(plan.note, color = Palette.amber, style = MaterialTheme.typography.bodySmall)
         }
+        val dueHere = data.tasks.filter { t ->
+            t.status == com.maven.notafraud.core.model.TaskStatus.TODO && t.dueAt != null && Time.dateOf(t.dueAt!!, zone) == date &&
+                (com.maven.notafraud.core.plan.Homework.isHomework(t) || t.priority == com.maven.notafraud.core.model.Priority.HIGH)
+        }.sortedBy { it.dueAt }
+        if (dueHere.isNotEmpty()) {
+            item { SectionLabel("Due this day · tap to say how long it'll take") }
+            items(dueHere, key = { "due-" + it.id }) { t ->
+                Row(Modifier.fillMaxWidth().clickable { sizing = t }, verticalAlignment = Alignment.CenterVertically) {
+                    Text(t.title, Modifier.weight(1f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("${Time.clock(t.dueAt!!, zone)} · ${Time.durationText(com.maven.notafraud.core.score.Scorer.minutesLeft(t))} left", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                }
+            }
+            item { Spacer(Modifier.height(4.dp)) }
+        }
         items(plan.blocks, key = { "${it.start}-${it.kind}-${it.title}-${it.stepId}" }) { b ->
             BlockRow(
                 b, zone,
@@ -93,6 +108,7 @@ fun PlanScreen(data: AppData, now: Long) {
     }
 
     acting?.let { b -> BlockActions(b, data, java.time.LocalDate.parse(plan.date), today, onDismiss = { acting = null }) }
+    sizing?.let { t -> HowLong(t) { sizing = null } }
 }
 
 /** What you can do with a block: start / done / later / not today / pick a day / something came up; skip a class (and make it up). */
@@ -105,6 +121,7 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
     val anchor = d.anchors.firstOrNull { it.id == b.anchorId }
     var pickTime by remember { mutableStateOf(false) }
     var pickDay by remember { mutableStateOf(false) }
+    var sizingTask by remember { mutableStateOf(false) }
     fun done(fn: (AppData) -> AppData) { Graph.changeAndReplan(ctx) { fn(it) }; onDismiss() }
 
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -130,6 +147,7 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
                     TextButton(onClick = { done { Actions.somethingCameUp(it, task.id, Graph.now()) } }) { Text("Something came up: re-plan from now") }
                 }
                 TextButton(onClick = { pickDay = true }) { Text("Pick a day…") }
+                if (task.dueAt != null) TextButton(onClick = { sizingTask = true }) { Text("How long will this take? (${Time.durationText(task.estMin)})") }
                 TextButton(onClick = { done { Actions.bump(it, task.id, Graph.now()) } }) { Text("Bump importance for a week") }
             } else if (anchor != null && !anchor.protected) {
                 TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = true, now = Graph.now()) } }) { Text("Skip it and make it up later") }
@@ -152,6 +170,7 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
         done { Actions.laterToday(it, task!!.id, at, Graph.now()) }
         pickTime = false
     }
+    if (sizingTask && task != null) HowLong(task) { sizingTask = false; onDismiss() }
     if (pickDay) {
         val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = today.plusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli())
         androidx.compose.material3.DatePickerDialog(
@@ -217,4 +236,27 @@ private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, i
         }
 
     }
+}
+
+
+/** Say how long an assignment will really take; the planner spreads it over the days before its target. */
+@Composable
+fun HowLong(t: com.maven.notafraud.core.model.Task, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var est by remember { mutableIntStateOf(t.estMin) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(t.title) },
+        text = {
+            androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("How long will it take in total? ${if (t.loggedMin > 0) "(${Time.durationText(t.loggedMin)} done so far)" else ""}", color = Palette.textDim)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (m in listOf(30, 60, 120, 180, 240, 360, 480, 600, 900)) FilterChip(est == m, { est = m }, { Text(Time.durationText(m)) })
+                }
+                Text("Big ones are split over several days (most per day: More → Planning).", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = { Graph.changeAndReplan(ctx) { d -> d.copy(tasks = d.tasks.map { if (it.id == t.id) it.copy(estMin = est) else it }) }; onDismiss() }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

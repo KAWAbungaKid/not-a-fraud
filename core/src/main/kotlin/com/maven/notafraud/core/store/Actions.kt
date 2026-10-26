@@ -448,4 +448,41 @@ object Actions {
         todayPlan = null,
         weekPlan = emptyList(),
     )
+
+    // ---- To-do list -----------------------------------------------------------------------
+
+    /** Puts a task on the to-do list at a level: ASAP / on [day] / between [from] and [to] / someday. */
+    fun setHorizon(d: AppData, id: String, h: com.maven.notafraud.core.model.Horizon?, day: LocalDate?, from: LocalDate?, to: LocalDate?): AppData {
+        val zone = Time.zone(d.settings.zoneId)
+        return d.copy(tasks = d.tasks.map { t ->
+            if (t.id != id) t else when (h) {
+                com.maven.notafraud.core.model.Horizon.ON_DAY -> t.copy(horizon = h, notBefore = Time.at(day!!, 0, zone), dueAt = Time.at(day, 23 * 60 + 59, zone))
+                com.maven.notafraud.core.model.Horizon.WITHIN -> t.copy(horizon = h, notBefore = Time.at(from!!, 0, zone), dueAt = Time.at(to!!, 23 * 60 + 59, zone))
+                com.maven.notafraud.core.model.Horizon.ASAP, com.maven.notafraud.core.model.Horizon.SOMEDAY ->
+                    t.copy(horizon = h, notBefore = null, dueAt = if (t.horizon == com.maven.notafraud.core.model.Horizon.ON_DAY || t.horizon == com.maven.notafraud.core.model.Horizon.WITHIN) null else t.dueAt)
+                null -> t.copy(horizon = null)
+            }
+        })
+    }
+
+    fun addTodo(d: AppData, title: String, h: com.maven.notafraud.core.model.Horizon, day: LocalDate?, from: LocalDate?, to: LocalDate?, estMin: Int, now: Long): AppData {
+        val t = Task(title = title.trim(), estMin = estMin, minBlockMin = minOf(15, estMin), energy = com.maven.notafraud.core.model.Energy.MED, createdAt = now, horizon = h)
+        return setHorizon(d.copy(tasks = d.tasks + t), t.id, h, day, from, to)
+    }
+
+    // ---- Block suggestions -----------------------------------------------------------------
+
+    /** Apps averaging [Settings.suggestBlockMin]+ min/day over the last 7 days that aren't blocked, focus or dismissed. */
+    fun blockSuggestions(d: AppData, today: LocalDate, ignore: Set<String>): List<Triple<String, String, Int>> {
+        val days = (0..6).map { today.minusDays(it.toLong()).toString() }.toSet()
+        val use = d.usage.filter { it.device == "phone" && it.date in days }
+        val total = HashMap<String, Int>()
+        val labels = HashMap<String, String>()
+        for (u in use) { u.minutesByApp.forEach { (k, v) -> total[k] = (total[k] ?: 0) + v }; labels.putAll(u.labels) }
+        val n = use.size.coerceAtLeast(1)
+        return total.map { (k, v) -> Triple(k, labels[k] ?: k, v / n) }
+            .filter { it.third >= d.settings.suggestBlockMin }
+            .filter { it.first !in d.rules.blocked && it.first !in d.rules.focus && it.first !in d.rules.alwaysAllowed && it.first !in d.settings.notSuggest && it.first !in ignore }
+            .sortedByDescending { it.third }
+    }
 }

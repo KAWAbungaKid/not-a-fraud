@@ -134,7 +134,9 @@ class BlockActivity : ComponentActivity() {
                 }
             }
 
-            Panel(highlight = !stillTexting) {
+            if (profile.askPurpose) PurposePanel(pkg, label, profile)
+
+            Panel(highlight = !stillTexting && !profile.askPurpose) {
                 SectionLabel("Right now")
                 Text(now.headline, style = MaterialTheme.typography.titleLarge)
                 if (now.detail.isNotBlank()) Text(now.detail, color = Palette.textDim)
@@ -166,7 +168,8 @@ class BlockActivity : ComponentActivity() {
 
             val usedToday = Credits.emergencyUsesToday(data.ledger, Graph.startOfToday())
             val left = profile.emergencyPerDay - usedToday
-            OutlinedButton(
+            val extra = Credits.extraEmergencyLeft(data.ledger, profile, Graph.startOfToday())
+            if (left > 0) OutlinedButton(
                 onClick = {
                     val n = Graph.now()
                     Graph.update { d ->
@@ -174,10 +177,53 @@ class BlockActivity : ComponentActivity() {
                     }
                     openTarget()
                 },
-                enabled = left > 0,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (left > 0) "Emergency: open now (${data.settings.emergencyUnlockMin} min · $left left today)" else "No emergency unlocks left today") }
+            ) { Text("Emergency: open now (${data.settings.emergencyUnlockMin} min · $left left today)") }
+            else if (extra > 0) Panel {
+                SectionLabel("Out of emergencies · $extra more if you type it")
+                var typed by remember { mutableStateOf("") }
+                Text("Type: \"${data.settings.emergencyPhrase}\"", color = Palette.textDim)
+                OutlinedTextField(typed, { typed = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Type it out") })
+                val ok = Credits.phraseMatches(typed, data.settings.emergencyPhrase)
+                OutlinedButton(onClick = {
+                    val n = Graph.now()
+                    Graph.update { d -> Credits.emergencyWithPhrase(d.ledger, d.settings, profile, pkg, label, typed, n, Graph.startOfToday())?.let { d.copy(ledger = it) } ?: d }
+                    GuardLog.add(label, "extra emergency (typed)")
+                    openTarget()
+                }, enabled = ok, modifier = Modifier.fillMaxWidth()) { Text("Open for ${data.settings.emergencyUnlockMin} min") }
+            } else Text("No emergency unlocks left today.", color = Palette.textDim)
             TextButton(onClick = { goHome() }) { Text("Go home") }
+        }
+    }
+
+    /** "What are you doing?" Open it by saying what for; it asks again every few minutes, and today's answers stay on screen. */
+    @Composable
+    private fun PurposePanel(pkg: String, label: String, profile: com.maven.notafraud.core.model.BlockProfile) {
+        val data by Graph.store.state.collectAsState()
+        val start = Graph.startOfToday()
+        val today = data.ledger.purposeLog.filter { it.pkg == pkg && it.at >= start }
+        val used = Credits.purposeUsedMin(data.ledger, profile, pkg, start)
+        val budgetLeft = profile.purposeDailyMin - used
+        var what by remember { mutableStateOf("") }
+        Panel(highlight = true) {
+            SectionLabel(if (today.isEmpty()) "What are you opening $label for?" else "Still on $label. What are you doing now?")
+            OutlinedTextField(what, { what = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text(if (today.isEmpty()) "e.g. how to replace a bike chain" else "Be honest: \"scrolling\" counts") })
+            Button(
+                onClick = {
+                    val n = Graph.now()
+                    Graph.update { d -> Credits.purpose(d.ledger, profile, pkg, label, what, n, start)?.let { d.copy(ledger = it) } ?: d }
+                    GuardLog.add(label, "purpose: ${what.trim()}")
+                    openTarget()
+                },
+                enabled = what.trim().length >= 3 && budgetLeft >= profile.purposeCheckMin,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (budgetLeft >= profile.purposeCheckMin) "Open for ${profile.purposeCheckMin} min" else "Today's ${profile.purposeDailyMin} min are used") }
+            Text("Asks again every ${profile.purposeCheckMin} min · ${budgetLeft.coerceAtLeast(0)} of ${profile.purposeDailyMin} min left today", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            if (today.isNotEmpty()) {
+                SectionLabel("You said today")
+                val fmt = java.text.SimpleDateFormat("h:mm", java.util.Locale.US)
+                for (e in today.takeLast(8).reversed()) Text("${fmt.format(java.util.Date(e.at))}  ${e.what}", style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 

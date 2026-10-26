@@ -134,7 +134,7 @@ private fun TodoRow(t: Task, zone: java.time.ZoneId, now: Long, onCheck: () -> U
                 Horizon.WITHIN -> listOfNotNull(t.notBefore, t.dueAt).map { Time.dateOf(it, zone).format(DAYFMT) }.joinToString(" – ")
                 else -> null
             }
-            val late = !done && t.dueAt != null && t.dueAt < now
+            val late = !done && (t.dueAt ?: Long.MAX_VALUE) < now
             Text(listOfNotNull(whenText, Time.durationText(t.estMin), if (late) "past its date" else null).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = if (late) Palette.amber else Palette.textDim)
         }

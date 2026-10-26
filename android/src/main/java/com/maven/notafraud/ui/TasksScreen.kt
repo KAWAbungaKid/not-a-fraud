@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -84,7 +85,7 @@ fun TasksScreen(data: AppData, now: Long) {
     Column(Modifier.fillMaxSize()) {
         androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
             listOf("Map", "Projects", "To-do").forEachIndexed { i, label ->
-                androidx.compose.material3.SegmentedButton(
+                SegmentedButton(
                     selected = tab == i, onClick = { tab = i },
                     shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, 3),
                 ) { Text(label) }

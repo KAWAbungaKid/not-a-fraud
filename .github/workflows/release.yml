@@ -45,13 +45,19 @@ jobs:
           cp desktop/build/compose/binaries/main-release/msi/*.msi not-a-fraud-windows-$v.msi
       - uses: actions/upload-artifact@v4
         with: { name: msi, path: "not-a-fraud-windows-*.msi" }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(grep appVersionName gradle.properties | cut -d= -f2)
+          for i in $(seq 1 30); do gh release view "v$v" >/dev/null 2>&1 && break; sleep 20; done
+          gh release upload "v$v" not-a-fraud-windows-*.msi --clobber || true
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: release-msi, file: build.log }
 
+  # The phone APK publishes as soon as it's built; the Windows MSI (slow, has hung) adds itself to the release later.
   publish:
-    needs: [apk, msi]
-    if: ${{ always() && needs.apk.result == 'success' }}
+    needs: [apk]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -5,9 +5,9 @@ Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notaf
 
 ---
 
-## 0. Where things stand (2026-10-26, v0.7.0)
+## 0. Where things stand (2026-10-26, v0.8.0)
 
-v0.7.0: homework read fix, one priority per task, Tasks tabs Map/Projects/To-do with tap/hold/+ map, workout app link (section 17). v0.6.0: to-do list, homework calendars with work-ahead, settings lock, purpose mode, typed extra emergencies, block suggestions (section 15). v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
+v0.8.0: calendar sync switch-on (real Canvas cause), split Health permission request, numbers settings page, workout app owns days/week (section 18). v0.7.0: homework read fix, one priority per task, Tasks tabs Map/Projects/To-do with tap/hold/+ map, workout app link (section 17). v0.6.0: to-do list, homework calendars with work-ahead, settings lock, purpose mode, typed extra emergencies, block suggestions (section 15). v0.5.0: pages + choosable bottom bar, Classes/semester, constellation skill trees, Health fixes + diagnostics, less hard-coding (section 14). v0.4.0: stats, skill trees, auto re-plan, burnout prompt, weekly check-in, guard log, stricter call check, accent colors (section 13). Earlier:
 
 v0.2 confirmed on the phone (site blocking, Google Calendar writing). **v0.3.0** built from section 11:
 
@@ -446,3 +446,14 @@ missed minimum lock credits/apps, or only nag?
 - Onboarding with neutral templates (replaces the seed above); editors for the "no editor" items.
 - User-defined routine types with a "counts as" mapping.
 - Workout: "climbing tomorrow" planning via the workout app's muscle data; Body stat from `/sessions`.
+
+
+## 18. v0.8.0 (2026-10-26)
+
+**Maven's screenshots:** Google Calendar shows "HW6 [MECH_ENG-3525-…]" as an all-day Canvas entry (Busy), but Not a Fraud's diagnostics said Canvas: 0 entries, hidden, **NOT SYNCING** (same for another calendar). So the provider's `SYNC_EVENTS` = 0: the Google Calendar app displays it from the web, but nothing reaches CalendarContract. Sleep from Samsung Health also still missing (no diagnostics screenshot yet).
+
+**Answers:** (1) settings page for the guessed numbers now; (2) yes, the workout routine item stops having its own days/week.
+
+**Built:** `PhoneCalendar.enableSync` (sets `SYNC_EVENTS` = 1 and `VISIBLE` = 1 on the Calendars row, which apps are allowed to write, then `ContentResolver.requestSync` expedited for the account). Auto-runs once per process for non-Events, non-Ignore calendars that aren't syncing; button on the Calendar page. Health permission request split (`Health.BASE`, then `BACKGROUND`). New settings `roughFocusCapMin`, `stillTextingMin`, `messageWindowMin`, `angryRepeatMin`, `workTargetMin`, `mindTargetMin`, `sportMin` and a Numbers panel (More → Planning) through `Lock.setNumber` (`ChangeKind.NUMBER`: raising still-texting / message window / credit cap / emergency length / angry interval waits for the morning). `WorkoutLink.receive` sets the WORKOUT routine item's weeklyTarget to `targetPerWeek`; Health exercise doesn't tick it while the workout app is connected.
+
+**Open:** if sleep still fails, get a screenshot of More → Calendar & health → Samsung Health (permissions line + records list).

@@ -182,7 +182,7 @@ class DayPlanner(
         val focusCap: Int? = when {
             mode == DayMode.WRITEOFF -> 0
             mode == DayMode.PUSH -> null
-            soft -> roughFocusCapMin
+            soft -> s.roughFocusCapMin
             else -> null
         }
 
@@ -430,7 +430,7 @@ class DayPlanner(
                 null -> if (rough) buildString {
                     append("Rough day")
                     ctx?.sleepHours?.let { append(" (%.1fh sleep)".format(it)) }
-                    append(": lighter plan, ${Time.durationText(roughFocusCapMin)} focus cap, workout optional.")
+                    append(": lighter plan, ${Time.durationText(s.roughFocusCapMin)} focus cap, workout optional.")
                 } else null
             },
             if (gaveWay.isNotEmpty() && hotTasks.isNotEmpty() && !shedHabits) "${gaveWay.distinct().joinToString()} gave way: ${hotTasks.first().title} is due soon." else null,

@@ -131,7 +131,7 @@ object RoutinePolicy {
             if (bedtimeSignal && item.trigger == RoutineTrigger.BEDTIME && (mood == Mood.DUE || mood == Mood.LATE)) mood = Mood.ANGRY
             val fire = when (mood) {
                 Mood.LATE -> last == null
-                Mood.ANGRY -> last == null || now - last >= (ANGRY_REPEAT_MIN - 1) * Time.MIN ||
+                Mood.ANGRY -> last == null || now - last >= (d.settings.angryRepeatMin - 1) * Time.MIN ||
                     (bedtimeSignal && item.trigger == RoutineTrigger.BEDTIME && now - last >= 10 * Time.MIN)
                 else -> false
             }
@@ -159,7 +159,7 @@ object RoutinePolicy {
             val i = st.item
             candidates += Time.at(date, i.dueMin, zone)
             candidates += Time.at(date, i.angryMin, zone)
-            today.alerted[i.id]?.let { candidates += it + ANGRY_REPEAT_MIN * Time.MIN }
+            today.alerted[i.id]?.let { candidates += it + d.settings.angryRepeatMin * Time.MIN }
         }
         // More due than we post at once: come back in a few minutes for the rest.
         if (allDue(d, now, false).size > MAX_AT_ONCE) candidates += now + 5 * Time.MIN

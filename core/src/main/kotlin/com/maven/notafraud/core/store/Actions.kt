@@ -69,7 +69,7 @@ object Actions {
 
     /** 20+ minutes on a skill in a sport tree (climbing, athletics…) checks today's workout with that sport. */
     private fun sportCountsAsWorkout(d: AppData, taskId: String?, minutes: Int, now: Long): AppData {
-        if (taskId == null || minutes < 20) return d
+        if (taskId == null || minutes < d.settings.sportMin) return d
         val skill = d.skills.firstOrNull { it.practiceTaskId == taskId } ?: return d
         val tree = d.skillTrees.firstOrNull { it.id == skill.treeId && it.sport } ?: return d
         val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT) ?: return d
@@ -191,7 +191,8 @@ object Actions {
             else if (ctx.firstUnlock != null) x = checkRoutine(x, wake.id, ctx.firstUnlock, "first unlock")
         }
         val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT)
-        if (workout != null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
+        // With the workout app connected, it alone ticks the workout (not Samsung Health guesses).
+        if (workout != null && d.workout == null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
             val zone = Time.zone(d.settings.zoneId)
             x = checkRoutine(x, workout.id, Time.at(date, 12 * 60, zone).coerceAtMost(System.currentTimeMillis()), "from Samsung Health")
         }

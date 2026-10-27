@@ -29,7 +29,8 @@ object Health {
     val STEPS = HealthPermission.getReadPermission(StepsRecord::class)
     const val BACKGROUND = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
 
-    val PERMISSIONS: Set<String> = setOf(SLEEP, EXERCISE, STEPS, BACKGROUND)
+    val BASE: Set<String> = setOf(SLEEP, EXERCISE, STEPS)
+    val PERMISSIONS: Set<String> = BASE + BACKGROUND
 
     fun available(ctx: Context) = HealthConnectClient.getSdkStatus(ctx) == HealthConnectClient.SDK_AVAILABLE
 

@@ -127,9 +127,9 @@ class BlockActivity : ComponentActivity() {
                     SectionLabel("Your window ended")
                     Button(onClick = {
                         val n = Graph.now()
-                        Graph.update { d -> d.copy(ledger = Credits.freeWindow(d.ledger, pkg, 3, n, "Still texting: $label")) }
+                        Graph.update { d -> d.copy(ledger = Credits.freeWindow(d.ledger, pkg, d.settings.stillTextingMin, n, "Still texting: $label")) }
                         openTarget()
-                    }, modifier = Modifier.fillMaxWidth()) { Text("Still texting: 3 more minutes") }
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Still texting: ${data.settings.stillTextingMin} more minutes") }
                     Text("Typing keeps the window open on its own. This is for when you were reading or about to reply.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 }
             }

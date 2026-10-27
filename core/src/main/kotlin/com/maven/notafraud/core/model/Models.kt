@@ -284,7 +284,7 @@ data class PendingChange(
 )
 
 @Serializable
-enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME, WORKOUT_PAUSE }
+enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME, WORKOUT_PAUSE, NUMBER }
 
 /** A school term: class blocks run between [start] and [end], except [offDates] (breaks). */
 @Serializable
@@ -474,6 +474,19 @@ data class Settings(
     val workoutPausesCredits: Boolean = true,
     /** Workout nags start at this time on a must-work-out day. */
     val workoutNagFromMin: Int = 12 * 60,
+    /** Rough day (bad sleep or marked): most focus minutes the plan gives. */
+    val roughFocusCapMin: Int = 240,
+    /** "Still texting?" on the block screen: minutes it adds. */
+    val stillTextingMin: Int = 3,
+    /** Opening a blocked app within this many minutes of a new message = free reply window. */
+    val messageWindowMin: Int = 10,
+    /** Routine items past "angry" nag again every this many minutes. */
+    val angryRepeatMin: Int = 30,
+    /** Stats: weekly minutes that make Work and Mind a 10. */
+    val workTargetMin: Int = 360,
+    val mindTargetMin: Int = 300,
+    /** A session this long on a sport skill counts as the day's workout. */
+    val sportMin: Int = 20,
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */

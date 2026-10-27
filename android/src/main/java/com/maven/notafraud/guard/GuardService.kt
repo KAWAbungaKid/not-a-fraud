@@ -237,9 +237,9 @@ class GuardService : AccessibilityService() {
             GuardAction.BLOCK -> {
                 // Someone messaged in the last few minutes: this open is a reply. Free window, once per message.
                 val label = AppLabels.label(this, pkg)
-                val reply = Credits.replyWindowIfMessage(Graph.data.ledger, Graph.data.rules.profile(pkg), pkg, label, now)
+                val reply = Credits.replyWindowIfMessage(Graph.data.ledger, Graph.data.rules.profile(pkg), pkg, label, now, Graph.data.settings.messageWindowMin)
                 if (reply != null && !pkg.startsWith(Sites.PREFIX)) {
-                    Graph.update { x -> x.copy(ledger = Credits.replyWindowIfMessage(x.ledger, x.rules.profile(pkg), pkg, label, now) ?: x.ledger) }
+                    Graph.update { x -> x.copy(ledger = Credits.replyWindowIfMessage(x.ledger, x.rules.profile(pkg), pkg, label, now, x.settings.messageWindowMin) ?: x.ledger) }
                     reevaluate()
                     return
                 }

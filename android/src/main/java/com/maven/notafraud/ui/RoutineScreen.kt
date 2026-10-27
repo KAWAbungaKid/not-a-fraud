@@ -256,7 +256,9 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                     for (m in listOf(0, 15, 20, 30, 45, 60, 90)) FilterChip(r.reserveMin == m, { r = r.copy(reserveMin = m) }, { Text(if (m == 0) "none" else "${m}m") })
                 }
                 SectionLabel("Times per week")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val fromWorkoutApp = r.autoCheck == com.maven.notafraud.core.model.AutoCheck.WORKOUT && com.maven.notafraud.Graph.data.workout != null
+                if (fromWorkoutApp) Text("Set by the Workout app (${com.maven.notafraud.Graph.data.workout?.targetPerWeek} a week, minimum ${com.maven.notafraud.Graph.data.workout?.minPerWeek}). Change it there.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(r.weeklyTarget == null, { r = r.copy(weeklyTarget = null) }, { Text("every day listed") })
                     for (n in 2..7) FilterChip(r.weeklyTarget == n, { r = r.copy(weeklyTarget = n) }, { Text("$n") })
                 }

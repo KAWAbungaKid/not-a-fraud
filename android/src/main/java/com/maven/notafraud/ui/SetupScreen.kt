@@ -82,7 +82,13 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
     val calLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         scope.launch { Workers.syncSensors(ctx); Graph.replan(); Graph.refresh(ctx) }
     }
-    val healthLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
+    // Health Connect: sleep / exercise / steps first, then (separately) background reading. Asking for all four at once
+    // can make the whole request fail quietly on phones where background reading isn't offered.
+    val healthBgLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
+        scope.launch { Workers.syncSensors(ctx) }
+    }
+    val healthLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+        if (Health.SLEEP in granted && Health.BACKGROUND !in granted) runCatching { healthBgLauncher.launch(setOf(Health.BACKGROUND)) }
         scope.launch { Workers.syncSensors(ctx) }
     }
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -129,7 +135,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 else -> "Health Connect isn't available on this device."
             }
             PermRow("5. Health Connect", healthGranted, detail) {
-                if (healthStatus == HealthConnectClient.SDK_AVAILABLE) healthLauncher.launch(Health.PERMISSIONS)
+                if (healthStatus == HealthConnectClient.SDK_AVAILABLE) healthLauncher.launch(Health.BASE)
                 else open(ctx, Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata")))
             }
         }
@@ -277,6 +283,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 SwitchRow("Weekly check-in (Social, Spirit stats)", data.settings.checkInEnabled) { on -> Graph.update { it.copy(settings = it.settings.copy(checkInEnabled = on)) } }
                 TextButton(onClick = { ideas = true }) { Text("Recharge ideas: " + data.settings.rechargeIdeas.joinToString(", ").ifBlank { "none" }) }
             }
+            NumbersPanel(data)
             Panel {
                 Text("Workout app", style = MaterialTheme.typography.titleSmall)
                 SwitchRow("When today's workout is needed for the weekly minimum, pause credits until it's started", data.settings.workoutPausesCredits) { on ->
@@ -321,7 +328,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
         item { CalendarPanel(data, resumes) }
 
         item { SectionLabel("Samsung Health") }
-        item { HealthPanel(resumes) { if (healthStatus == HealthConnectClient.SDK_AVAILABLE) healthLauncher.launch(Health.PERMISSIONS) } }
+        item { HealthPanel(resumes) { if (healthStatus == HealthConnectClient.SDK_AVAILABLE) healthLauncher.launch(Health.BASE) } }
         }
 
         if (section == "blocks") {
@@ -575,6 +582,7 @@ fun ListDialog(title: String, hint: String, initial: List<String>, onDismiss: ()
 @Composable
 private fun CalendarPanel(data: AppData, resumes: Long) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val cals = remember(resumes, data.settings.outputCalendarId) { com.maven.notafraud.sense.PhoneCalendar.calendars(ctx) }
     Panel {
         if (cals.isEmpty()) {
@@ -614,7 +622,15 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
                     style = MaterialTheme.typography.bodySmall,
                     color = if (!c.synced || (mode != com.maven.notafraud.core.model.CalMode.IGNORE && n == 0)) Palette.amber else Palette.textDim,
                 )
-                if (!c.synced) Text("Google Calendar app → Settings → this calendar → turn Sync on.", style = MaterialTheme.typography.bodySmall, color = Palette.amber)
+                if (!c.synced) {
+                    var tried by remember(c.id) { mutableStateOf(false) }
+                    TextButton(onClick = {
+                        com.maven.notafraud.sense.PhoneCalendar.enableSync(ctx, c); tried = true
+                        scope.launch { kotlinx.coroutines.delay(15_000); Workers.syncSensors(ctx) }
+                    }) { Text(if (tried) "Sync requested: entries appear in a minute or so" else "Turn on sync for this calendar") }
+                    Text("Google Calendar can show a calendar from the web while its Sync switch is off, but then no other app sees any of it. If the button doesn't stick: Google Calendar → Settings → ${c.account ?: "your account"} → ${c.name} → Sync on.",
+                        style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                }
             }
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (m in com.maven.notafraud.core.model.CalMode.entries) {
@@ -803,5 +819,45 @@ private fun HealthPanel(resumes: Long, onGrant: () -> Unit) {
                 "Samsung Health copies data over when it syncs, so opening Samsung Health once in the morning helps. Records listed here from com.sec.android.app.shealth mean it's working.",
             color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+
+/** The numbers Claude guessed (v0.8): your day, blocks, nudges, windows, stats. Looser ones wait for the morning. */
+@Composable
+private fun NumbersPanel(data: AppData) {
+    val ctx = LocalContext.current
+    val st = data.settings
+    @Composable
+    fun row(label: String, key: String, options: List<Int>, fmt: (Int) -> String) {
+        val cur = com.maven.notafraud.core.store.Lock.number(st, key)
+        Text(label, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (v in options) androidx.compose.material3.FilterChip(cur == v, {
+                Graph.changeAndReplan(ctx) { com.maven.notafraud.core.store.Lock.setNumber(it, key, v, "$label: ${fmt(v)}", Graph.now()) }
+            }, { Text(fmt(v)) })
+        }
+        data.pending.firstOrNull { it.kind == com.maven.notafraud.core.model.ChangeKind.NUMBER && it.pkg == key }?.let {
+            Text("${fmt(it.number ?: 0)} waits for the morning (settings lock)", color = Palette.amber, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    val dur = { m: Int -> Time.durationText(m) }
+    Panel {
+        Text("Your day and numbers", style = MaterialTheme.typography.titleSmall)
+        row("Planning starts", "dayStartMin", listOf(5, 6, 7, 8, 9).map { it * 60 }) { hm(it) }
+        row("Planning ends", "dayEndMin", listOf(20 * 60, 21 * 60, 21 * 60 + 30, 22 * 60, 23 * 60)) { hm(it) }
+        row("Longest work block", "maxChunkMin", listOf(30, 45, 60, 90, 120), dur)
+        row("Break after a block", "breakMin", listOf(5, 10, 15, 20), dur)
+        row("A rough day is under this much sleep", "badSleepTenths", listOf(50, 55, 60, 65, 70)) { "%.1f h".format(it / 10.0) }
+        row("Most focus time on a rough day", "roughFocusCapMin", listOf(120, 180, 240, 300, 360), dur)
+        row("Routine items past angry nag again every", "angryRepeatMin", listOf(15, 30, 45, 60), dur)
+        row("\"Still texting\" adds", "stillTextingMin", listOf(1, 2, 3, 5), dur)
+        row("Free reply if you open it within … of a new message", "messageWindowMin", listOf(5, 10, 15), dur)
+        row("Most credits you can bank", "maxBalanceMin", listOf(60, 90, 120, 180), dur)
+        row("An emergency unlock lasts", "emergencyUnlockMin", listOf(2, 3, 5, 10), dur)
+        row("Stats: Work is a 10 at this much a week", "workTargetMin", listOf(180, 360, 600, 900), dur)
+        row("Stats: Mind is a 10 at least at this much a week", "mindTargetMin", listOf(120, 300, 600), dur)
+        row("A sport skill session counts as a workout after", "sportMin", listOf(10, 20, 30, 45), dur)
+        row("Suggest blocking apps used more than … a day", "suggestBlockMin", listOf(10, 20, 30, 60), dur)
     }
 }

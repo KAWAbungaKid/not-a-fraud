@@ -86,7 +86,29 @@ object UsageReader {
 object PhoneCalendar {
     const val SOURCE = "phone"
 
-    data class Cal(val id: Long, val name: String, val account: String?, val writable: Boolean, val visible: Boolean = true, val synced: Boolean = true)
+    data class Cal(val id: Long, val name: String, val account: String?, val writable: Boolean, val visible: Boolean = true, val synced: Boolean = true, val accountType: String? = null)
+
+    /**
+     * A calendar Google Calendar doesn't sync to the phone (its "Sync" switch is off: the Google Calendar app can still
+     * show it from the web, but no other app sees a single entry). Flip that switch for it and ask for a sync now.
+     */
+    fun enableSync(ctx: Context, cal: Cal): Boolean = runCatching {
+        val v = android.content.ContentValues().apply {
+            put(CalendarContract.Calendars.SYNC_EVENTS, 1)
+            put(CalendarContract.Calendars.VISIBLE, 1)
+        }
+        val n = ctx.contentResolver.update(ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, cal.id), v, null, null)
+        if (cal.account != null && cal.accountType != null) {
+            val extras = android.os.Bundle().apply {
+                putBoolean(android.content.ContentResolver.SYNC_EXTRAS_MANUAL, true)
+                putBoolean(android.content.ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
+            }
+            runCatching { android.content.ContentResolver.requestSync(android.accounts.Account(cal.account, cal.accountType), CalendarContract.AUTHORITY, extras) }
+        }
+        n > 0
+    }.getOrDefault(false)
+
+    private val autoEnabled = HashSet<Long>()
 
     fun calendars(ctx: Context): List<Cal> {
         if (!Perms.calendar(ctx)) return emptyList()
@@ -97,6 +119,7 @@ object PhoneCalendar {
             CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
             CalendarContract.Calendars.VISIBLE,
             CalendarContract.Calendars.SYNC_EVENTS,
+            CalendarContract.Calendars.ACCOUNT_TYPE,
         )
         val out = mutableListOf<Cal>()
         runCatching {
@@ -109,6 +132,7 @@ object PhoneCalendar {
                         writable = c.getInt(3) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
                         visible = c.getInt(4) == 1,
                         synced = c.getInt(5) == 1,
+                        accountType = c.getString(6),
                     )
                 }
             }
@@ -133,7 +157,13 @@ object PhoneCalendar {
     /** Reads every calendar once and splits by mode: events to plan around, deadlines to turn into tasks. */
     fun readSplit(ctx: Context): Split? {
         val settings = Graph.data.settings
-        val modes = calendars(ctx).associate { it.id to modeFor(it, settings) }
+        val cals = calendars(ctx)
+        val modes = cals.associate { it.id to modeFor(it, settings) }
+        // Homework / deadline / test calendars must sync to the phone or nothing can be read: switch it on (once per run).
+        for (c in cals) {
+            val m = modes[c.id]
+            if (!c.synced && m != null && m != com.maven.notafraud.core.model.CalMode.EVENTS && m != com.maven.notafraud.core.model.CalMode.IGNORE && autoEnabled.add(c.id)) enableSync(ctx, c)
+        }
         // Events calendars: only what's shown and busy. Homework / deadlines / tests: every entry, even from a calendar
         // hidden in Google Calendar or marked "free" (Canvas entries often are) — 0.6 dropped those, so no homework.
         val raw = readRaw(ctx, daysAhead = 60) ?: return null

@@ -110,7 +110,7 @@ object Stats {
 
     private fun mind(d: AppData, today: LocalDate): Stat {
         val target = d.tasks.filter { it.kind == TaskKind.PRACTICE && d.projects.firstOrNull { p -> p.id == it.projectId }?.areaId in areasFor(d, "mind") }
-            .sumOf { it.weeklyTargetMin ?: 0 }.coerceAtLeast(300)
+            .sumOf { it.weeklyTargetMin ?: 0 }.coerceAtLeast(d.settings.mindTargetMin)
         fun calc(ds: List<LocalDate>) = clamp(10.0 * minutesIn(d, ds, areasFor(d, "mind")) / target).takeIf { d.sessions.isNotEmpty() }
         val m = minutesIn(d, days(today), areasFor(d, "mind"))
         return Stat("mind", "Mind", calc(days(today)), calc(days(today, 1)), listOf("Study logged" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), areasFor(d, "mind"))
@@ -118,7 +118,7 @@ object Stats {
 
     private fun work(d: AppData, today: LocalDate): Stat {
         val areas = areasFor(d, "work")
-        val target = 360
+        val target = d.settings.workTargetMin.coerceAtLeast(30)
         fun calc(ds: List<LocalDate>) = clamp(10.0 * minutesIn(d, ds, areas) / target).takeIf { d.sessions.isNotEmpty() }
         val m = minutesIn(d, days(today), areas)
         return Stat("work", "Work", calc(days(today)), calc(days(today, 1)), listOf("Research / PT / career" to Time.durationText(m), "Weekly aim" to Time.durationText(target)), areasFor(d, "work"))

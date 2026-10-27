@@ -57,6 +57,7 @@ object Lock {
         ChangeKind.LOCK -> d.copy(settings = d.settings.copy(settingsLock = c.flag ?: true))
         ChangeKind.LOCK_TIME -> d.copy(settings = d.settings.copy(lockReleaseMin = c.number ?: d.settings.lockReleaseMin))
         ChangeKind.WORKOUT_PAUSE -> d.copy(settings = d.settings.copy(workoutPausesCredits = c.flag ?: true))
+        ChangeKind.NUMBER -> d.copy(settings = withNumber(d.settings, c.text ?: "", c.number ?: return d))
     }
 
     /** Does [new] give more access than [old]? */
@@ -116,5 +117,32 @@ object Lock {
     fun setSwitch(d: AppData, kind: ChangeKind, on: Boolean, label: String, now: Long): AppData {
         val c = PendingChange(kind = kind, label = label, createdAt = now, applyAfter = now, flag = on)
         return if (on) apply(d, c).copy(pending = d.pending.filterNot { it.kind == kind }) else request(d, c, now)
+    }
+
+    /** Number settings (More → Planning → Your day and numbers). Keys are field names. */
+    fun number(s: com.maven.notafraud.core.model.Settings, key: String): Int = when (key) {
+        "dayStartMin" -> s.dayStartMin; "dayEndMin" -> s.dayEndMin; "maxChunkMin" -> s.maxChunkMin; "breakMin" -> s.breakMin
+        "badSleepTenths" -> (s.badSleepHours * 10).toInt(); "roughFocusCapMin" -> s.roughFocusCapMin
+        "stillTextingMin" -> s.stillTextingMin; "messageWindowMin" -> s.messageWindowMin; "maxBalanceMin" -> s.maxBalanceMin.toInt()
+        "emergencyUnlockMin" -> s.emergencyUnlockMin; "angryRepeatMin" -> s.angryRepeatMin; "workTargetMin" -> s.workTargetMin
+        "mindTargetMin" -> s.mindTargetMin; "sportMin" -> s.sportMin; "suggestBlockMin" -> s.suggestBlockMin
+        else -> 0
+    }
+
+    fun withNumber(s: com.maven.notafraud.core.model.Settings, key: String, v: Int): com.maven.notafraud.core.model.Settings = when (key) {
+        "dayStartMin" -> s.copy(dayStartMin = v); "dayEndMin" -> s.copy(dayEndMin = v); "maxChunkMin" -> s.copy(maxChunkMin = v); "breakMin" -> s.copy(breakMin = v)
+        "badSleepTenths" -> s.copy(badSleepHours = v / 10.0); "roughFocusCapMin" -> s.copy(roughFocusCapMin = v)
+        "stillTextingMin" -> s.copy(stillTextingMin = v); "messageWindowMin" -> s.copy(messageWindowMin = v); "maxBalanceMin" -> s.copy(maxBalanceMin = v.toDouble())
+        "emergencyUnlockMin" -> s.copy(emergencyUnlockMin = v); "angryRepeatMin" -> s.copy(angryRepeatMin = v); "workTargetMin" -> s.copy(workTargetMin = v)
+        "mindTargetMin" -> s.copy(mindTargetMin = v); "sportMin" -> s.copy(sportMin = v); "suggestBlockMin" -> s.copy(suggestBlockMin = v)
+        else -> s
+    }
+
+    /** Raising these gives more access, so it waits for the morning. */
+    private val LOOSER_WHEN_HIGHER = setOf("stillTextingMin", "messageWindowMin", "maxBalanceMin", "emergencyUnlockMin", "angryRepeatMin")
+
+    fun setNumber(d: AppData, key: String, v: Int, label: String, now: Long): AppData {
+        val c = PendingChange(kind = ChangeKind.NUMBER, label = label, createdAt = now, applyAfter = now, pkg = key, text = key, number = v)
+        return if (key in LOOSER_WHEN_HIGHER && v > number(d.settings, key)) request(d, c, now) else apply(d, c).copy(pending = d.pending.filterNot { it.kind == ChangeKind.NUMBER && it.pkg == key })
     }
 }

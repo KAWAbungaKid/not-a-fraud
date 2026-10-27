@@ -71,6 +71,10 @@ object WorkoutLink {
     fun receive(d: AppData, status: WorkoutStatus, now: Long): AppData {
         var x = d.copy(workout = status)
         val item = x.routineFor(AutoCheck.WORKOUT) ?: return x
+        // The workout app owns how many days a week: the routine item follows it instead of its own "6 a week".
+        if (item.weeklyTarget != status.targetPerWeek && status.targetPerWeek in 1..7) {
+            x = x.copy(routine = x.routine.map { if (it.id == item.id) it.copy(weeklyTarget = status.targetPerWeek) else it })
+        }
         val today = Time.dateOf(now, Time.zone(d.settings.zoneId))
         if (status.trainedToday && status.today == today.toString()) {
             val done = x.routineDays.firstOrNull { it.date == today.toString() }?.done?.containsKey(item.id) == true

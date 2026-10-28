@@ -457,3 +457,27 @@ missed minimum lock credits/apps, or only nag?
 **Built:** `PhoneCalendar.enableSync` (sets `SYNC_EVENTS` = 1 and `VISIBLE` = 1 on the Calendars row, which apps are allowed to write, then `ContentResolver.requestSync` expedited for the account). Auto-runs once per process for non-Events, non-Ignore calendars that aren't syncing; button on the Calendar page. Health permission request split (`Health.BASE`, then `BACKGROUND`). New settings `roughFocusCapMin`, `stillTextingMin`, `messageWindowMin`, `angryRepeatMin`, `workTargetMin`, `mindTargetMin`, `sportMin` and a Numbers panel (More → Planning) through `Lock.setNumber` (`ChangeKind.NUMBER`: raising still-texting / message window / credit cap / emergency length / angry interval waits for the morning). `WorkoutLink.receive` sets the WORKOUT routine item's weeklyTarget to `targetPerWeek`; Health exercise doesn't tick it while the workout app is connected.
 
 **Open:** if sleep still fails, get a screenshot of More → Calendar & health → Samsung Health (permissions line + records list).
+
+## 19. Status check (2026-10-28): what works, what's left
+
+**Confirmed on the phone:** Canvas homework now reaches the plan (0.8 sync switch-on fixed it).
+
+**Sleep still failing.** Diagnostics: all four Health Connect permissions granted, steps arrive (2,742 read while Samsung Health showed 3,828), but **0 sleep records in Health Connect** in 3 days, while Samsung Health shows nights on the 22nd, 25th, 26th, 27th (none last night: watch not worn). So the Samsung Health → Health Connect link carries steps but not sleep: Not a Fraud can't read what isn't there. Next checks are on the phone: Health Connect → data → Sleep (empty?), Health Connect → App permissions → Samsung Health → write Sleep on. Fallback if Samsung won't export sleep: Samsung Health Data SDK (developer mode on the phone), or keep wake time from first unlock.
+
+**New requests (Maven):**
+- Two-step confirmation: changing a normal setting pops up "change X from A to B?", so scrolling can't change things by accident.
+- Explanations around the app for first-time users → part of the next phase: group everything still personalized, plan making the app ready for other people, design onboarding, then make it universal.
+
+**Everything still to add or change (for the next conversation):**
+1. Sleep from Samsung Health (above).
+2. Two-step confirm on settings (scope to decide: every setting on More pages, or only switches/chips).
+3. Next phase, "ready for other people": the § 17 list of tailored and guessed things; in-app explanations; onboarding flow; user-defined routine types with a "counts as" mapping; "research session days" → generic dated sessions; fixed lists (workout notes, sports, stat names) → editable; neutral starter templates; Workout app presets for other people.
+4. Skill trees: draw your own constellation on a grid, filling in as skills are earned.
+5. Workout link, rest of the spec (§ 16): on a TIGHT day the workout block can't be pushed with "do later" without confirmation; a MISSED week counts against Discipline; "climbing tomorrow" planning from the workout app's muscle data; Body stat from workout sessions.
+6. Stats (tabled until more is automatic): feed Work/Discipline from the homework meter, Body from workouts, screen time trends.
+7. Recurring practice has three ways to set up (Habit weekly block, practice task with weekly target, a skill's "Plan practice"): merge or keep?
+8. Blocking: "what are you doing?" for websites (YouTube in a browser skips it today); weekly review of purpose answers; settings lock covering deleting tasks / routine items; Snap: longer reply window vs typed extra emergencies.
+9. Text brightness / contrast option.
+10. Old items: review of the stale web-app tasks; trading vs ME 3411 time clash; confirm the Samsung "never sleeping" setup step.
+11. Deferred by Maven: PC/phone sync (Firebase) + Windows app, easier updates (Obtainium), diet app, meal timing.
+12. Workout app's own backlog (docs/workout/STATE.md § 6): Hevy import, warm-up / plate calculator, rest timer notification, write workouts to Health Connect, edit finished workouts, supersets, weekly volume.

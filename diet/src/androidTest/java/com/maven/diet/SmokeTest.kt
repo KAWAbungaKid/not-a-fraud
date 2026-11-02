@@ -88,7 +88,7 @@ class SmokeTest {
         shot("09-progress")
         rule.onNodeWithText("Settings").performClick()
         shot("10-settings")
-        scrollTo("Connections")
+        scrollTo("Samsung Health (Health Connect)")
         shot("11-settings-connections")
     }
 

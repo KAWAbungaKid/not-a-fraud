@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A twig with two leaves. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#6EE7FF" android:strokeWidth="5" android:strokeLineCap="round" android:fillColor="#00000000"
+        android:pathData="M38,78 C46,66 56,52 72,32" />
+    <path android:fillColor="#6EE7FF" android:pathData="M52,58 C40,58 32,50 30,40 C42,40 50,46 52,58 Z" />
+    <path android:fillColor="#6EE7FF" android:pathData="M62,46 C62,34 70,26 80,24 C80,36 74,44 62,46 Z" />
+</vector>

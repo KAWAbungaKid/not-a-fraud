@@ -107,3 +107,12 @@ object Fasting {
         return (first - prev) / 3_600_000.0
     }
 }
+
+object Num {
+    fun fmt(v: Double?): String = when {
+        v == null -> ""
+        kotlin.math.abs(v - Math.round(v)) < 1e-6 -> Math.round(v).toString()
+        kotlin.math.abs(v * 10 - Math.round(v * 10)) < 1e-6 -> "%.1f".format(v)
+        else -> "%.2f".format(v)
+    }
+}

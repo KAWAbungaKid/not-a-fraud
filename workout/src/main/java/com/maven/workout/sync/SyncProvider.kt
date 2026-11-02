@@ -55,7 +55,7 @@ class SyncProvider : ContentProvider() {
  */
 object SyncNotifier {
     const val ACTION = "com.maven.workout.CHANGED"
-    private val TARGETS = listOf("com.maven.notafraud", "com.maven.notafraud.dev")
+    private val TARGETS = listOf("com.maven.notafraud", "com.maven.notafraud.dev", "com.maven.diet", "com.maven.diet.dev")
     @Volatile private var lastKey: String? = null
 
     fun changed(ctx: Context, d: WorkoutData) {

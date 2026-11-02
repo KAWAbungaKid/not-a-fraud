@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+
+    <!-- Shared with Not a Fraud and Not a Troglodyte (signature: same keystore only). Declared by every app. -->
+    <permission
+        android:name="com.maven.permission.SYNC"
+        android:label="Maven app sync"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.maven.permission.SYNC" />
+
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.maven.notafraud" />
+        <package android:name="com.maven.notafraud.dev" />
+        <package android:name="com.maven.workout" />
+        <package android:name="com.maven.workout.dev" />
+    </queries>
+
+    <application
+        android:name=".DietApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="${appLabel}"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Diet">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Read by Not a Fraud: content://<applicationId>.sync/status -->
+        <provider
+            android:name=".sync.SyncProvider"
+            android:authorities="${applicationId}.sync"
+            android:exported="true"
+            android:readPermission="com.maven.permission.SYNC" />
+
+        <receiver android:name=".notify.NagReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Not a Troglodyte says a workout started/finished: re-read it. -->
+        <receiver
+            android:name=".link.WorkoutChangedReceiver"
+            android:exported="true"
+            android:permission="com.maven.permission.SYNC">
+            <intent-filter>
+                <action android:name="com.maven.workout.CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

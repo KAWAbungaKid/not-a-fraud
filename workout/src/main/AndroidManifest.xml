@@ -17,6 +17,8 @@
     <queries>
         <package android:name="com.maven.notafraud" />
         <package android:name="com.maven.notafraud.dev" />
+        <package android:name="com.maven.diet" />
+        <package android:name="com.maven.diet.dev" />
     </queries>
 
     <application

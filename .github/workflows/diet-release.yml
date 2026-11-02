@@ -1,0 +1,50 @@
+name: diet-release
+# Publishes the diet APK as GitHub Release "diet-v<version>" (never marked Latest, so
+# Not a Fraud stays the repo's latest release). Runs when release notes are added, or by hand.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/diet/releases/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+defaults:
+  run:
+    shell: bash
+env:
+  GRADLE_VERSION: "9.8.2"
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "${{ env.GRADLE_VERSION }}" }
+      - name: Build release APK
+        run: |
+          set -o pipefail
+          gradle :diet:assembleRelease --console=plain 2>&1 | tee build.log
+          v=$(grep '^dietVersionName' gradle.properties | cut -d= -f2)
+          mkdir dist && cp diet/build/outputs/apk/release/diet-release.apk dist/not-a-twig-$v.apk
+      - if: always()
+        uses: ./.github/actions/push-log
+        with: { name: diet-release, file: build.log }
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(grep '^dietVersionName' gradle.properties | cut -d= -f2)
+          tag="diet-v$v"
+          notes="docs/diet/releases/v$v.md"
+          [ -f "$notes" ] || notes=/dev/null
+          gh release create "$tag" dist/* --title "Not a Twig $v" --notes-file "$notes" --latest=false \
+            || gh release upload "$tag" dist/* --clobber
+      - name: Mirror APK to a git branch (readable from the Claude sandbox)
+        run: |
+          cd dist
+          git init -q -b main
+          git config user.name ci; git config user.email ci@localhost
+          git add -A; git commit -qm "diet binaries"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/diet-dist

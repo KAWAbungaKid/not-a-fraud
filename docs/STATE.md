@@ -482,3 +482,21 @@ Body stat. Missed minimum → pause credit unlocks (§ 17).
 10. Old items: review of the stale web-app tasks; trading vs ME 3411 time clash; confirm the Samsung "never sleeping" setup step.
 11. Deferred by Maven: PC/phone sync (Firebase) + Windows app, easier updates (Obtainium), diet app, meal timing.
 12. Workout app's own backlog (docs/workout/STATE.md § 6): Hevy import, warm-up / plate calculator, rest timer notification, write workouts to Health Connect, edit finished workouts, supersets, weekly volume.
+
+
+## 20. The app family + Not a Twig (diet) (2026-11-02)
+
+Maven's apps are all "Not a _": **Not a Fraud** (this app), **Not a Troglodyte** (workout, app ID
+`com.maven.workout`, renamed from "Workout" in 0.1.2), **Not a Twig** (diet, `com.maven.diet`, new — full doc
+**`docs/diet/STATE.md`**). All three live in this repo, share the signing key and the signature permission
+`com.maven.permission.SYNC`.
+
+Not a Twig serves `content://com.maven.diet.sync/status` (kcal/macros eaten vs target, water, weighedToday,
+trend, fasting window state, hours since food, slots logged, overdue **nags** with level 1–3, today's clarity /
+energy check-in) and broadcasts `com.maven.diet.CHANGED` to Not a Fraud.
+
+**Not a Fraud to-do from this (diet doc § 4):** read the diet status like the workout status (add
+`<queries>` for `com.maven.diet` / `.dev` and a receiver for `com.maven.diet.CHANGED`); route Twig's meal /
+water / weigh-in nags into the routine "anger" so there's one nag system; tick meal routine items from
+`slotsLogged`; show clarity/energy in "How's today"; later hand Twig sleep hours for bad-day help and insights.
+Sports/climbing → cardio (§ 16).

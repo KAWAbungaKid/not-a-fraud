@@ -74,7 +74,7 @@ class SmokeTest {
         shot("06-foods")
         rule.onNodeWithText("+ Food from label").performClick()
         rule.waitForIdle()
-        rule.onNodeWithText("Save food").assertExists()
+        rule.onNodeWithText("Calories").assertExists()
         shot("07-label")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()

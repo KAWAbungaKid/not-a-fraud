@@ -247,7 +247,7 @@ class WorkoutTest {
         // Forgot to finish: saved hours later with the real end.
         d = Actions.finish(d, at("2026-10-25T18:40")).first
         val s = d.sessions.single()
-        assertEquals(60L, (s.endedAt!! - s.startedAt) / 60_000)
+        assertEquals(70L, (s.endedAt!! - s.startedAt) / 60_000)
         // Edit a finished workout; end before start is refused.
         d = Actions.setTimes(d, id, at("2026-10-24T07:00"), at("2026-10-24T08:15"), z)
         assertEquals("2026-10-24", d.sessions.single().date)

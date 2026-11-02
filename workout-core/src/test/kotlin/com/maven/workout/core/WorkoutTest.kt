@@ -235,6 +235,27 @@ class WorkoutTest {
     }
 
     @Test
+    fun `workout times can be fixed`() {
+        val z = java.time.ZoneId.of("America/Chicago")
+        fun at(s: String) = java.time.LocalDateTime.parse(s).atZone(z).toInstant().toEpochMilli()
+        var d = Actions.start(seed, "push", Mode.NORMAL, mon, at("2026-10-26T18:00"))
+        val id = d.active!!.id
+        // Forgot to start: really began yesterday evening.
+        d = Actions.setTimes(d, id, at("2026-10-25T17:30"), null, z)
+        assertEquals("2026-10-25", d.active!!.date)
+        d = Actions.completeSet(d, 0, 0, at("2026-10-25T17:40"))
+        // Forgot to finish: saved hours later with the real end.
+        d = Actions.finish(d, at("2026-10-25T18:40")).first
+        val s = d.sessions.single()
+        assertEquals(60L, (s.endedAt!! - s.startedAt) / 60_000)
+        // Edit a finished workout; end before start is refused.
+        d = Actions.setTimes(d, id, at("2026-10-24T07:00"), at("2026-10-24T08:15"), z)
+        assertEquals("2026-10-24", d.sessions.single().date)
+        assertEquals(d, Actions.setTimes(d, id, at("2026-10-24T09:00"), at("2026-10-24T08:00"), z))
+        assertEquals(java.time.LocalDate.parse("2026-10-24"), Week.trainedDates(d).single())
+    }
+
+    @Test
     fun `sync status serializes`() {
         val st = Sync.status(seed, LocalDate.parse("2026-10-29"), 0L)
         assertEquals("TIGHT", st.risk)

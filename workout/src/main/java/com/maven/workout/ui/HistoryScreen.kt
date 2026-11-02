@@ -70,6 +70,9 @@ private fun SessionRow(d: WorkoutData, s: Session, onClick: () -> Unit) {
     }
 }
 
+fun clock(ms: Long): String = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault())
+    .toLocalTime().format(DateTimeFormatter.ofPattern("h:mm a"))
+
 fun minutes(s: Session): Long = ((s.endedAt ?: s.startedAt) - s.startedAt) / 60_000L
 
 @Composable
@@ -77,12 +80,14 @@ fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
     val s = d.sessions.firstOrNull { it.id == id }
     if (s == null) { Text("Deleted.", Modifier.padding(16.dp)); return }
     var confirm by remember { mutableStateOf(false) }
+    var editTimes by remember { mutableStateOf(false) }
     val prs = Strength.prs(d, s)
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Panel(highlight = prs.isNotEmpty()) {
                 Text(s.name, style = MaterialTheme.typography.headlineSmall)
-                Dim("${s.date} · Week ${s.week} Block ${s.block} · ${minutes(s)} min · ${s.mode.label}")
+                Dim("${s.date} · ${clock(s.startedAt)}–${clock(s.endedAt ?: s.startedAt)} · ${minutes(s)} min · Week ${s.week} Block ${s.block} · ${s.mode.label}")
+                TextButton(onClick = { editTimes = true }) { Text("Edit date & times") }
                 Text("${s.doneSets} set${if (s.doneSets == 1) "" else "s"} · volume ${Rpe.fmt(Rpe.round(Strength.volume(s), 1.0))} ${d.settings.unit}", style = Mono)
                 if (prs.isNotEmpty()) {
                     SectionLabel("Personal records")
@@ -112,6 +117,10 @@ fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
             TextButton(onClick = { confirm = true }) { Text("Delete this workout", color = Palette.red) }
             Spacer(Modifier.height(16.dp))
         }
+    }
+    if (editTimes) TimesDialog("Workout times", s.startedAt, s.endedAt ?: s.startedAt, onDismiss = { editTimes = false }) { start, end ->
+        Graph.update { Actions.setTimes(it, id, start, end, java.time.ZoneId.systemDefault()) }
+        editTimes = false
     }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },

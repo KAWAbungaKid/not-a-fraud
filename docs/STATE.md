@@ -411,8 +411,9 @@ when it changes. Guarded by signature permission `com.maven.permission.SYNC`. De
 6. **Stats:** Body/Strength can read `/sessions` (count, minutes) and `streakWeeks`.
 7. "Start workout" actions open the workout app (`com.maven.workout/.ui.MainActivity`).
 
-**Open questions for Maven:** do climbing / other sports count toward the minimum of 3? (Currently no.) Should a
-missed minimum lock credits/apps, or only nag?
+**Answered:** climbing / other sports do **not** count toward the workout minimum (§ 17) — **but they do count as
+cardio** (2026-11-02): a climbing/sport session should tick the daily cardio routine item and feed cardio in the
+Body stat. Missed minimum → pause credit unlocks (§ 17).
 
 
 ## 17. v0.7.0 (2026-10-26)

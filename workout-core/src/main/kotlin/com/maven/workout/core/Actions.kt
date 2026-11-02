@@ -102,6 +102,18 @@ object Actions {
 
     fun deleteSession(d: WorkoutData, id: String) = d.copy(sessions = d.sessions.filter { it.id != id })
 
+    /**
+     * Fix the clock on a workout (forgot to start it, or forgot to finish it). Works on the active workout
+     * ([end] ignored) or a finished one. The workout's date follows its start time. End before start = no change.
+     */
+    fun setTimes(d: WorkoutData, id: String, start: Long, end: Long?, zone: java.time.ZoneId): WorkoutData {
+        val date = java.time.Instant.ofEpochMilli(start).atZone(zone).toLocalDate().toString()
+        val a = d.active
+        if (a != null && a.id == id) return d.copy(active = a.copy(startedAt = start, date = date))
+        if (end == null || end <= start) return d
+        return d.copy(sessions = d.sessions.map { if (it.id == id) it.copy(startedAt = start, endedAt = end, date = date) else it })
+    }
+
     // ---- Library ----
 
     fun saveExercise(d: WorkoutData, ex: Exercise): WorkoutData =

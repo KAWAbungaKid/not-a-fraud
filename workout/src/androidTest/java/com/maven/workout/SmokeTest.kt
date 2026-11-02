@@ -62,6 +62,7 @@ class SmokeTest {
         rule.waitForIdle()
         rule.onNode(hasText("Finish") and hasAnyAncestor(isDialog())).performClick()
         rule.waitForIdle()
+        rule.onNodeWithText("Edit date & times").assertExists()
         shot("04-summary")
         back()
         shot("05-today-after")

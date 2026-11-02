@@ -2,6 +2,7 @@ package com.maven.workout.ui
 
 import android.os.VibrationEffect
 import android.os.VibratorManager
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -86,6 +87,8 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
     var picker by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var confirmFinish by remember { mutableStateOf(false) }
+    var editStart by remember { mutableStateOf(false) }
+    var fixFinish by remember { mutableStateOf(false) }
 
     LaunchedEffect(now >= restEnds, restBuzzed) {
         if (!restBuzzed && now >= restEnds) {
@@ -111,7 +114,10 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, style = MaterialTheme.typography.titleLarge)
-                        Dim("Week ${s.week} · Block ${s.block} · ${Fmt.secs(((now - s.startedAt) / 1000).toInt())} · ${s.doneSets} set${if (s.doneSets == 1) "" else "s"}")
+                        Dim(
+                            "Week ${s.week} · Block ${s.block} · ${Fmt.secs(((now - s.startedAt) / 1000).toInt())} ✎ · ${s.doneSets} set${if (s.doneSets == 1) "" else "s"}",
+                            Modifier.clickable { editStart = true },
+                        )
                     }
                     TextButton(onClick = onClose) { Text("Hide") }
                     Button(onClick = { confirmFinish = true }) { Text("Finish") }
@@ -160,12 +166,33 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
         confirmButton = { TextButton(onClick = { Graph.update { Actions.discard(it) }; confirmDiscard = false; onClose() }) { Text("Discard", color = Palette.red) } },
         dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep going") } },
     )
+    if (editStart) TimesDialog("When did you start?", s.startedAt, null, onDismiss = { editStart = false }) { start, _ ->
+        Graph.update { Actions.setTimes(it, s.id, start, null, java.time.ZoneId.systemDefault()) }
+        editStart = false
+    }
+    if (fixFinish) TimesDialog("Workout times", s.startedAt, Graph.now(), confirm = "Finish", onDismiss = { fixFinish = false }) { start, end ->
+        var saved: Session? = null
+        Graph.update {
+            val moved = Actions.setTimes(it, s.id, start, null, java.time.ZoneId.systemDefault())
+            val (nd, ss) = Actions.finish(moved, end ?: Graph.now()); saved = ss; nd
+        }
+        fixFinish = false
+        onClose()
+        saved?.let { onOpen(Route.SessionDetail(it.id)) }
+    }
     if (confirmFinish) {
         val undone = s.entries.filter { !it.skipped }.sumOf { e -> e.sets.count { !it.done } }
         AlertDialog(
             onDismissRequest = { confirmFinish = false },
             title = { Text("Finish ${s.name}?") },
-            text = { Text(if (undone > 0) "$undone unticked sets will be dropped. Ticked sets are saved." else "Nice. Saving it.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(if (undone > 0) "$undone unticked sets will be dropped. Ticked sets are saved." else "Nice. Saving it.")
+                    val hrs = (Graph.now() - s.startedAt) / 3_600_000.0
+                    if (hrs >= 2.5) Text("It's been running ${"%.1f".format(hrs)} h — forgot to finish?", color = Palette.amber)
+                    TextButton(onClick = { confirmFinish = false; fixFinish = true }) { Text("Change start / end time…") }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     var saved: Session? = null

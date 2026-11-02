@@ -117,6 +117,12 @@ then anything. **Habit-breaker:** among core days, the one done least in the las
   not toward maxes. Mark the injury healed when done.
 - Mode can be switched mid-workout; completed sets are kept.
 
+### Fixing times (v0.1.1)
+
+Forgot to start or finish the timer: tap the elapsed time (✎) in a running workout to set when it really started
+(date + time); the Finish dialog has "Change start / end time…" and warns after 2.5 h; a finished workout has
+"Edit date & times". The date follows the start time, so a workout moved to yesterday counts for yesterday's week.
+
 ### Screens
 
 Today (week strip + risk, suggestion with mode chips and a preview of weights, other days with 4-week counts,
@@ -173,10 +179,11 @@ and re-reads `/status`.
 - Warm-up set generator and plate calculator for the top set.
 - Rest timer as a notification when the screen is off (now in-app only, screen kept on during a workout).
 - Write finished workouts to Health Connect (ExerciseSession) so Samsung Health / Not a Fraud's stats see them.
-- Other activities (climbing, sports) — log here or keep in Not a Fraud's sport rule? Should they count toward
-  the minimum? Undecided.
+- Other activities (climbing, sports): **decided 2026-11-02** — they do NOT count toward the workout minimum,
+  but DO count as cardio. Not a Fraud's sport rule handles them for now; if they get logged here later, keep
+  them out of `doneThisWeek` and expose them separately (e.g. `cardioToday`) in the sync status.
 - "Climbing tomorrow" planning: Not a Fraud knows the calendar; it could ask the workout app for a day that avoids
   shoulders/arms (muscles are already on every exercise).
-- Edit a finished workout (now: delete only).
+- Edit a finished workout's sets (now: delete, or fix its date/times).
 - Supersets; per-muscle weekly volume; diet app (separate, later).
 - Onboarding with neutral presets for other people (only Maven's preset exists).

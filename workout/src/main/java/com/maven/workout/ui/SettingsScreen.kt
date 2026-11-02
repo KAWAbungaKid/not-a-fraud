@@ -89,7 +89,7 @@ fun SettingsScreen(d: WorkoutData) {
                 OutlinedButton(onClick = { copy(ctx, Graph.store.exportJson()) }) { Text("Copy all data") }
                 OutlinedButton(onClick = { importing = true }) { Text("Import…") }
             }
-            Dim("Workout ${BuildConfig.VERSION_NAME} · ${d.sessions.size} workouts · ${d.exercises.size} exercises")
+            Dim("Not a Troglodyte ${BuildConfig.VERSION_NAME} · ${d.sessions.size} workouts · ${d.exercises.size} exercises")
         }
         Spacer(Modifier.height(16.dp))
     }

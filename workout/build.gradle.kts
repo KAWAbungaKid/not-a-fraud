@@ -33,12 +33,12 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".dev"
-            manifestPlaceholders["appLabel"] = "Workout dev"
+            manifestPlaceholders["appLabel"] = "Trog dev"
             versionNameSuffix = "-dev"
             signingConfig = signingConfigs.getByName("naf")
         }
         release {
-            manifestPlaceholders["appLabel"] = "Workout"
+            manifestPlaceholders["appLabel"] = "Not a Troglodyte"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("naf")
         }

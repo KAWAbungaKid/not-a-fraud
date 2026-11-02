@@ -1,4 +1,4 @@
-# Workout app — state of the build
+# Not a Troglodyte (workout app) — state of the build
 
 Living doc for Maven's workout tracker (the Hevy replacement that talks to Not a Fraud). Read this first in
 any chat about the workout app. Not a Fraud's doc is `docs/STATE.md`; § 16 there is the integration summary.
@@ -6,7 +6,7 @@ Last updated 2026-10-26 (v0.1.0, first build).
 
 - **Lives in:** the Not a Fraud repo (`github.com/KAWAbungaKid/not-a-fraud`), modules `workout-core/` (pure Kotlin)
   and `workout/` (Android). Same repo so it shares the toolchain, CI and — on purpose — the signing key.
-- **App ID** `com.maven.workout` (label "Workout"); debug `com.maven.workout.dev` ("Workout dev").
+- **App ID** `com.maven.workout` (label **"Not a Troglodyte"** since 0.1.2 — Maven's apps are all "Not a _"); debug `com.maven.workout.dev` ("Trog dev"). The ID stays `workout` so updates install in place.
 - **Version** `workoutVersionName` / `workoutVersionCode` in `gradle.properties` (separate from Not a Fraud's).
 - **CI:** `.github/workflows/workout-ci.yml` (core tests, debug APK, emulator smoke test). Logs on branches
   `ci-logs/workout-core`, `ci-logs/workout-android`, `ci-logs/workout-emulator`. Not a Fraud's `ci.yml` ignores

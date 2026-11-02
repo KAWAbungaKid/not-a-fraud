@@ -27,7 +27,7 @@ jobs:
           set -o pipefail
           gradle :workout:assembleRelease --console=plain 2>&1 | tee build.log
           v=$(grep '^workoutVersionName' gradle.properties | cut -d= -f2)
-          mkdir dist && cp workout/build/outputs/apk/release/workout-release.apk dist/workout-$v.apk
+          mkdir dist && cp workout/build/outputs/apk/release/workout-release.apk dist/not-a-troglodyte-$v.apk
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: workout-release, file: build.log }
@@ -39,7 +39,7 @@ jobs:
           tag="workout-v$v"
           notes="docs/workout/releases/v$v.md"
           [ -f "$notes" ] || notes=/dev/null
-          gh release create "$tag" dist/* --title "Workout $v" --notes-file "$notes" --latest=false \
+          gh release create "$tag" dist/* --title "Not a Troglodyte $v" --notes-file "$notes" --latest=false \
             || gh release upload "$tag" dist/* --clobber
       - name: Mirror APK to a git branch (readable from the Claude sandbox)
         run: |

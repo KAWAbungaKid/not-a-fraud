@@ -1,7 +1,7 @@
 # Not a Twig (diet app) — state of the build
 
 Living doc for Maven's diet app. Read this first in any chat about it. The other apps: Not a Fraud
-(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-02 (v0.1.0).
+(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-03 (v0.2.0).
 
 - **Lives in:** the Not a Fraud repo, modules `diet-core/` (pure Kotlin) + `diet/` (Android). Same signing key.
 - **App ID** `com.maven.diet` (label "Not a Twig"); debug `com.maven.diet.dev` ("Twig dev").
@@ -87,6 +87,22 @@ meals/recipes editor with per-portion macros) · Progress (weight chart, rate vs
 7-day averages, comparisons, check-in history) · Settings (profile, goal, macros, fasting window, meal slots and
 times, water, nag times, Health Connect + workout link status, backup).
 
+### v0.2.0 (2026-11-03): units + label scan
+
+- **Units** (`Units.kt`): every food has `serving`, its count units (`Food.units`: name → servings, e.g. egg,
+  slice, scoop), mass units when `servingGrams` is known (g, oz, lb, kg) and volume units when `servingMl` is
+  known (ml, tsp, tbsp, fl oz, cup, pint, l). `Units.parseServing("2/3 cup (55g)")` fills grams / ml / count
+  units from serving text (exact "(55 g)"/"(240 ml)" beat converted ones); `Units.enrich` runs on save and in
+  migration v2. Log entries and meal items keep servings for the math plus `amount` + `unit` for display; the
+  amount dialog opens in the unit last used for that food.
+- **Label scan** (`LabelParser.kt` + `ui/LabelScan.kt`): camera (`TakePicture` into `cache/labels` via
+  FileProvider) or photo picker → ML Kit text recognition (bundled Latin model, offline) → lines regrouped into
+  rows by position → parser: serving size, servings per container, calories, total fat, sat fat, cholesterol,
+  sodium, carbs, fiber, total sugars, protein, vitamin D (mcg / IU / %), calcium, iron, potassium, magnesium; "%"
+  values converted with FDA daily values; OCR O→0, l→1 fixed inside numbers. Fills the food form and says what
+  it couldn't find; nothing saves without the user checking. Name isn't on labels — typed by hand.
+- Not yet: barcode lookup (Open Food Facts) — would also fill the name/brand.
+
 ## 4. Links between the apps
 
 - **Reads Not a Troglodyte** (`content://com.maven.workout.sync/status`, `/sessions?since=`): training day, lift
@@ -108,9 +124,8 @@ Body stats; pass **sleep hours** to Twig later so bad-day remedies and the insig
 1. **v0.1 (built):** diary, foods, meals/recipes, water, weight trend, targets + the math, adaptive maintenance,
    fasting, check-in, remedies, insights v1, nags, Health Connect, workout link, sync. *Start logging now —
    2 weeks of weigh-ins + complete days unlock the real maintenance number.*
-2. **Food data:** Maven's labels and recipes (he'll add later; photos of labels can be pasted into a chat and
-   turned into the seed); USDA FoodData Central subset bundled offline for full micronutrients; barcode scan
-   (on-device ML Kit + Open Food Facts).
+2. **Food data:** ~~label scan~~ (0.2.0) · Maven's own foods and recipes · USDA FoodData Central subset bundled
+   offline for full micronutrients · barcode scan (ML Kit + Open Food Facts) for name/brand.
 3. **Weekly review:** Monday summary — trend vs goal, maintenance estimate, suggested change, adherence.
 4. **Meal planner (Eat This Much):** generate a day from his foods/recipes to hit targets within budget;
    recipe breakdown; grocery list.

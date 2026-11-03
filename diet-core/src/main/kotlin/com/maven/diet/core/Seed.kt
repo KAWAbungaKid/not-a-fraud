@@ -12,7 +12,7 @@ object Seed {
     private fun f(
         id: String, name: String, serving: String, grams: Double?, kcal: Double, p: Double, c: Double, fat: Double,
         vararg n: Pair<Nutrient, Double>,
-    ) = Food(id, name, "", serving, grams, kcal, p, c, fat, n.toMap(), source = "builtin")
+    ) = Units.enrich(Food(id, name, "", serving, grams, kcal = kcal, protein = p, carbs = c, fat = fat, nutrients = n.toMap(), source = "builtin"))
 
     val foods = listOf(
         f("chicken-breast-raw", "Chicken breast, raw", "4 oz (112 g)", 112.0, 134.0, 25.2, 0.0, 2.9, SODIUM to 50.0, POTASSIUM to 375.0),
@@ -59,6 +59,11 @@ object Seed {
 }
 
 object Migration {
-    const val CURRENT = 1
-    fun apply(d: DietData): DietData = if (d.version >= CURRENT) d else d.copy(version = CURRENT)
+    const val CURRENT = 2
+    fun apply(d: DietData): DietData {
+        var x = d
+        // v2: measurement units — fill grams / ml / count units from each food's serving text.
+        if (x.version < 2) x = x.copy(foods = x.foods.map { Units.enrich(it) }, version = 2)
+        return x
+    }
 }

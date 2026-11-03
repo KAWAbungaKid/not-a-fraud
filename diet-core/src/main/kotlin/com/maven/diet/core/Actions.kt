@@ -14,13 +14,30 @@ object Actions {
         return id
     }
 
-    fun logFood(d: DietData, date: LocalDate, slot: String, foodId: String, servings: Double, at: Long): DietData {
+    fun logFood(
+        d: DietData, date: LocalDate, slot: String, foodId: String, servings: Double, at: Long,
+        amount: Double? = null, unit: String? = null,
+    ): DietData {
         if (servings <= 0 || d.food(foodId) == null) return d
-        return d.copy(log = d.log + LogEntry(newId(), date.toString(), slot, foodId, servings, at))
+        return d.copy(log = d.log + LogEntry(newId(), date.toString(), slot, foodId, servings, at, amount, unit))
     }
 
-    fun editEntry(d: DietData, id: String, servings: Double?, slot: String? = null): DietData = d.copy(log = d.log.mapNotNull { e ->
-        if (e.id != id) e else if (servings != null && servings <= 0) null else e.copy(servings = servings ?: e.servings, slot = slot ?: e.slot)
+    /** Log [amount] of [unit] ("6", "oz"); converted to servings with [Units]. */
+    fun logAmount(d: DietData, date: LocalDate, slot: String, foodId: String, amount: Double, unit: String, at: Long): DietData {
+        val f = d.food(foodId) ?: return d
+        val s = Units.toServings(f, amount, unit) ?: return d
+        return logFood(d, date, slot, foodId, s, at, amount, unit)
+    }
+
+    fun editEntry(
+        d: DietData, id: String, servings: Double?, slot: String? = null, amount: Double? = null, unit: String? = null,
+    ): DietData = d.copy(log = d.log.mapNotNull { e ->
+        if (e.id != id) e
+        else if (servings != null && servings <= 0) null
+        else e.copy(
+            servings = servings ?: e.servings, slot = slot ?: e.slot,
+            amount = if (servings != null) amount else e.amount, unit = if (servings != null) unit else e.unit,
+        )
     })
 
     fun removeEntry(d: DietData, id: String) = d.copy(log = d.log.filter { it.id != id })
@@ -29,18 +46,18 @@ object Actions {
     fun logMeal(d: DietData, date: LocalDate, slot: String, mealId: String, portions: Double, at: Long): DietData {
         val m = d.meal(mealId) ?: return d
         val k = portions / m.servings.coerceAtLeast(0.01)
-        return m.items.fold(d) { acc, it -> logFood(acc, date, slot, it.foodId, it.servings * k, at) }
+        return m.items.fold(d) { acc, it -> logFood(acc, date, slot, it.foodId, it.servings * k, at, it.amount?.times(k), it.unit) }
     }
 
     /** "Same as yesterday": copy a slot from another day. */
     fun copySlot(d: DietData, from: LocalDate, to: LocalDate, slot: String, at: Long): DietData {
         val items = d.log.filter { it.date == from.toString() && it.slot == slot }
-        return items.fold(d) { acc, e -> logFood(acc, to, slot, e.foodId, e.servings, at) }
+        return items.fold(d) { acc, e -> logFood(acc, to, slot, e.foodId, e.servings, at, e.amount, e.unit) }
     }
 
     /** Save what's logged in a slot as a reusable meal. */
     fun saveSlotAsMeal(d: DietData, date: LocalDate, slot: String, name: String): DietData {
-        val items = d.log.filter { it.date == date.toString() && it.slot == slot }.map { MealItem(it.foodId, it.servings) }
+        val items = d.log.filter { it.date == date.toString() && it.slot == slot }.map { MealItem(it.foodId, it.servings, it.amount, it.unit) }
         if (items.isEmpty()) return d
         return d.copy(meals = d.meals + SavedMeal(slug(name, d.meals.map { it.id }.toSet()), name.trim(), items))
     }
@@ -50,8 +67,10 @@ object Actions {
 
     fun deleteMeal(d: DietData, id: String) = d.copy(meals = d.meals.filter { it.id != id })
 
-    fun saveFood(d: DietData, f: Food) =
-        if (d.foods.any { it.id == f.id }) d.copy(foods = d.foods.map { if (it.id == f.id) f else it }) else d.copy(foods = d.foods + f)
+    fun saveFood(d: DietData, f0: Food): DietData {
+        val f = Units.enrich(f0)
+        return if (d.foods.any { it.id == f.id }) d.copy(foods = d.foods.map { if (it.id == f.id) f else it }) else d.copy(foods = d.foods + f)
+    }
 
     fun newFoodId(d: DietData, name: String) = slug(name, d.foods.map { it.id }.toSet())
 

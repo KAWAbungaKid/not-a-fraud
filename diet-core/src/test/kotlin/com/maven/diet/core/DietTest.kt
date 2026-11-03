@@ -164,3 +164,118 @@ class DietTest {
         assertEquals(1, again.current.weights.size)
     }
 }
+
+class UnitsAndLabelTest {
+    @Test
+    fun `serving text gives grams, ml and count units`() {
+        val p = Units.parseServing("2/3 cup (55g)")
+        assertEquals(55.0, p.grams); assertEquals(236.588236 * 2 / 3, p.ml!!, 1e-6); assertTrue(p.counts.isEmpty())
+        assertEquals(112.0, Units.parseServing("4 oz (112 g)").grams)           // exact grams beat converted oz
+        assertEquals(240.0, Units.parseServing("1 cup (240 mL)").ml)
+        assertEquals(FoodUnit("egg", 0.5), Units.parseServing("2 eggs (100 g)").counts.single())
+        assertEquals(FoodUnit("slice", 1.0), Units.parseServing("1 slice (32 g)").counts.single())
+        assertEquals(1.5 * 236.588236, Units.parseServing("1 1/2 cups").ml!!, 1e-6)
+        assertEquals(240.0, Units.parseServing("8 fl oz (240mL)").ml)
+        assertEquals(29.5735296 * 8, Units.parseServing("8 fl oz").ml!!, 1e-6)
+    }
+
+    @Test
+    fun `log chicken in ounces and rice in cups`() {
+        val seed = Seed.data("2026-11-03")
+        val chicken = seed.food("chicken-breast-raw")!!     // 4 oz (112 g)
+        val names = Units.options(chicken).map { it.name }
+        assertTrue(names.containsAll(listOf("serving", "g", "oz", "lb", "kg")))
+        assertEquals(2.0 * 28.349523125 * 6 / 112.0 / 2, Units.toServings(chicken, 6.0, "oz")!!, 1e-9)
+        val rice = seed.food("rice-white-dry")!!            // 1/4 cup (45 g)
+        assertEquals(4.0, Units.toServings(rice, 1.0, "cup")!!, 1e-6)
+        assertTrue("tbsp" in Units.options(rice).map { it.name })
+        val egg = seed.food("egg")!!
+        assertEquals(3.0, Units.toServings(egg, 3.0, "egg")!!, 1e-9)
+        assertEquals("egg", Units.default(egg).name)
+        val d = Actions.logAmount(seed, java.time.LocalDate.parse("2026-11-03"), "Lunch", "chicken-breast-raw", 8.0, "oz", 1L)
+        val e = d.log.single()
+        assertEquals(8.0 * 28.349523125 / 112.0, e.servings, 1e-9)
+        assertEquals("8 oz", Units.describe(chicken, e.servings, e.amount, e.unit))
+        assertEquals("3 eggs", Units.label(3.0, "egg"))
+    }
+
+    @Test
+    fun `migration fills units for old data`() {
+        val old = DietData(version = 1, foods = listOf(Food("x", "Oats", serving = "1/2 cup (40 g)", kcal = 150.0, protein = 5.0, carbs = 27.0, fat = 3.0)))
+        val m = Migration.apply(old)
+        assertEquals(2, m.version)
+        assertNotNull(m.foods.single().servingMl)
+    }
+
+    private val modern = """
+        Nutrition Facts
+        8 servings per container
+        Serving size 2/3 cup (55g)
+        Amount per serving
+        Calories 230
+        % Daily Value*
+        Total Fat 8g 10%
+        Saturated Fat 1g 5%
+        Trans Fat 0g
+        Cholesterol Omg 0%
+        Sodium 160mg 7%
+        Total Carbohydrate 37g 13%
+        Dietary Fiber 4g 14%
+        Total Sugars 12g
+        Includes 10g Added Sugars 20%
+        Protein 3g
+        Vitamin D 2mcg 10%
+        Calcium 260mg 20%
+        Iron 8mg 45%
+        Potassium 240mg 6%
+    """.trimIndent()
+
+    @Test
+    fun `reads a modern label`() {
+        val r = LabelParser.parse(modern)
+        assertEquals("2/3 cup (55g)", r.serving)
+        assertEquals(55.0, r.servingGrams)
+        assertEquals(8.0, r.servingsPerContainer)
+        assertEquals(230.0, r.kcal); assertEquals(8.0, r.fat); assertEquals(37.0, r.carbs); assertEquals(3.0, r.protein)
+        assertEquals(1.0, r.nutrients[Nutrient.SAT_FAT]); assertEquals(0.0, r.nutrients[Nutrient.CHOLESTEROL])
+        assertEquals(160.0, r.nutrients[Nutrient.SODIUM]); assertEquals(4.0, r.nutrients[Nutrient.FIBER])
+        assertEquals(12.0, r.nutrients[Nutrient.SUGAR]); assertEquals(2.0, r.nutrients[Nutrient.VITAMIN_D])
+        assertEquals(260.0, r.nutrients[Nutrient.CALCIUM]); assertEquals(8.0, r.nutrients[Nutrient.IRON])
+        assertEquals(240.0, r.nutrients[Nutrient.POTASSIUM])
+        assertTrue(r.missing.isEmpty())
+    }
+
+    @Test
+    fun `reads an older split-column label`() {
+        val r = LabelParser.parse("""
+            Nutrition Facts
+            Serving Size 1 cup (240mL)
+            Servings Per Container about 4
+            Amount Per Serving
+            Calories 130 Calories from Fat 45
+            Total Fat 5g
+            8%
+            Sodium 125mg
+            Total Carbohydrate
+            12g
+            Protein
+            8g
+            Vitamin A 10% • Vitamin C 4%
+            Calcium 30% • Iron 0%
+            Vitamin D 25%
+        """.trimIndent())
+        assertEquals(240.0, r.servingMl)
+        assertEquals(4.0, r.servingsPerContainer)
+        assertEquals(130.0, r.kcal); assertEquals(5.0, r.fat); assertEquals(12.0, r.carbs); assertEquals(8.0, r.protein)
+        assertEquals(125.0, r.nutrients[Nutrient.SODIUM])
+        assertEquals(390.0, r.nutrients[Nutrient.CALCIUM]!!, 1e-9)
+        assertEquals(0.0, r.nutrients[Nutrient.IRON])
+        assertEquals(5.0, r.nutrients[Nutrient.VITAMIN_D]!!, 1e-9)
+    }
+
+    @Test
+    fun `partial read reports what is missing`() {
+        val r = LabelParser.parse("Calories 90\nProtein 20g")
+        assertEquals(listOf("carbs", "fat"), r.missing)
+    }
+}

@@ -72,8 +72,12 @@ data class Food(
     val brand: String = "",
     /** What one serving is, as printed: "1 cup (240 ml)", "4 oz (112 g)". */
     val serving: String = "1 serving",
-    /** Grams in one serving if known (lets you log by weight). */
+    /** Grams in one serving if known (unlocks g / oz / lb / kg). */
     val servingGrams: Double? = null,
+    /** Millilitres in one serving if known (unlocks ml / tsp / tbsp / fl oz / cup / l). */
+    val servingMl: Double? = null,
+    /** Count units: "egg", "slice", "breast", "scoop"… each = so many servings. */
+    val units: List<FoodUnit> = emptyList(),
     val kcal: Double,
     val protein: Double,
     val carbs: Double,
@@ -91,12 +95,19 @@ data class LogEntry(
     /** Meal slot name (Settings.slots). */
     val slot: String,
     val foodId: String,
+    /** Always in servings (what the math uses). [amount] + [unit] are what you typed, for display. */
     val servings: Double,
     val at: Long,
+    val amount: Double? = null,
+    val unit: String? = null,
 )
 
+/** A count unit for one food: 1 [name] = [servings] servings. */
 @Serializable
-data class MealItem(val foodId: String, val servings: Double)
+data class FoodUnit(val name: String, val servings: Double)
+
+@Serializable
+data class MealItem(val foodId: String, val servings: Double, val amount: Double? = null, val unit: String? = null)
 
 /** A saved meal ("my usual lunch") or a recipe (items make [servings] portions; logging 1 = one portion). */
 @Serializable

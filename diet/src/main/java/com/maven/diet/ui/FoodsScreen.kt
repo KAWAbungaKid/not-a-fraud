@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,6 +35,8 @@ import com.maven.diet.core.Actions
 import com.maven.diet.core.Diary
 import com.maven.diet.core.DietData
 import com.maven.diet.core.Food
+import com.maven.diet.core.FoodUnit
+import com.maven.diet.core.Units
 import com.maven.diet.core.Macros
 import com.maven.diet.core.MealItem
 import com.maven.diet.core.Num
@@ -131,8 +134,8 @@ fun AddFoodScreen(d: DietData, date: String, slot: String, onOpen: (Route) -> Un
         item { Spacer(Modifier.height(16.dp)) }
     }
     picked?.let { f ->
-        ServingsDialog(f, onDismiss = { picked = null }) { servings ->
-            Graph.update { Actions.logFood(it, day, slot, f.id, servings, logTime(day)) }
+        AmountDialog(d, f, onDismiss = { picked = null }) { servings, amount, unit ->
+            Graph.update { Actions.logFood(it, day, slot, f.id, servings, logTime(day), amount, unit) }
             picked = null; onDone()
         }
     }
@@ -159,38 +162,6 @@ fun AddFoodScreen(d: DietData, date: String, slot: String, onOpen: (Route) -> Un
     }
 }
 
-/** Servings or grams; shows what that adds up to. */
-@Composable
-fun ServingsDialog(f: Food, confirm: String = "Log", initial: Double = 1.0, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
-    var servings by remember { mutableStateOf(Num.fmt(initial)) }
-    var grams by remember { mutableStateOf(f.servingGrams?.let { Num.fmt(it * initial) } ?: "") }
-    val s = servings.toDoubleOrNull() ?: 0.0
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(f.name) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Dim("1 serving = ${f.serving}" + if (f.source == "builtin") " · approximate values" else "")
-                ChipRow(listOf(0.5, 1.0, 1.5, 2.0, 3.0), { abs(it - s) < 1e-9 }, { Num.fmt(it) }) { v ->
-                    servings = Num.fmt(v); f.servingGrams?.let { grams = Num.fmt(it * v) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(servings, { t -> servings = t; t.toDoubleOrNull()?.let { v -> f.servingGrams?.let { grams = Num.fmt(it * v) } } },
-                        label = { Text("Servings") }, singleLine = true, modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                    val sg = f.servingGrams
-                    if (sg != null) OutlinedTextField(grams, { t -> grams = t; t.toDoubleOrNull()?.let { g -> servings = Num.fmt(g / sg) } },
-                        label = { Text("Grams") }, singleLine = true, modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                }
-                Text(macroLine(foodMacros(f) * s), style = Mono)
-            }
-        },
-        confirmButton = { TextButton(enabled = s > 0, onClick = { onSave(s) }) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
 @Composable
 private fun LabelField(label: String, v: String, numeric: Boolean, mod: Modifier = Modifier.fillMaxWidth(), set: (String) -> Unit) =
     OutlinedTextField(v, set, label = { Text(label) }, singleLine = true, modifier = mod,
@@ -204,6 +175,9 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
     var brand by remember { mutableStateOf(f?.brand ?: "") }
     var serving by remember { mutableStateOf(f?.serving ?: "") }
     var grams by remember { mutableStateOf(Num.fmt(f?.servingGrams)) }
+    var ml by remember { mutableStateOf(Num.fmt(f?.servingMl)) }
+    val units = remember { (f?.units ?: emptyList()).map { mutableStateOf(it.name) to mutableStateOf(Num.fmt(it.servings)) }.toMutableStateList() }
+    var scanNote by remember { mutableStateOf<String?>(null) }
     var kcal by remember { mutableStateOf(Num.fmt(f?.kcal)) }
     var p by remember { mutableStateOf(Num.fmt(f?.protein)) }
     var c by remember { mutableStateOf(Num.fmt(f?.carbs)) }
@@ -218,12 +192,36 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
         item {
             Panel {
                 if (f?.source == "builtin") Dim("Built-in, approximate. If you have the package, a copy of its label is more accurate.")
+                ScanButtons { r ->
+                    r.onSuccess { l ->
+                        l.serving?.let { serving = it }
+                        l.servingGrams?.let { grams = Num.fmt(Math.round(it * 10) / 10.0) }
+                        l.servingMl?.let { ml = Num.fmt(Math.round(it * 10) / 10.0) }
+                        if (units.isEmpty()) for (u in l.units) units += mutableStateOf(u.name) to mutableStateOf(Num.fmt(Math.round(u.servings * 1000) / 1000.0))
+                        l.kcal?.let { kcal = Num.fmt(it) }; l.protein?.let { p = Num.fmt(it) }
+                        l.carbs?.let { c = Num.fmt(it) }; l.fat?.let { fat = Num.fmt(it) }
+                        for ((n, v) in l.nutrients) nut.getValue(n).value = Num.fmt(Math.round(v * 10) / 10.0)
+                        scanNote = when {
+                            l.found == 0 -> "Couldn't find a Nutrition Facts panel in that photo. Try closer, flat, good light."
+                            l.missing.isEmpty() -> "Read ${l.found} values" + (l.servingsPerContainer?.let { " (${Num.fmt(it)} servings per container)" } ?: "") + ". Check each one against the label, then add the name."
+                            else -> "Read ${l.found} values; couldn't find ${l.missing.joinToString()}. Fill those in by hand and check the rest."
+                        }
+                    }.onFailure { scanNote = "Couldn't read the photo: ${it.message ?: it.javaClass.simpleName}" }
+                }
+                scanNote?.let { Text(it, color = Palette.amber) }
                 LabelField("Name", name, false) { name = it }
                 LabelField("Brand (optional)", brand, false) { brand = it }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LabelField("Serving size, as printed", serving, false, Modifier.weight(1.4f)) { serving = it }
-                    LabelField("Grams", grams, true, Modifier.weight(1f)) { grams = it }
+                LabelField("Serving size, as printed (e.g. 2/3 cup (55 g))", serving, false) { t ->
+                    serving = t
+                    val ps = Units.parseServing(t)
+                    if (grams.isBlank()) ps.grams?.let { grams = Num.fmt(Math.round(it * 10) / 10.0) }
+                    if (ml.isBlank()) ps.ml?.let { ml = Num.fmt(Math.round(it * 10) / 10.0) }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LabelField("Grams / serving", grams, true, Modifier.weight(1f)) { grams = it }
+                    LabelField("ml / serving", ml, true, Modifier.weight(1f)) { ml = it }
+                }
+                Dim("Grams unlock g/oz/lb/kg; ml unlocks tsp/tbsp/fl oz/cup. Fill both if you know them.")
                 SectionLabel("Per serving")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LabelField("Calories", kcal, true, Modifier.weight(1f)) { kcal = it }
@@ -234,6 +232,18 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
                     LabelField("Fat g", fat, true, Modifier.weight(1f)) { fat = it }
                 }
                 if (k != null && calc > 0 && abs(calc - k) / k > 0.15) Text("Macros add up to ${calc.roundToInt()} kcal vs ${k.roundToInt()} on the label — double-check.", color = Palette.amber)
+            }
+        }
+        item {
+            Panel {
+                SectionLabel("Count units (optional)")
+                Dim("Things you count: 1 egg, 1 slice, 1 scoop, 1 breast. How many servings is one?")
+                for ((i, pair) in units.withIndex()) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LabelField("Name", pair.first.value, false, Modifier.weight(1.3f)) { pair.first.value = it }
+                    LabelField("Servings each", pair.second.value, true, Modifier.weight(1f)) { pair.second.value = it }
+                    TextButton(onClick = { units.removeAt(i) }) { Text("✕") }
+                }
+                TextButton(onClick = { units += mutableStateOf("") to mutableStateOf("1") }) { Text("+ Add a unit") }
             }
         }
         item {
@@ -254,7 +264,12 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
                 val food = Food(
                     id = f?.id ?: Actions.newFoodId(Graph.data, name),
                     name = name.trim(), brand = brand.trim(), serving = serving.trim().ifEmpty { "1 serving" },
-                    servingGrams = grams.toDoubleOrNull(),
+                    servingGrams = grams.toDoubleOrNull()?.takeIf { it > 0 },
+                    servingMl = ml.toDoubleOrNull()?.takeIf { it > 0 },
+                    units = units.mapNotNull { (n, s) ->
+                        val sv = s.value.toDoubleOrNull()
+                        if (n.value.isBlank() || sv == null || sv <= 0) null else FoodUnit(n.value.trim().lowercase(), sv)
+                    },
                     kcal = kcal.toDouble(), protein = p.toDouble(), carbs = c.toDouble(), fat = fat.toDouble(),
                     nutrients = nut.mapNotNull { (n, st) -> st.value.toDoubleOrNull()?.let { n to it } }.toMap(),
                     source = if (f?.source == "builtin" && f.kcal == kcal.toDouble() && f.protein == p.toDouble()) "builtin" else "label",
@@ -293,7 +308,7 @@ fun MealEditScreen(d: DietData, id: String, onDone: () -> Unit) {
             Row(Modifier.fillMaxWidth().clickable { editIdx = i }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(f?.name ?: "(deleted food)")
-                    Dim("${Num.fmt(mi.servings)} × ${f?.serving ?: ""}")
+                    Dim(Units.describe(f, mi.servings, mi.amount, mi.unit))
                 }
                 Text("${((f?.kcal ?: 0.0) * mi.servings).roundToInt()}", style = Mono)
             }
@@ -311,8 +326,11 @@ fun MealEditScreen(d: DietData, id: String, onDone: () -> Unit) {
     editIdx?.let { i ->
         val item = m.items.getOrNull(i)
         val f = item?.let { d.food(it.foodId) }
-        if (item == null || f == null) { editIdx = null } else ServingsDialog(f, confirm = "Save", initial = item.servings, onDismiss = { editIdx = null }) { s ->
-            save { x -> x.copy(items = x.items.mapIndexed { j, it -> if (j == i) it.copy(servings = s) else it }) }
+        if (item == null || f == null) { editIdx = null } else AmountDialog(
+            d, f, confirm = "Save", initialAmount = item.amount ?: item.servings, initialUnit = item.unit ?: Units.SERVING,
+            onDismiss = { editIdx = null },
+        ) { s, a, u ->
+            save { x -> x.copy(items = x.items.mapIndexed { j, it -> if (j == i) it.copy(servings = s, amount = a, unit = u) else it }) }
             editIdx = null
         }
     }

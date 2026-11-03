@@ -157,7 +157,7 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
                     Row(Modifier.fillMaxWidth().clickable { editing = e }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(f?.name ?: "(deleted food)")
-                            Dim("${Num.fmt(e.servings)} × ${f?.serving ?: ""}")
+                            Dim(com.maven.diet.core.Units.describe(f, e.servings, e.amount, e.unit))
                         }
                         Text("${m.kcal.roundToInt()}", style = Mono)
                     }
@@ -307,21 +307,31 @@ private fun WeightPanel(d: DietData, date: LocalDate) {
 @Composable
 private fun EntryDialog(d: DietData, e: LogEntry, onDismiss: () -> Unit) {
     val f = d.food(e.foodId)
-    var servings by remember { mutableStateOf(Num.fmt(e.servings)) }
+    val options = remember(f) { f?.let { com.maven.diet.core.Units.options(it) } ?: emptyList() }
+    var unit by remember { mutableStateOf(options.firstOrNull { it.name == (e.unit ?: com.maven.diet.core.Units.SERVING) } ?: options.firstOrNull()) }
+    var amount by remember { mutableStateOf(Num.fmt(e.amount ?: e.servings)) }
     var slot by remember { mutableStateOf(e.slot) }
+    val a = amount.toDoubleOrNull() ?: 0.0
+    val servings = a * (unit?.servingsPerUnit ?: 1.0)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(f?.name ?: "Entry") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(servings, { servings = it }, label = { Text("Servings of ${f?.serving ?: ""}") }, singleLine = true,
+                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' }.take(7) }, label = { Text("Amount (${unit?.name ?: "servings"})") }, singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal))
+                if (options.size > 1) ChipRow(options, { it.name == unit?.name }, { it.name }) { u ->
+                    if (a > 0) amount = Num.fmt(Math.round(servings / u.servingsPerUnit * 100) / 100.0)
+                    unit = u
+                }
+                SectionLabel("Meal")
                 ChipRow(d.settings.slots.map { it.name }, { it == slot }, { it }) { slot = it }
+                f?.let { Text(macroLine(foodMacros(it) * servings), style = Mono) }
             }
         },
         confirmButton = {
-            TextButton(enabled = (servings.toDoubleOrNull() ?: 0.0) > 0, onClick = {
-                Graph.update { Actions.editEntry(it, e.id, servings.toDoubleOrNull(), slot) }; onDismiss()
+            TextButton(enabled = servings > 0, onClick = {
+                Graph.update { Actions.editEntry(it, e.id, servings, slot, a, unit?.name) }; onDismiss()
             }) { Text("Save") }
         },
         dismissButton = {

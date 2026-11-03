@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.health.connect)
+    // On-device text recognition for nutrition labels (bundled Latin model: works offline, photo never leaves the phone).
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)

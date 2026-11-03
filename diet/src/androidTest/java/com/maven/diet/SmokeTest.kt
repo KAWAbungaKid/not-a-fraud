@@ -11,6 +11,7 @@ import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -32,10 +33,11 @@ class SmokeTest {
     @get:Rule(order = 1)
     val rule = createAndroidComposeRule<MainActivity>()
 
-    private fun shot(name: String) {
+    private fun shot(name: String, dialog: Boolean = false) {
         rule.waitForIdle()
         runCatching {
-            val bmp = rule.onAllNodes(isRoot()).onFirst().captureToImage().asAndroidBitmap()
+            val roots = rule.onAllNodes(isRoot())
+            val bmp = (if (dialog) roots.onLast() else roots.onFirst()).captureToImage().asAndroidBitmap()
             val dir = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "shots").apply { mkdirs() }
             java.io.FileOutputStream(java.io.File(dir, "$name.png")).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
         }
@@ -56,7 +58,9 @@ class SmokeTest {
         shot("02-add-food")
         rule.onAllNodesWithText("Chicken breast, raw").onFirst().performClick()
         rule.waitForIdle()
-        shot("03-servings")
+        rule.onNode(hasText("oz") and hasAnyAncestor(isDialog())).performClick()
+        rule.waitForIdle()
+        shot("03-amount-oz", dialog = true)
         rule.onNode(hasText("Log") and hasAnyAncestor(isDialog())).performClick()
         rule.waitForIdle()
         scrollTo("+16")
@@ -75,6 +79,7 @@ class SmokeTest {
         rule.onNodeWithText("+ Food from label").performClick()
         rule.waitForIdle()
         rule.onNodeWithText("Calories").assertExists()
+        rule.onNodeWithText("Scan label").assertExists()
         shot("07-label")
         rule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         rule.waitForIdle()

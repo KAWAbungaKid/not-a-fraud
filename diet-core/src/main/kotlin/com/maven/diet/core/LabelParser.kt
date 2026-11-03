@@ -53,7 +53,7 @@ object LabelParser {
 
     fun parse(raw: String): Result {
         val text = raw.replace('\r', '\n').replace("µg", "mcg").replace(Regex("(?<=\\d)\\s*ug\\b", RegexOption.IGNORE_CASE), "mcg")
-        val kcal = Regex("""calories(?!\s*from)[^0-9]{0,14}([0-9oO]{1,4})(?![0-9]*\s*%)""", RO).find(text)?.let { num(it.groupValues[1]) }
+        val kcal = Regex("""calories(?!\s*from)[^0-9]{0,14}([0-9oO]{1,4})(?![0-9]*[ \t]*%)""", RO).find(text)?.let { num(it.groupValues[1]) }
         val fat = grams(text, """total\s*fat""") ?: grams(text, """(?<!saturated |trans )\bfat""")
         val carbs = grams(text, """total\s*carb\w*\.?""") ?: grams(text, """carbohydrates?""")
         val protein = grams(text, """protein""")

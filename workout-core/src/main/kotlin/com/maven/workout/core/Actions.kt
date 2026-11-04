@@ -93,10 +93,49 @@ object Actions {
     fun finish(d: WorkoutData, now: Long): Pair<WorkoutData, Session?> {
         val a = d.active ?: return d to null
         val entries = a.entries.filter { !it.skipped }.map { e -> e.copy(sets = e.sets.filter { it.done }) }.filter { it.sets.isNotEmpty() }
+        // Editing a finished workout: it keeps its own times and replaces itself.
+        if (a.reopenedEnd != null) {
+            val s = a.copy(endedAt = a.reopenedEnd, reopenedEnd = null, entries = entries)
+            val rest = d.sessions.filter { it.id != a.id }
+            return if (entries.isEmpty()) d.copy(active = null, sessions = rest) to null else d.copy(active = null, sessions = rest + s) to s
+        }
         if (entries.isEmpty()) return d.copy(active = null) to null
         val s = a.copy(endedAt = now, entries = entries)
         return d.copy(active = null, sessions = d.sessions + s) to s
     }
+
+    /** Edit a finished workout's sets: it opens like a running one; Finish saves it back, Discard leaves it as it was. */
+    fun reopen(d: WorkoutData, id: String): WorkoutData {
+        if (d.active != null) return d
+        val s = d.sessions.firstOrNull { it.id == id && it.endedAt != null } ?: return d
+        return d.copy(active = s.copy(reopenedEnd = s.endedAt, endedAt = null, entries = s.entries.map { e -> e.copy(sets = e.sets.map { it.copy(done = true) }) }))
+    }
+
+    /** Superset: join entry [ei] with the next one (or leave the group). */
+    fun toggleSuperset(d: WorkoutData, ei: Int) = editActive(d) { s ->
+        val e = s.entries.getOrNull(ei) ?: return@editActive s
+        val next = s.entries.getOrNull(ei + 1)
+        if (e.superset != null && next?.superset == e.superset) {
+            // Leaving: this one and the next part ways.
+            s.copy(entries = s.entries.mapIndexed { i, x -> if (i == ei) x.copy(superset = null) else x })
+        } else {
+            if (next == null) return@editActive s
+            val g = e.superset ?: next.superset ?: ((s.entries.mapNotNull { it.superset }.maxOrNull() ?: 0) + 1)
+            s.copy(entries = s.entries.mapIndexed { i, x -> if (i == ei || i == ei + 1) x.copy(superset = g) else x })
+        }
+    }
+
+    /** Warm-up sets before the first working set (bar, ~40 %, ~60 %, ~80 %), skipped if it already has some. */
+    fun addWarmups(d: WorkoutData, ei: Int) = editEntry(d, ei) { e ->
+        if (e.sets.any { it.kind == SetKind.WARMUP }) return@editEntry e
+        val top = e.sets.firstOrNull { it.kind != SetKind.WARMUP }?.let { it.weight ?: it.targetWeight } ?: return@editEntry e
+        val ex = d.exercise(e.exerciseId)
+        val warm = Plates.warmups(top, d.settings.barWeight, ex?.roundTo ?: 5.0).map { (w, r) -> SetLog(kind = SetKind.WARMUP, targetWeight = w, targetReps = r) }
+        e.copy(sets = warm + e.sets)
+    }
+
+    fun setSportDay(d: WorkoutData, date: String, sport: String?) =
+        d.copy(sportDays = (if (sport.isNullOrBlank()) d.sportDays - date else d.sportDays + (date to sport)).filterKeys { it >= java.time.LocalDate.now().minusDays(7).toString() })
 
     fun discard(d: WorkoutData) = d.copy(active = null)
 

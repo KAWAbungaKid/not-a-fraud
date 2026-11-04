@@ -2,7 +2,7 @@
 
 Living doc for Maven's workout tracker (the Hevy replacement that talks to Not a Fraud). Read this first in
 any chat about the workout app. Not a Fraud's doc is `docs/STATE.md`; § 16 there is the integration summary.
-Last updated 2026-10-26 (v0.1.0, first build).
+Last updated 2026-11-04 (v0.2.0).
 
 - **Lives in:** the Not a Fraud repo (`github.com/KAWAbungaKid/not-a-fraud`), modules `workout-core/` (pure Kotlin)
   and `workout/` (Android). Same repo so it shares the toolchain, CI and — on purpose — the signing key.
@@ -173,17 +173,28 @@ the workout app sends broadcast `com.maven.workout.CHANGED` explicitly to `com.m
 `com.maven.notafraud.dev`, requiring `com.maven.permission.SYNC`. Not a Fraud registers a manifest receiver for it
 and re-reads `/status`.
 
+## 5b. v0.2.0 (2026-11-04)
+
+`HevyImport` (CSV → sessions, name-matched exercises, de-dup by start time, `Session.source = "hevy"`);
+`Plates.perSide/text/warmups` + `Settings.barWeight/plates` + `Actions.addWarmups`; `RestTimer` (chronometer
+notification + exact alarm → "Rest's over"); `HealthWrite` (ExerciseSessionRecord, strength training,
+clientRecordId `trog-<id>`; Not a Fraud filters this origin out of cardio); `Actions.reopen` / `Session.reopenedEnd`
+(edit a finished workout, keeps its times; not "in progress" in the sync status); `Entry.superset` +
+`Actions.toggleSuperset` (rest after the group); `Volume.week` on History; `WorkoutData.sportDays` written by Not a
+Fraud via `update content://…workout.sync/hint` (date, sport) → `Suggest` swaps an arm-focused day (≥ 50 % of
+exercises mainly shoulders / arms / grip) for another when tomorrow is a sport day.
+
 ## 6. Backlog / ideas (not built)
 
-- Import Hevy history (Hevy exports CSV) so e1RM history starts full.
-- Warm-up set generator and plate calculator for the top set.
-- Rest timer as a notification when the screen is off (now in-app only, screen kept on during a workout).
-- Write finished workouts to Health Connect (ExerciseSession) so Samsung Health / Not a Fraud's stats see them.
+- ~~Import Hevy history~~ (0.2.0).
+- ~~Warm-up set generator and plate calculator~~ (0.2.0).
+- ~~Rest timer notification~~ (0.2.0).
+- ~~Write finished workouts to Health Connect~~ (0.2.0).
 - Other activities (climbing, sports): **decided 2026-11-02** — they do NOT count toward the workout minimum,
   but DO count as cardio. Not a Fraud's sport rule handles them for now; if they get logged here later, keep
   them out of `doneThisWeek` and expose them separately (e.g. `cardioToday`) in the sync status.
 - "Climbing tomorrow" planning: Not a Fraud knows the calendar; it could ask the workout app for a day that avoids
   shoulders/arms (muscles are already on every exercise).
-- Edit a finished workout's sets (now: delete, or fix its date/times).
-- Supersets; per-muscle weekly volume; diet app (separate, later).
+- ~~Edit a finished workout's sets~~ (0.2.0).
+- ~~Supersets; per-muscle weekly volume~~ (0.2.0); diet app is Not a Twig.
 - Onboarding with neutral presets for other people (only Maven's preset exists).

@@ -21,6 +21,8 @@ data class WorkoutData(
     /** The workout in progress, if any. Survives the app being killed. */
     val active: Session? = null,
     val settings: Settings = Settings(),
+    /** From Not a Fraud: date → a sport planned that day ("Climbing"). The day before spares shoulders & arms. */
+    val sportDays: Map<String, String> = emptyMap(),
 ) {
     fun exercise(id: String) = exercises.firstOrNull { it.id == id }
     fun progression(id: String?) = id?.let { p -> progressions.firstOrNull { it.id == p } }
@@ -164,6 +166,8 @@ data class Entry(
     /** Skipped by injured mode (or by hand) — kept so it can be restored. */
     val skipped: Boolean = false,
     val skipReason: String = "",
+    /** Entries sharing a group are a superset: rest comes after the last one of the group. */
+    val superset: Int? = null,
 )
 
 @Serializable
@@ -180,6 +184,10 @@ data class Session(
     val endedAt: Long? = null,
     val entries: List<Entry> = emptyList(),
     val note: String = "",
+    /** Re-opened finished workout being edited: its original end time (kept on save). */
+    val reopenedEnd: Long? = null,
+    /** Imported from Hevy (source tag), not logged here. */
+    val source: String? = null,
 ) {
     val doneSets get() = entries.sumOf { e -> e.sets.count { it.done } }
 }
@@ -231,4 +239,9 @@ data class Settings(
     val unit: String = "lb",
     /** Training max = best e1RM in this many days (injured sessions excluded). */
     val maxWindowDays: Int = 42,
+    /** Bar weight and the plates you have (per side), for the plate calculator. */
+    val barWeight: Double = 45.0,
+    val plates: List<Double> = listOf(45.0, 35.0, 25.0, 10.0, 5.0, 2.5),
+    /** Write finished workouts to Health Connect (Samsung Health sees them). */
+    val writeHealth: Boolean = true,
 )

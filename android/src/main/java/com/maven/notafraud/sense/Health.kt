@@ -77,7 +77,9 @@ object Health {
 
             val end = if (day == today) now else s0.plus(Duration.ofDays(1))
             val dayFilter = TimeRangeFilter.between(s0, end)
-            val workouts = if (EXERCISE in g) runCatching { c.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, dayFilter)).records }.getOrDefault(emptyList()) else emptyList()
+            // Workouts Not a Troglodyte wrote are lifts it already reports itself: they don't count as cardio here.
+            val workouts = if (EXERCISE in g) runCatching { c.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, dayFilter)).records }.getOrDefault(emptyList())
+                .filterNot { it.metadata.dataOrigin.packageName.startsWith("com.maven.workout") } else emptyList()
             val workoutMin = workouts.sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
             val steps = if (STEPS in g) runCatching {
                 c.aggregate(AggregateRequest(metrics = setOf(StepsRecord.COUNT_TOTAL), timeRangeFilter = dayFilter))[StepsRecord.COUNT_TOTAL]

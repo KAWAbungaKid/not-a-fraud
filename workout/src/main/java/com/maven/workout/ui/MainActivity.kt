@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                             is Route.ProgressionEdit -> ProgressionEditScreen(d, top.id, onBack = { back() })
                             is Route.ProgramEdit -> ProgramEditScreen(d, top.id, onOpen = ::open, onBack = { back() })
                             is Route.DayEdit -> DayEditScreen(d, top.programId, top.dayId, onBack = { back() })
-                            is Route.SessionDetail -> SessionDetailScreen(d, top.id, onBack = { back() })
+                            is Route.SessionDetail -> SessionDetailScreen(d, top.id, onBack = { back() }, onEditSets = { back(); open(Route.Workout) })
                         }
                     }
                 }

@@ -275,4 +275,62 @@ class WorkoutTest {
         assertEquals(1, again.current.injuries.size)
         assertEquals(seed.exercises.size, again.current.exercises.size)
     }
+
+    @Test
+    fun `plates and warm-ups`() {
+        val l = Plates.perSide(225.0, 45.0, listOf(45.0, 35.0, 25.0, 10.0, 5.0, 2.5))
+        assertEquals(listOf(45.0, 45.0), l.perSide)
+        assertEquals("2×45 per side", Plates.text(l))
+        assertEquals(listOf(45.0, 2.5), Plates.perSide(140.0, 45.0, listOf(45.0, 2.5)).perSide)
+        val w = Plates.warmups(255.0, 45.0, 5.0)
+        assertEquals(45.0 to 10, w.first())
+        assertTrue(w.all { it.first < 255.0 })
+    }
+
+    @Test
+    fun `edit a finished workout keeps its times`() {
+        var d = Actions.start(seed, seed.program()!!.days.first().id, Mode.NORMAL, mon, 1_000L)
+        d = Actions.completeSet(d, 0, 0, 2_000L)
+        val (fin, s) = Actions.finish(d, 3_600_000L)
+        assertNotNull(s)
+        var x = Actions.reopen(fin, s.id)
+        assertNotNull(x.active)
+        assertFalse(Sync.status(x, mon, 4_000_000L).inProgress)
+        x = Actions.addSet(x, 0)
+        x = Actions.completeSet(x, 0, x.active!!.entries[0].sets.lastIndex, 5_000_000L)
+        val (after, saved) = Actions.finish(x, 9_999_999L)
+        assertEquals(3_600_000L, saved!!.endedAt)
+        assertEquals(1, after.sessions.count { it.id == s.id })
+    }
+
+    @Test
+    fun `climbing tomorrow steers away from shoulders and arms`() {
+        val p = seed.program()!!
+        val arms = p.days.firstOrNull { Suggest.armFocus(seed, it) >= 0.5 } ?: return
+        val done = p.days.filter { it != arms }.take(p.coreDays).map { t ->
+            Session(id = t.id, name = t.name, templateId = t.id, date = mon.toString(), startedAt = 0, endedAt = 1, entries = listOf(Entry(t.exerciseIds.first(), listOf(SetLog(done = true)))))
+        }
+        val d = seed.copy(sessions = done, sportDays = mapOf(mon.plusDays(1).toString() to "Climbing"))
+        val pick = Suggest.today(d, mon).pick
+        if (pick != null) assertTrue(Suggest.armFocus(d, pick.template) < 0.5 || p.days.all { Suggest.armFocus(d, it) >= 0.5 }, pick.reason)
+    }
+
+    @Test
+    fun `hevy csv imports sessions and new exercises`() {
+        val csv = listOf(
+            "title,start_time,end_time,description,exercise_title,superset_id,exercise_notes,set_index,set_type,weight_lbs,reps,distance_miles,duration_seconds,rpe",
+            "\"Push day\",\"20 Oct 2026, 17:05\",\"20 Oct 2026, 18:10\",\"\",\"Bench Press (Barbell)\",\"\",\"\",0,warmup,135,8,,,",
+            "\"Push day\",\"20 Oct 2026, 17:05\",\"20 Oct 2026, 18:10\",\"\",\"Bench Press (Barbell)\",\"\",\"\",1,normal,225,5,,,8",
+            "\"Push day\",\"20 Oct 2026, 17:05\",\"20 Oct 2026, 18:10\",\"\",\"Plank\",\"\",\"\",0,normal,,,,60,",
+        ).joinToString("\n")
+        val zone = java.time.ZoneId.of("America/Chicago")
+        val r = HevyImport.import(seed, csv, zone)
+        assertEquals(1, r.sessions)
+        assertEquals(3, r.sets)
+        val s = r.data.sessions.last()
+        assertEquals("2026-10-20", s.date)
+        assertEquals(SetKind.WARMUP, s.entries.first().sets.first().kind)
+        assertEquals(225.0, s.entries.first().sets[1].weight)
+        assertEquals(0, HevyImport.import(r.data, csv, zone).sessions)
+    }
 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +77,53 @@ fun SettingsScreen(d: WorkoutData) {
                 Switch(s.reminder, { v -> set { it.copy(reminder = v) } })
             }
             Stepper("At hour (24h)", s.reminderHour, 0..23) { v -> set { it.copy(reminderHour = v) } }
+        }
+        Panel {
+            SectionLabel("Bar and plates")
+            Stepper("Bar (${s.unit})", s.barWeight.toInt(), 10..60, step = 5) { v -> set { it.copy(barWeight = v.toDouble()) } }
+            var plates by remember { mutableStateOf(s.plates.joinToString(", ") { com.maven.workout.core.Rpe.fmt(it) }) }
+            OutlinedTextField(plates, { t ->
+                plates = t
+                val list = t.split(',', ' ').mapNotNull { it.trim().toDoubleOrNull() }.filter { it > 0 }
+                if (list.isNotEmpty()) set { it.copy(plates = list.distinct().sortedDescending()) }
+            }, label = { Text("Plates you have (per side)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Dim("Used for \"Plates for 225: 2×45 per side\" and for warm-up sets.")
+        }
+        Panel {
+            SectionLabel("Health Connect")
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            var granted by remember { mutableStateOf<Boolean?>(null) }
+            androidx.compose.runtime.LaunchedEffect(Unit) { granted = com.maven.workout.link.HealthWrite.granted(ctx) }
+            val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()) { g ->
+                granted = com.maven.workout.link.HealthWrite.WRITE in g
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Write finished workouts to Health Connect", Modifier.weight(1f))
+                Switch(s.writeHealth, { v -> set { it.copy(writeHealth = v) } })
+            }
+            Dim(when (granted) { true -> "Allowed. Samsung Health sees your lifts; Not a Fraud doesn't count them as cardio."; false -> "Not allowed yet."; null -> "Checking…" })
+            if (granted == false && com.maven.workout.link.HealthWrite.available(ctx)) OutlinedButton(onClick = { launcher.launch(setOf(com.maven.workout.link.HealthWrite.WRITE)) }) { Text("Allow") }
+        }
+        Panel {
+            SectionLabel("Import from Hevy")
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            var result by remember { mutableStateOf<String?>(null) }
+            val pick = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                scope.launch {
+                    val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { ctx.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() } }.getOrNull() }
+                    if (text == null) { result = "Couldn't read that file."; return@launch }
+                    var r: com.maven.workout.core.HevyImport.Result? = null
+                    Graph.update { val x = com.maven.workout.core.HevyImport.import(it, text, java.time.ZoneId.systemDefault()); r = x; x.data }
+                    result = r?.let { x ->
+                        "Imported ${x.sessions} workouts (${x.sets} sets)." + (if (x.newExercises.isNotEmpty()) " New exercises: ${x.newExercises.joinToString()}. Give them a type in Exercises." else "") +
+                            (if (x.skipped > 0) " Skipped ${x.skipped} rows (already here or unreadable)." else "")
+                    }
+                }
+            }
+            Dim("In Hevy: Profile → ⚙ → Export & import data → Export workouts (CSV). Then pick the file here. e1RMs and history start full; importing the same file twice adds nothing.")
+            OutlinedButton(onClick = { pick.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values", "application/octet-stream")) }) { Text("Pick Hevy CSV…") }
+            result?.let { Text(it, color = Palette.green) }
         }
         Panel {
             SectionLabel("Not a Fraud link")

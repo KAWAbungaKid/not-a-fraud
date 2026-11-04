@@ -67,6 +67,7 @@ import com.maven.workout.core.SetLog
 import com.maven.workout.core.Strength
 import com.maven.workout.core.WorkoutData
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) {
@@ -100,11 +101,23 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
         }
     }
 
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     fun startRest(ex: Exercise, set: SetLog) {
         val heavy = set.kind == SetKind.TOP || set.kind == SetKind.TEST || (set.targetReps ?: set.reps ?: 8) <= 5
         val sec = if (ex.measure == Measure.TIME) 90 else if (heavy) d.settings.restHeavySec else d.settings.restSec
         restEnds = Graph.now() + sec * 1000L
         restBuzzed = false
+        // Also in the notification shade with a buzz at the end, for when the screen is off.
+        com.maven.workout.notify.RestTimer.start(ctx, restEnds, "After ${ex.name}")
+    }
+    /** In a superset, rest comes after the last exercise of the group. */
+    fun continuesSuperset(ei: Int): Boolean {
+        val g = s.entries.getOrNull(ei)?.superset ?: return false
+        return s.entries.getOrNull(ei + 1)?.superset == g
+    }
+    fun finished(saved: Session?) {
+        com.maven.workout.notify.RestTimer.cancel(ctx)
+        if (saved != null && d.settings.writeHealth) scope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { com.maven.workout.link.HealthWrite.write(ctx, saved) } }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -114,6 +127,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(s.name, style = MaterialTheme.typography.titleLarge)
+                        if (s.reopenedEnd != null) Text("Editing the ${s.date} workout · Finish saves, Discard leaves it as it was", color = Palette.amber, style = MaterialTheme.typography.bodySmall)
                         Dim(
                             "Week ${s.week} · Block ${s.block} · ${Fmt.secs(((now - s.startedAt) / 1000).toInt())} ✎ · ${s.doneSets} set${if (s.doneSets == 1) "" else "s"}",
                             Modifier.clickable { editStart = true },
@@ -127,8 +141,8 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
                 }
                 if (restEnds > now) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Rest ${Fmt.secs(((restEnds - now + 999) / 1000).toInt())}", style = Mono.copy(fontSize = 20.sp), color = Palette.accent, modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { restEnds += 30_000 }) { Text("+30s") }
-                    TextButton(onClick = { restEnds = 0L; restBuzzed = true }) { Text("Skip") }
+                    OutlinedButton(onClick = { restEnds += 30_000; com.maven.workout.notify.RestTimer.start(ctx, restEnds, "Rest") }) { Text("+30s") }
+                    TextButton(onClick = { restEnds = 0L; restBuzzed = true; com.maven.workout.notify.RestTimer.cancel(ctx) }) { Text("Skip") }
                 }
             }
         }
@@ -137,7 +151,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
             item { Spacer(Modifier.height(4.dp)) }
             itemsIndexed(s.entries, key = { i, e -> "${s.id}/$i/${e.exerciseId}" }) { ei, e ->
                 val ex = d.exercise(e.exerciseId)
-                if (ex != null) EntryCard(d, s, ei, e, ex, now, onSetDone = { set -> startRest(ex, set) }, onOpen = onOpen)
+                if (ex != null) EntryCard(d, s, ei, e, ex, now, onSetDone = { set -> if (continuesSuperset(ei)) { restEnds = 0L; com.maven.workout.notify.RestTimer.cancel(ctx) } else startRest(ex, set) }, onOpen = onOpen)
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -163,7 +177,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
         onDismissRequest = { confirmDiscard = false },
         title = { Text("Discard this workout?") },
         text = { Text("Nothing from it is saved.") },
-        confirmButton = { TextButton(onClick = { Graph.update { Actions.discard(it) }; confirmDiscard = false; onClose() }) { Text("Discard", color = Palette.red) } },
+        confirmButton = { TextButton(onClick = { Graph.update { Actions.discard(it) }; com.maven.workout.notify.RestTimer.cancel(ctx); confirmDiscard = false; onClose() }) { Text("Discard", color = Palette.red) } },
         dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep going") } },
     )
     if (editStart) TimesDialog("When did you start?", s.startedAt, null, onDismiss = { editStart = false }) { start, _ ->
@@ -176,6 +190,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
             val moved = Actions.setTimes(it, s.id, start, null, java.time.ZoneId.systemDefault())
             val (nd, ss) = Actions.finish(moved, end ?: Graph.now()); saved = ss; nd
         }
+        finished(saved)
         fixFinish = false
         onClose()
         saved?.let { onOpen(Route.SessionDetail(it.id)) }
@@ -197,6 +212,7 @@ fun WorkoutScreen(d: WorkoutData, onClose: () -> Unit, onOpen: (Route) -> Unit) 
                 TextButton(onClick = {
                     var saved: Session? = null
                     Graph.update { val (nd, ss) = Actions.finish(it, Graph.now()); saved = ss; nd }
+                    finished(saved)
                     confirmFinish = false
                     onClose()
                     saved?.let { onOpen(Route.SessionDetail(it.id)) }
@@ -222,6 +238,7 @@ private fun EntryCard(
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
+                e.superset?.let { g -> Text("SUPERSET ${'A' + ((g - 1).mod(26))}", color = Palette.accent, style = MaterialTheme.typography.labelSmall) }
                 Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
                     color = if (e.skipped) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                 Dim(listOfNotNull(
@@ -238,6 +255,9 @@ private fun EntryCard(
                     DropdownMenuItem(text = { Text("Move down") }, onClick = { menu = false; Graph.update { Actions.moveEntry(it, ei, 1) } })
                     DropdownMenuItem(text = { Text(if (e.skipped) "Do light sets" else "Skip today") }, onClick = { menu = false; Graph.update { Actions.toggleSkip(it, ei, today) } })
                     DropdownMenuItem(text = { Text("Remove") }, onClick = { menu = false; Graph.update { Actions.removeEntry(it, ei) } })
+                    val inGroup = e.superset != null && s.entries.getOrNull(ei + 1)?.superset == e.superset
+                    if (ei < s.entries.lastIndex || inGroup) DropdownMenuItem(text = { Text(if (inGroup) "Unlink from the next exercise" else "Superset with the next exercise") }, onClick = { menu = false; Graph.update { Actions.toggleSuperset(it, ei) } })
+                    if (ex.measure == Measure.WEIGHT_REPS && e.sets.none { it.kind == SetKind.WARMUP }) DropdownMenuItem(text = { Text("Add warm-up sets") }, onClick = { menu = false; Graph.update { Actions.addWarmups(it, ei) } })
                     DropdownMenuItem(text = { Text("Exercise details") }, onClick = { menu = false; onOpen(Route.ExerciseEdit(ex.id)) })
                 }
             }
@@ -248,6 +268,10 @@ private fun EntryCard(
             return@Panel
         }
         HeaderRow(ex)
+        // Plate calculator for the heaviest set planned (top set or first working set).
+        if (ex.measure == Measure.WEIGHT_REPS) e.sets.filter { it.kind != SetKind.WARMUP }.mapNotNull { it.weight ?: it.targetWeight }.maxOrNull()?.let { w ->
+            if (w > d.settings.barWeight) Dim("Plates for ${Rpe.fmt(w)}: " + com.maven.workout.core.Plates.text(com.maven.workout.core.Plates.perSide(w, d.settings.barWeight, d.settings.plates)))
+        }
         var workNo = 0
         for ((si, set) in e.sets.withIndex()) {
             val label = when (set.kind) {

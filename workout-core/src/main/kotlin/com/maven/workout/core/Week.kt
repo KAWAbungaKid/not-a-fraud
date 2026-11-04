@@ -184,8 +184,27 @@ object Suggest {
             val most = core.maxByOrNull { bal[it.id] ?: 0 }!!
             why = "${pick.name} ${bal[pick.id] ?: 0}× vs ${most.name} ${bal[most.id] ?: 0}× in 4 weeks — evening it out."
         }
-        val others = p.days.filter { it != pick }
-        return Result(pick?.let { Pick(it, why) }, others, bal, imbalance(core, bal))
+        // Not a Fraud says tomorrow is a sport day (climbing): keep shoulders & arms fresh for it.
+        val sport = d.sportDays[today.plusDays(1).toString()]
+        var finalPick = pick
+        if (sport != null && pick != null && armFocus(d, pick) >= 0.5) {
+            ranked.firstOrNull { armFocus(d, it) < 0.5 }?.let { alt ->
+                finalPick = alt
+                why = "$sport tomorrow: ${alt.name} today, so ${pick.name} doesn't tire you for it."
+            }
+        }
+        val others = p.days.filter { it != finalPick }
+        return Result(finalPick?.let { Pick(it, why) }, others, bal, imbalance(core, bal))
+    }
+
+    private val ARMS = setOf(Muscle.SHOULDERS, Muscle.BICEPS, Muscle.TRICEPS, Muscle.FOREARMS)
+    private val BIG = setOf(Muscle.CHEST, Muscle.BACK, Muscle.QUADS, Muscle.HAMSTRINGS, Muscle.GLUTES)
+
+    /** Share of a day's exercises that are mainly shoulders / arms / grip (what climbing needs fresh). */
+    fun armFocus(d: WorkoutData, t: DayTemplate): Double {
+        val exs = t.exerciseIds.mapNotNull { d.exercise(it) }
+        if (exs.isEmpty()) return 0.0
+        return exs.count { e -> e.muscles.any { it in ARMS } && e.muscles.none { it in BIG } }.toDouble() / exs.size
     }
 
     /** "Push 4× · Legs 1× in 4 weeks" when the core days are lopsided by 2 or more. */

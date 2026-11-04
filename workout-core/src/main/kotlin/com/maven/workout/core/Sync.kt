@@ -72,7 +72,7 @@ object Sync {
             message = w.message(),
             suggestedToday = sug.pick?.template?.name,
             suggestedReason = sug.pick?.reason,
-            inProgress = d.active != null,
+            inProgress = d.active != null && d.active.reopenedEnd == null,
             inProgressName = d.active?.name,
             inProgressStartedAt = d.active?.startedAt,
             lastWorkoutDate = Week.trainedDates(d).maxOrNull()?.toString(),

@@ -46,7 +46,18 @@ class SyncProvider : ContentProvider() {
     override fun getType(uri: Uri): String = "application/json"
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
     override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int = 0
-    override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int = 0
+    /** update content://…sync/hint  date=YYYY-MM-DD sport=Climbing|null: Not a Fraud's "sport tomorrow". */
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int {
+        val ctx = context ?: return 0
+        if (uri.lastPathSegment != "hint" || values == null) return 0
+        val date = values.getAsString("date") ?: return 0
+        Graph.init(ctx)
+        val before = Graph.data.sportDays[date]
+        val sport = values.getAsString("sport")
+        if (before == sport) return 0
+        Graph.update { com.maven.workout.core.Actions.setSportDay(it, date, sport) }
+        return 1
+    }
 }
 
 /**

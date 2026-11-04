@@ -289,6 +289,13 @@ class UnitsAndLabelTest {
         assertTrue(renamed.slots.none { it.name == "Supper" } && renamed.slots.any { it.name == "Dinner" && it.by == "19:00" })
         assertTrue(MealSync.apply(s, "Lunch", null, null, true).slots.none { it.name == "Lunch" })
     }
+}
+
+class TwigV3Test {
+    private val z = ZoneId.of("America/Chicago")
+    private val mon = LocalDate.parse("2026-11-02")
+    private val seed = Seed.data(mon.toString())
+    private fun at(s: String) = LocalDateTime.parse(s).atZone(z).toInstant().toEpochMilli()
 
     @Test
     fun `meal planner fills open slots near the target from what you eat`() {

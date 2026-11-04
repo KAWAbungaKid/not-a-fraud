@@ -48,6 +48,9 @@ fun HistoryScreen(d: WorkoutData, onOpen: (Route) -> Unit) {
                     SectionLabel("Week of ${ws.format(DateTimeFormatter.ofPattern("MMM d"))}", Modifier.weight(1f))
                     Text("$n/${d.settings.minPerWeek}", style = Mono, color = if (n >= d.settings.minPerWeek) Palette.green else Palette.amber)
                 }
+                // Hard sets per muscle that week: what's getting a lot, what's getting nothing.
+                val vol = remember(d.sessions, ws) { com.maven.workout.core.Volume.week(d, ws) }
+                if (vol.isNotEmpty()) Dim("Sets: " + vol.entries.sortedByDescending { it.value }.joinToString(" · ") { "${it.key.label} ${it.value}" })
             }
             items(list, key = { it.id }) { s -> SessionRow(d, s) { onOpen(Route.SessionDetail(s.id)) } }
         }
@@ -76,7 +79,7 @@ fun clock(ms: Long): String = java.time.Instant.ofEpochMilli(ms).atZone(java.tim
 fun minutes(s: Session): Long = ((s.endedAt ?: s.startedAt) - s.startedAt) / 60_000L
 
 @Composable
-fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
+fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit, onEditSets: () -> Unit = {}) {
     val s = d.sessions.firstOrNull { it.id == id }
     if (s == null) { Text("Deleted.", Modifier.padding(16.dp)); return }
     var confirm by remember { mutableStateOf(false) }
@@ -87,7 +90,13 @@ fun SessionDetailScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
             Panel(highlight = prs.isNotEmpty()) {
                 Text(s.name, style = MaterialTheme.typography.headlineSmall)
                 Dim("${s.date} · ${clock(s.startedAt)}–${clock(s.endedAt ?: s.startedAt)} · ${minutes(s)} min · Week ${s.week} Block ${s.block} · ${s.mode.label}")
-                TextButton(onClick = { editTimes = true }) { Text("Edit date & times") }
+                Row {
+                    TextButton(onClick = { editTimes = true }) { Text("Edit date & times") }
+                    TextButton(onClick = {
+                        if (Graph.data.active == null) { Graph.update { com.maven.workout.core.Actions.reopen(it, s.id) }; onEditSets() }
+                    }, enabled = d.active == null) { Text("Edit sets") }
+                }
+                if (s.source == "hevy") Dim("Imported from Hevy.")
                 Text("${s.doneSets} set${if (s.doneSets == 1) "" else "s"} · volume ${Rpe.fmt(Rpe.round(Strength.volume(s), 1.0))} ${d.settings.unit}", style = Mono)
                 if (prs.isNotEmpty()) {
                     SectionLabel("Personal records")

@@ -559,8 +559,7 @@ private fun AnchorEditor(initial: Anchor, data: AppData, isNew: Boolean, onDismi
                 }
                 SectionLabel("How firm")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Habit blocks are practice tasks with a fixed time since v0.11 (one practice type).
-                    com.maven.notafraud.core.model.AnchorMode.entries.filter { it != com.maven.notafraud.core.model.AnchorMode.HABIT || a.mode == it }.forEach { m ->
+                    com.maven.notafraud.core.model.AnchorMode.entries.forEach { m ->
                         androidx.compose.material3.FilterChip(a.mode == m, { a = a.copy(mode = m) }, { Text(m.name.lowercase()) })
                     }
                 }

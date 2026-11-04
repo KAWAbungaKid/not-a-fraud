@@ -98,9 +98,32 @@ object Actions {
         val merged = if (old == null) a else old.copy(
             activeKcal = a.activeKcal ?: old.activeKcal, steps = a.steps ?: old.steps,
             liftMin = a.liftMin ?: old.liftMin, liftStartAt = a.liftStartAt ?: old.liftStartAt, updatedAt = a.updatedAt,
+            sleepH = a.sleepH ?: old.sleepH,
         )
         if (merged == old) return d
         return d.copy(activity = (d.activity.filter { it.date != a.date } + merged).sortedBy { it.date }.takeLast(400))
+    }
+
+    fun saveExperiment(d: DietData, e: Experiment) =
+        d.copy(experiments = if (d.experiments.any { it.id == e.id }) d.experiments.map { if (it.id == e.id) e else it } else d.experiments + e)
+
+    fun deleteExperiment(d: DietData, id: String) = d.copy(experiments = d.experiments.filter { it.id != id })
+
+    fun markExperimentDay(d: DietData, id: String, date: LocalDate, followed: Boolean?, gym: Int? = null) = d.copy(experiments = d.experiments.map { e ->
+        if (e.id != id) e else e.copy(
+            followed = if (followed == null) e.followed - date.toString() else e.followed + (date.toString() to followed),
+            gym = if (gym == null) e.gym else e.gym + (date.toString() to gym),
+        )
+    })
+
+    /** Log a planned day (meal planner) into the diary, slot by slot. */
+    fun logPlan(d: DietData, date: LocalDate, plan: MealPlanner.DayPlan, at: Long): DietData = plan.slots.fold(d) { acc, s ->
+        s.items.fold(acc) { x, it ->
+            when (it) {
+                is MealPlanner.Pick.FoodPick -> logFood(x, date, s.slot, it.foodId, it.servings, at)
+                is MealPlanner.Pick.MealPick -> logMeal(x, date, s.slot, it.mealId, it.portions, at)
+            }
+        }
     }
 
     fun profile(d: DietData, f: (Profile) -> Profile) = d.copy(profile = f(d.profile))

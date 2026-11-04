@@ -83,6 +83,9 @@ object Remedies {
         val fast = Fasting.status(d, now, zone)
         val eaten = Diary.totals(d, today)
         val hour = Instant.ofEpochMilli(now).atZone(zone).hour
+        d.activity.firstOrNull { it.date == today.toString() }?.sleepH?.takeIf { it < 6.5 }?.let { h ->
+            out += Suggestion("Short night (${"%.1f".format(h)} h)", "Not food's fault. Eat on time, get daylight early, caffeine before 2 pm only, and keep tonight's bedtime.")
+        }
         fast.hoursSinceFood?.let { h ->
             if (h >= 5 && fast.inWindow) out += Suggestion("Eat a real meal", "${"%.0f".format(h)} h since you last ate. Protein + carbs (chicken and rice counts).")
             else if (h >= 14 && !fast.inWindow) out += Suggestion("Consider breaking the fast early", "${"%.0f".format(h)} h fasted and you feel bad — note it; that's exactly what the fasting experiment wants to know.")

@@ -34,7 +34,7 @@ class V9Test {
             d.copy(schema = 8, routine = d.routine.map { it.copy(dietSlot = null, autoCheck = if (it.id == "r-cardio") null else it.autoCheck, title = if (it.id == "r-workout") "Workout (lift, climb...)" else it.title) })
         }
         val v9 = Migration.apply(old, at(4))
-        assertEquals(9, v9.schema)
+        assertEquals(Migration.CURRENT, v9.schema)
         assertEquals("Lunch", v9.routine.first { it.id == "r-lunch" }.dietSlot)
         assertEquals("Supper", v9.routine.first { it.id == "r-supper" }.dietSlot)
         assertEquals("Pre-workout", v9.routine.first { it.id == "r-meal1" }.dietSlot)

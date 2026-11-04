@@ -18,6 +18,7 @@ object Insights {
         val waterOz: Double,
         val trained: Boolean, val activeKcal: Double?,
         val clarity: Int?, val energy: Int?,
+        val sleepH: Double? = null,
     )
 
     fun rows(d: DietData, zone: ZoneId, until: LocalDate, days: Int = 90): List<Row> {
@@ -32,7 +33,7 @@ object Insights {
                 val z = Instant.ofEpochMilli(it).atZone(zone); z.hour + z.minute / 60.0
             }
             Row(dt, m.kcal, m.protein, m.carbs, Fasting.overnightHours(d, dt), first, Diary.waterOz(d, dt),
-                (a?.liftMin ?: 0) > 0, a?.activeKcal, c?.clarity, c?.energy)
+                (a?.liftMin ?: 0) > 0, a?.activeKcal, c?.clarity, c?.energy, a?.sleepH)
         }
     }
 
@@ -68,6 +69,7 @@ object Insights {
         split("Protein", "higher-protein days", "lower-protein days") { if (it.protein > 0) it.protein >= pMed else null }
         split("Water", "80+ oz water", "under 80 oz") { it.waterOz >= 80 }
         split("Training", "lifted", "didn't lift") { it.trained }
+        split("Sleep", "slept 7 h+", "under 7 h") { it.sleepH?.let { h -> h >= 7 } }
         return out.sortedByDescending { it.strength }
     }
 }

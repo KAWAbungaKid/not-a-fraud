@@ -97,7 +97,8 @@ class V10Test {
     @Test
     fun `habit blocks became practice with a fixed time`() {
         val fresh = Seed.data(at(4))
-        assertTrue(fresh.anchors.none { it.mode == com.maven.notafraud.core.model.AnchorMode.HABIT && it.dates.isEmpty() })
+        assertTrue(fresh.anchors.none { it.mode == com.maven.notafraud.core.model.AnchorMode.HABIT && it.yieldsToHot && it.dates.isEmpty() })
+        assertTrue(fresh.anchors.any { it.title.startsWith("Weekly review") }, "rhythm blocks stay blocks")
         val cswe = fresh.tasks.first { it.title == "CSWE practice" }
         assertEquals(com.maven.notafraud.core.model.TaskKind.PRACTICE, cswe.kind)
         assertEquals(setOf(7), cswe.fixedDays)

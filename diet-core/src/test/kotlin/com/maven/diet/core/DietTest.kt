@@ -289,4 +289,71 @@ class UnitsAndLabelTest {
         assertTrue(renamed.slots.none { it.name == "Supper" } && renamed.slots.any { it.name == "Dinner" && it.by == "19:00" })
         assertTrue(MealSync.apply(s, "Lunch", null, null, true).slots.none { it.name == "Lunch" })
     }
+
+    @Test
+    fun `meal planner fills open slots near the target from what you eat`() {
+        var d = seed
+        val past = mon.minusDays(3)
+        // Two past days of chicken and rice so the planner knows the usual amounts.
+        for (k in 0..1) {
+            val day = past.plusDays(k.toLong())
+            d = Actions.logFood(d, day, "Lunch", "chicken-breast-cooked", 2.0, at("${day}T13:00"))
+            d = Actions.logFood(d, day, "Lunch", "rice-white-cooked", 1.5, at("${day}T13:00"))
+            d = Actions.logFood(d, day, "Supper", "oats", 2.0, at("${day}T19:00"))
+        }
+        val t = Targets.forDay(d, mon, workoutSaysLikely = true).macros
+        val plan = MealPlanner.plan(d, mon, t, seed = 1)
+        assertEquals(listOf("Lunch", "Pre-workout", "Supper"), plan.slots.map { it.slot })
+        assertTrue(plan.macros.kcal > t.kcal * 0.6, "${plan.macros.kcal} vs ${t.kcal}")
+        val logged = Actions.logPlan(d, mon, plan, at("2026-11-02T12:30"))
+        assertTrue(Diary.entries(logged, mon).isNotEmpty())
+        val g = MealPlanner.groceries(d, listOf(plan))
+        assertTrue(g.isNotEmpty())
+    }
+
+    @Test
+    fun `experiments alternate and compare followed days`() {
+        val e = Experiment("e1", "Chocolate milk timing", "15 min before", "3 h before", mon.toString(), days = 10)
+        assertEquals('A', Experiments.conditionOn(e, mon))
+        assertEquals('B', Experiments.conditionOn(e, mon.plusDays(1)))
+        assertNull(Experiments.conditionOn(e, mon.plusDays(10)))
+        var d = Actions.saveExperiment(seed, e)
+        for (k in 0..7) {
+            val day = mon.plusDays(k.toLong())
+            d = Actions.checkIn(d, day, 3, if (k % 2 == 0) 5 else 2, at("${day}T15:00"))
+            d = Actions.markExperimentDay(d, "e1", day, true)
+        }
+        val r = Experiments.results(d, d.experiments.first()).first { it.metric == "Energy" }
+        assertEquals(5.0, r.a, 0.01); assertEquals(2.0, r.b, 0.01)
+        assertEquals("likely real", r.verdict)
+    }
+
+    @Test
+    fun `open food facts product becomes a food`() {
+        val body = """{"status":1,"product":{"product_name":"Greek Yogurt","brands":"Fage, Total","serving_size":"170 g","serving_quantity":170,
+            "nutriments":{"energy-kcal_serving":100,"proteins_serving":18,"carbohydrates_serving":6,"fat_serving":0,"sodium_serving":0.065}}}"""
+        val p = OpenFoodFacts.parse(body, "0689544001300", "greek-yogurt")!!
+        assertEquals("Greek Yogurt", p.food.name)
+        assertEquals("Fage", p.food.brand)
+        assertEquals(100.0, p.food.kcal, 0.01)
+        assertEquals(18.0, p.food.protein, 0.01)
+        assertEquals(65.0, p.food.nutrients[Nutrient.SODIUM]!!, 0.01)
+        assertTrue(p.perServing)
+        assertNull(OpenFoodFacts.parse("""{"status":0}""", "1", "x"))
+    }
+
+    @Test
+    fun `weekly review suggests one change`() {
+        var d = seed
+        val wk = mon.minusDays(7)
+        for (k in 0..13) {
+            val day = wk.minusDays(7).plusDays(k.toLong())
+            d = Actions.setWeight(d, day, 200.0 - k * 0.1, at("${day}T07:00"))
+            d = Actions.logFood(d, day, "Lunch", "chicken-breast-cooked", 3.0, at("${day}T13:00"))
+            d = Actions.setComplete(d, day, true)
+        }
+        val r = WeeklyReview.build(d, wk, mon)
+        assertEquals(7, r.completeDays)
+        assertTrue(r.suggestion.contains("Below your goal") || r.suggestion.contains("On track"), r.suggestion)
+    }
 }

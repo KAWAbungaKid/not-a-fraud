@@ -184,6 +184,8 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
     var fat by remember { mutableStateOf(Num.fmt(f?.fat)) }
     val nut = remember { Nutrient.entries.associateWith { mutableStateOf(Num.fmt(f?.nutrients?.get(it))) } }
     var archived by remember { mutableStateOf(f?.archived ?: false) }
+    var price by remember { mutableStateOf(Num.fmt(f?.price)) }
+    var barcode by remember { mutableStateOf(f?.barcode) }
     val ok = name.isNotBlank() && kcal.toDoubleOrNull() != null && p.toDoubleOrNull() != null && c.toDoubleOrNull() != null && fat.toDoubleOrNull() != null
     val calc = (p.toDoubleOrNull() ?: 0.0) * 4 + (c.toDoubleOrNull() ?: 0.0) * 4 + (fat.toDoubleOrNull() ?: 0.0) * 9
     val k = kcal.toDoubleOrNull()
@@ -207,6 +209,20 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
                             else -> "Read ${l.found} values; couldn't find ${l.missing.joinToString()}. Fill those in by hand and check the rest."
                         }
                     }.onFailure { scanNote = "Couldn't read the photo: ${it.message ?: it.javaClass.simpleName}" }
+                }
+                BarcodeButton(newId = { Actions.newFoodId(Graph.data, it) }) { r ->
+                    r.onSuccess { o ->
+                        val x = o.food
+                        if (x.name.isNotBlank()) name = x.name
+                        if (x.brand.isNotBlank()) brand = x.brand
+                        serving = x.serving
+                        x.servingGrams?.let { grams = Num.fmt(it) }
+                        kcal = Num.fmt(x.kcal); p = Num.fmt(x.protein); c = Num.fmt(x.carbs); fat = Num.fmt(x.fat)
+                        for ((n, v) in x.nutrients) nut.getValue(n).value = Num.fmt(Math.round(v * 10) / 10.0)
+                        barcode = x.barcode
+                        scanNote = "From Open Food Facts (community data, per ${if (o.perServing) "serving" else "100 g"})" +
+                            (if (o.missing.isEmpty()) "" else "; missing ${o.missing.joinToString()}") + ". Check it against the package."
+                    }.onFailure { scanNote = it.message ?: "Couldn't look that barcode up." }
                 }
                 scanNote?.let { Text(it, color = Palette.amber) }
                 LabelField("Name", name, false) { name = it }
@@ -253,6 +269,7 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
                     val st = nut.getValue(n)
                     LabelField("${n.label} (${n.unit})", st.value, true) { st.value = it }
                 }
+                LabelField("Price per serving, \$ (optional, for the meal planner)", price, true) { price = it }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Archived (hidden when adding)", Modifier.weight(1f))
                     Switch(archived, { archived = it })
@@ -274,6 +291,8 @@ fun FoodEditScreen(d: DietData, id: String?, onDone: () -> Unit) {
                     nutrients = nut.mapNotNull { (n, st) -> st.value.toDoubleOrNull()?.let { n to it } }.toMap(),
                     source = if (f?.source == "builtin" && f.kcal == kcal.toDouble() && f.protein == p.toDouble()) "builtin" else "label",
                     archived = archived,
+                    price = price.toDoubleOrNull()?.takeIf { it >= 0 },
+                    barcode = barcode,
                 )
                 Graph.update { Actions.saveFood(it, food) }
                 onDone()

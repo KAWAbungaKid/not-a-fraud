@@ -23,6 +23,8 @@ data class DietData(
     /** Per-day override of training vs rest targets ("2026-11-02" → true = training). */
     val trainingOverride: Map<String, Boolean> = emptyMap(),
     val settings: Settings = Settings(),
+    /** Self-experiments (§ 5 step 5): one question, two conditions, alternating days. */
+    val experiments: List<Experiment> = emptyList(),
 ) {
     fun food(id: String) = foods.firstOrNull { it.id == id }
     fun meal(id: String) = meals.firstOrNull { it.id == id }
@@ -86,6 +88,10 @@ data class Food(
     /** "label" (typed by you), "builtin" (approximate, from USDA / typical labels). */
     val source: String = "label",
     val archived: Boolean = false,
+    /** What one serving costs (dollars), for the meal planner's budget and the grocery list. Optional. */
+    val price: Double? = null,
+    /** Barcode it was scanned from (Open Food Facts). */
+    val barcode: String? = null,
 )
 
 @Serializable
@@ -144,6 +150,27 @@ data class DayActivity(
     val liftMin: Int? = null,
     val liftStartAt: Long? = null,
     val updatedAt: Long = 0,
+    /** Night sleep that ended this morning (Health Connect, from the watch). */
+    val sleepH: Double? = null,
+)
+
+/**
+ * A self-experiment: does [conditionA] or [conditionB] give better energy / clarity / gym ratings?
+ * Days alternate A, B, A, B… from [start] for [days] days. Each day can be marked done-as-planned (or not).
+ */
+@Serializable
+data class Experiment(
+    val id: String,
+    val question: String,
+    val conditionA: String,
+    val conditionB: String,
+    val start: String,
+    val days: Int = 14,
+    /** date → followed the day's condition. Days not followed are left out of the result. */
+    val followed: Map<String, Boolean> = emptyMap(),
+    /** date → how the workout felt, 1–5 (optional extra measure). */
+    val gym: Map<String, Int> = emptyMap(),
+    val ended: Boolean = false,
 )
 
 @Serializable

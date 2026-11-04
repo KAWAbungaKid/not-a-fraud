@@ -244,7 +244,7 @@ private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, on
                     " · $w/${i.weeklyTarget} this week" + if (tally.sport > 0) " (${tally.standard} standard + ${tally.sport} sport" + (if (tally.standard < RoutinePolicy.STANDARD_FIRST) ", sport counts after ${RoutinePolicy.STANDARD_FIRST} standard)" else ")") else ""
                 } ?: "") +
                     (if (i.trigger == RoutineTrigger.BEDTIME && st.mood != Mood.DONE) " · checks when you go to bed" else "") +
-                    (if (i.openPkg != null && st.mood != Mood.DONE) " · opens " + com.maven.notafraud.sense.AppLabels.label(LocalContext.current, i.openPkg) + " on unlock" else "")
+                    (if (i.openPkg != null && st.mood != Mood.DONE) " · opens " + com.maven.notafraud.sense.AppLabels.label(LocalContext.current, i.openPkg!!) + " on unlock" else "")
                 Text(line, color = color, style = MaterialTheme.typography.bodySmall)
             }
             Box(Modifier.size(10.dp).clip(CircleShape).background(color))

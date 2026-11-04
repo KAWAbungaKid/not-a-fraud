@@ -584,3 +584,14 @@ Health Connect write, edit finished, supersets, weekly volume, climbing tomorrow
 **Still open from § 19 (not asked for now):** "ready for other people" (onboarding, neutral templates, editable
 fixed lists), phone/PC sync, Obtainium. Samsung "never sleeping" step still unconfirmed. Stale web-app task review
 exists (Now → review queue). Ideas: NFC key for the ladder; ladder tuning after a week of use.
+
+
+## 23. v0.12.0 (2026-11-03): routine items open an app on unlock
+
+Maven: "a way for routine items to automatically open apps as the brick level adds up… when I need to read the bible
+per my routine, make it open the app when my phone is unlocked. Just build the feature, nothing set up yet."
+`RoutineItem.openPkg / openFromStage (0 due, 1 late, 2 angry) / openAtLevel / openEveryMin / openDoneMin`;
+`RoutineDay.opened / appMin`. `RoutinePolicy.appToOpen` (angriest first, throttled, not after quiet time); GuardService
+on USER_PRESENT launches it (takes precedence over unlock → Now); `Actions.routineAppTime` from `leave()` adds the
+minutes and ticks at `openDoneMin`. Routine-open apps are always allowed at Level 3 / bedtime (`Ladder.allowedAtTop`).
+No seeded items use it.

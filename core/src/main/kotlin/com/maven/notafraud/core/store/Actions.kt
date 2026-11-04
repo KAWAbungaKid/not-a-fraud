@@ -173,6 +173,31 @@ object Actions {
     fun uncheckRoutine(d: AppData, itemId: String, date: LocalDate) =
         editDay(d, date.toString()) { it.copy(done = it.done - itemId, notes = it.notes - itemId) }
 
+    fun markOpened(d: AppData, itemId: String, at: Long): AppData {
+        val date = Time.dateOf(at, Time.zone(d.settings.zoneId)).toString()
+        return editDay(d, date) { it.copy(opened = it.opened + (itemId to at)) }
+    }
+
+    /**
+     * Time just spent in [pkg]: adds to every due routine item that opens it, and ticks those that reach their
+     * "done after N minutes" (note: "in <app>"). Only counts while the item applies today and isn't done.
+     */
+    fun routineAppTime(d: AppData, pkg: String, minutes: Int, now: Long, appLabel: String = "the app"): AppData {
+        if (minutes <= 0) return d
+        val zone = Time.zone(d.settings.zoneId)
+        val date = Time.dateOf(now, zone)
+        var x = d
+        for (item in d.routine) {
+            if (item.openPkg != pkg || !item.enabled || !com.maven.notafraud.core.routine.RoutinePolicy.appliesOn(item, date)) continue
+            val day = com.maven.notafraud.core.routine.RoutinePolicy.day(x, date)
+            if (item.id in day.done) continue
+            val total = (day.appMin[item.id] ?: 0) + minutes
+            x = editDay(x, date.toString()) { it.copy(appMin = it.appMin + (item.id to total)) }
+            if (item.openDoneMin > 0 && total >= item.openDoneMin) x = checkRoutine(x, item.id, now, "${total} min in $appLabel")
+        }
+        return x
+    }
+
     /** A STREAK item was broken on [date]: the count starts over from the next day. */
     fun breakStreak(d: AppData, itemId: String, date: LocalDate, at: Long) =
         editDay(d, date.toString()) { it.copy(broken = it.broken + (itemId to at)) }

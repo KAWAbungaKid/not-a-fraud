@@ -123,4 +123,27 @@ class V10Test {
         assertEquals(60, piano.weeklyTargetMin)
         assertTrue(v.anchors.none { it.title == "Piano" })
     }
+
+    @Test
+    fun `routine items open their app on unlock and tick after time in it`() {
+        val bible = com.maven.notafraud.core.model.RoutineItem(
+            id = "bible", title = "Read the Bible", startMin = 7 * 60, dueMin = 8 * 60, angryMin = 9 * 60,
+            openPkg = "com.sirma.mobile.bible.android", openFromStage = 1, openAtLevel = 0, openEveryMin = 15, openDoneMin = 15,
+        )
+        var d = base().copy(routine = listOf(bible))
+        assertEquals(null, com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d, at(7, 30), 0), "due but not late yet")
+        assertEquals("bible", com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d, at(8, 10), 0)?.id)
+        assertEquals(null, com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d.copy(routine = listOf(bible.copy(openAtLevel = 2))), at(8, 10), 1), "ladder too low")
+        d = Actions.markOpened(d, "bible", at(8, 10))
+        assertEquals(null, com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d, at(8, 20), 0), "opened 10 min ago")
+        assertEquals("bible", com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d, at(8, 26), 0)?.id)
+        d = Actions.routineAppTime(d, "com.sirma.mobile.bible.android", 9, at(8, 30))
+        assertFalse(com.maven.notafraud.core.routine.RoutinePolicy.day(d, day).done.containsKey("bible"))
+        d = Actions.routineAppTime(d, "com.sirma.mobile.bible.android", 7, at(8, 45))
+        assertTrue(com.maven.notafraud.core.routine.RoutinePolicy.day(d, day).done.containsKey("bible"))
+        assertEquals(null, com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(d, at(9, 30), 3), "done: no more opening")
+        // Always opens at Level 3 / bedtime.
+        val locked = d.copy(settings = d.settings.copy(ladder = d.settings.ladder.copy(allowlistConfirmed = true)))
+        assertTrue(Ladder.allowedAtTop(locked, "com.sirma.mobile.bible.android", true))
+    }
 }

@@ -96,6 +96,8 @@ object Ladder {
         val l = d.settings.ladder
         if (FAMILY.any { pkg.startsWith(it) } || pkg in GuardPolicy.SAFE || pkg in d.rules.alwaysAllowed) return true
         if (pkg in d.rules.focus) return true
+        // Apps your routine opens (Bible, a reading app…) always open: they're how you get the item done.
+        if (pkg in com.maven.notafraud.core.routine.RoutinePolicy.openApps(d)) return true
         return pkg in l.allowlist || (bedtime && pkg in l.bedtimeExtra)
     }
 

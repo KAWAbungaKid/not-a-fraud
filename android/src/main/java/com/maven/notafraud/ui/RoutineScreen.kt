@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -242,7 +243,8 @@ private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, on
                     val tally = RoutinePolicy.weekTally(d, i, Time.dateOf(System.currentTimeMillis(), zone))
                     " · $w/${i.weeklyTarget} this week" + if (tally.sport > 0) " (${tally.standard} standard + ${tally.sport} sport" + (if (tally.standard < RoutinePolicy.STANDARD_FIRST) ", sport counts after ${RoutinePolicy.STANDARD_FIRST} standard)" else ")") else ""
                 } ?: "") +
-                    (if (i.trigger == RoutineTrigger.BEDTIME && st.mood != Mood.DONE) " · checks when you go to bed" else "")
+                    (if (i.trigger == RoutineTrigger.BEDTIME && st.mood != Mood.DONE) " · checks when you go to bed" else "") +
+                    (if (i.openPkg != null && st.mood != Mood.DONE) " · opens " + com.maven.notafraud.sense.AppLabels.label(LocalContext.current, i.openPkg) + " on unlock" else "")
                 Text(line, color = color, style = MaterialTheme.typography.bodySmall)
             }
             Box(Modifier.size(10.dp).clip(CircleShape).background(color))
@@ -393,6 +395,7 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                         com.maven.notafraud.core.model.AutoCheck.PICK3 to "you pick tomorrow's 3",
                     )) FilterChip(r.autoCheck == a, { r = r.copy(autoCheck = a) }, { Text(label) })
                 }
+                OpenAppSection(r) { r = it }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Also check when going to bed", Modifier.weight(1f))
                     Switch(r.trigger == RoutineTrigger.BEDTIME, { r = r.copy(trigger = if (it) RoutineTrigger.BEDTIME else RoutineTrigger.TIME) })
@@ -426,6 +429,58 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
             }
             picking = null
         }
+    }
+}
+
+/** "Open an app when I unlock": which app, from when, at what ladder level, and whether time in it ticks the item. */
+@Composable
+private fun OpenAppSection(r: RoutineItem, onChange: (RoutineItem) -> Unit) {
+    val ctx = LocalContext.current
+    var picking by remember { mutableStateOf(false) }
+    SectionLabel("Open an app when I unlock")
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(r.openPkg == null, { onChange(r.copy(openPkg = null)) }, { Text("off") })
+        FilterChip(r.openPkg != null, { picking = true }, { Text(r.openPkg?.let { com.maven.notafraud.sense.AppLabels.label(ctx, it) } ?: "pick an app…") })
+    }
+    if (r.openPkg != null) {
+        Text("Open it once it's", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((v, label) in listOf(0 to "due", 1 to "late", 2 to "angry")) FilterChip(r.openFromStage == v, { onChange(r.copy(openFromStage = v)) }, { Text(label) })
+        }
+        Text("Only when the brick ladder is at least", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (v in 0..3) FilterChip(r.openAtLevel == v, { onChange(r.copy(openAtLevel = v)) }, { Text(if (v == 0) "any level" else "${v} · ${com.maven.notafraud.core.guard.Ladder.NAMES[v]}") })
+        }
+        Text("Open it again after", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (v in listOf(5, 15, 30, 60)) FilterChip(r.openEveryMin == v, { onChange(r.copy(openEveryMin = v)) }, { Text("${v}m") })
+        }
+        Text("Tick it after this long in the app", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (v in listOf(0, 5, 10, 15, 20, 30)) FilterChip(r.openDoneMin == v, { onChange(r.copy(openDoneMin = v)) }, { Text(if (v == 0) "by hand" else "${v}m") })
+        }
+        Text("Unlocking while it's due takes you straight into the app (never during a call or after quiet time). This app always opens, even at Level 3 or bedtime.",
+            color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+    }
+    if (picking) {
+        val apps = remember { com.maven.notafraud.sense.AppLabels.launchable(ctx) }
+        var query by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text("Which app?") },
+            text = {
+                Column {
+                    OutlinedTextField(query, { query = it }, placeholder = { Text("Search") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                        items(apps.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }, key = { it.pkg }) { app ->
+                            Text(app.label, Modifier.fillMaxWidth().clickable { onChange(r.copy(openPkg = app.pkg)); picking = false }.padding(vertical = 12.dp))
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancel") } },
+        )
     }
 }
 

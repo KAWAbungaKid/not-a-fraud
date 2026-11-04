@@ -230,6 +230,31 @@ object RoutinePolicy {
     fun dietItem(n: com.maven.notafraud.core.diet.SyncNag) =
         RoutineItem(id = DietLink.PREFIX + n.key, title = n.title, category = RoutineCategory.OTHER, startMin = 0, dueMin = 0, angryMin = 0)
 
+    // ---- Open an app on unlock ---------------------------------------------------------------
+
+    private fun stage(m: Mood) = when (m) { Mood.DUE -> 0; Mood.LATE -> 1; Mood.ANGRY -> 2; else -> -1 }
+
+    /**
+     * The routine item whose app should open on this unlock, if any: due and not done, far enough along
+     * ([RoutineItem.openFromStage]), the ladder high enough ([RoutineItem.openAtLevel]), not opened in the last
+     * [RoutineItem.openEveryMin]. The angriest wins; ties go to routine order. Never after quiet time.
+     */
+    fun appToOpen(d: AppData, now: Long, ladderLevel: Int): RoutineItem? {
+        val zone = Time.zone(d.settings.zoneId)
+        if (Time.minuteOfDay(now, zone) >= QUIET_AFTER_MIN) return null
+        val today = day(d, Time.dateOf(now, zone))
+        return statuses(d, now)
+            .filter { st ->
+                val i = st.item
+                i.openPkg != null && i.category != RoutineCategory.STREAK && stage(st.mood) >= i.openFromStage &&
+                    ladderLevel >= i.openAtLevel && (today.opened[i.id]?.let { now - it >= i.openEveryMin * Time.MIN } ?: true)
+            }
+            .maxByOrNull { stage(it.mood) * 1000 - it.item.order }?.item
+    }
+
+    /** Apps routine items open: these always open, even at Level 3 / bedtime. */
+    fun openApps(d: AppData): Set<String> = d.routine.filter { it.enabled }.mapNotNull { it.openPkg }.toSet()
+
     /** Never a wall of notifications: at most this many at once, the most pressing first. */
     const val MAX_AT_ONCE = 2
 

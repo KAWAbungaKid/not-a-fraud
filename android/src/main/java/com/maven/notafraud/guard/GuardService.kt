@@ -56,9 +56,16 @@ class GuardService : AccessibilityService() {
                 Intent.ACTION_USER_PRESENT -> {
                     val n = System.currentTimeMillis()
                     Graph.update { d -> Actions.autoFromHealth(Actions.recordFirstUnlock(d, n), Graph.today()) }
-                    // Ladder Level 2+: unlocking lands on Now first (what to do, and why the phone is dull).
                     val lad = com.maven.notafraud.core.guard.Ladder.state(Graph.data, n)
-                    if (lad.level >= Graph.data.settings.ladder.unlockToNowFrom && lad.level > 0 && !inCall()) {
+                    // A routine item that opens an app (read the Bible…): unlocking lands right in it.
+                    val routineApp = if (inCall()) null else com.maven.notafraud.core.routine.RoutinePolicy.appToOpen(Graph.data, n, lad.level)
+                    val launch = routineApp?.openPkg?.let { packageManager.getLaunchIntentForPackage(it) }
+                    if (routineApp != null && launch != null) {
+                        Graph.update { d -> Actions.markOpened(d, routineApp.id, n) }
+                        GuardLog.add(label(routineApp.openPkg!!), "opened for routine: ${routineApp.title}")
+                        runCatching { startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)) }
+                    } else if (lad.level >= Graph.data.settings.ladder.unlockToNowFrom && lad.level > 0 && !inCall()) {
+                        // Ladder Level 2+: unlocking lands on Now first (what to do, and why the phone is dull).
                         runCatching {
                             startActivity(Intent(this@GuardService, com.maven.notafraud.ui.MainActivity::class.java)
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -341,6 +348,11 @@ class GuardService : AccessibilityService() {
                     d.copy(ledger = Credits.earn(d.ledger, d.settings, minutes, d.settings.earnPerFocusMin, "Focus: $label", now))
                 }
             }
+        }
+        // Time in an app a routine item opens counts toward that item ("done after 15 min in the Bible app").
+        if (pkg != null && !pkg.startsWith(Sites.PREFIX) && Graph.data.routine.any { it.openPkg == pkg }) {
+            val minutes = ((now - enteredAt) / 60_000L).toInt().coerceAtMost(180)
+            if (minutes >= 1) Graph.update { d -> Actions.routineAppTime(d, pkg, minutes, now, label(pkg)) }
         }
         if (currentAction == GuardAction.UNLOCKED) { Notifier.cancelNag(this); Notifier.cancelWindow(this) }
         cancelPending()

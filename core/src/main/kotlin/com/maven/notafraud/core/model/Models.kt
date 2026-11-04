@@ -271,6 +271,17 @@ data class RoutineItem(
     val streakSince: String? = null,
     /** Switched off because Not a Twig's meal schedule has no slot for it; switched back on if Twig goes away. */
     val pausedByDiet: Boolean = false,
+    /**
+     * Open an app on unlock (STATE.md § 23): while this item is due (and not done), unlocking the phone opens [openPkg]
+     * once it's at least [openFromStage] (0 = in its window, 1 = late, 2 = angry) and the brick ladder is at least
+     * [openAtLevel]. Opens again at most every [openEveryMin] minutes.
+     */
+    val openPkg: String? = null,
+    val openFromStage: Int = 0,
+    val openAtLevel: Int = 0,
+    val openEveryMin: Int = 15,
+    /** Ticks itself after this many minutes in [openPkg] while it's due (0 = tick by hand). */
+    val openDoneMin: Int = 0,
 )
 
 /** What can tick a routine item on its own. */
@@ -358,6 +369,10 @@ data class RoutineDay(
     val alerted: Map<String, Long> = emptyMap(),
     /** STREAK items broken on this day, and when that was said. */
     val broken: Map<String, Long> = emptyMap(),
+    /** Last time each item's app was opened on unlock. */
+    val opened: Map<String, Long> = emptyMap(),
+    /** Minutes spent in each item's app today (for "ticks itself after N minutes"). */
+    val appMin: Map<String, Int> = emptyMap(),
 )
 
 @Serializable

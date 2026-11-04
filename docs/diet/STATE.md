@@ -1,7 +1,7 @@
 # Not a Twig (diet app) — state of the build
 
 Living doc for Maven's diet app. Read this first in any chat about it. The other apps: Not a Fraud
-(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-03 (v0.2.0).
+(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-03 (v0.2.1).
 
 - **Lives in:** the Not a Fraud repo, modules `diet-core/` (pure Kotlin) + `diet/` (Android). Same signing key.
 - **App ID** `com.maven.diet` (label "Not a Twig"); debug `com.maven.diet.dev` ("Twig dev").
@@ -102,6 +102,13 @@ times, water, nag times, Health Connect + workout link status, backup).
   values converted with FDA daily values; OCR O→0, l→1 fixed inside numbers. Fills the food form and says what
   it couldn't find; nothing saves without the user checking. Name isn't on labels — typed by hand.
 - Not yet: barcode lookup (Open Food Facts) — would also fill the name/brand.
+
+### v0.2.1 (2026-11-03): Not a Fraud shows the reminders
+
+- `Settings.notifyHere` (Settings → Nagging → "Show reminders here"): off = Twig posts no notifications but
+  `Nags.due` still fills `DietStatus.nags`, which Not a Fraud 0.9.0 turns into its routine nags (`nags` off
+  empties the list for both). Not a Fraud ticks linked meal routine items from `slotsLogged`, shows the
+  check-in in "How's today" and uses clarity / energy ≤ 2 as a burnout signal (Not a Fraud STATE § 21).
 
 ## 4. Links between the apps
 

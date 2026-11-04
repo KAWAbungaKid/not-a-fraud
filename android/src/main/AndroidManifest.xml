@@ -20,7 +20,7 @@
     <uses-permission android:name="android.permission.health.READ_STEPS" />
     <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
 
-    <!-- Shared with the workout app (same signing key): reading its status and receiving its change broadcast.
+    <!-- Shared with Not a Troglodyte and Not a Twig (same signing key): reading its status and receiving its change broadcast.
          Both apps declare it so install order doesn't matter. -->
     <permission
         android:name="com.maven.permission.SYNC"
@@ -32,6 +32,8 @@
         <package android:name="com.google.android.apps.healthdata" />
         <package android:name="com.maven.workout" />
         <package android:name="com.maven.workout.dev" />
+        <package android:name="com.maven.diet" />
+        <package android:name="com.maven.diet.dev" />
     </queries>
 
     <application
@@ -124,6 +126,16 @@
             android:permission="com.maven.permission.SYNC">
             <intent-filter>
                 <action android:name="com.maven.workout.CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Not a Twig says something changed (meal logged, water, weigh-in, check-in). -->
+        <receiver
+            android:name=".sense.DietChangedReceiver"
+            android:exported="true"
+            android:permission="com.maven.permission.SYNC">
+            <intent-filter>
+                <action android:name="com.maven.diet.CHANGED" />
             </intent-filter>
         </receiver>
 

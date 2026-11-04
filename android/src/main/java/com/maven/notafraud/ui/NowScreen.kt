@@ -368,6 +368,14 @@ fun HowsToday(data: AppData, now: Long, onDismiss: () -> Unit) {
                     SectionLabel("Suggestion: " + modeName(advice.mode))
                     Text(advice.reason)
                 }
+                com.maven.notafraud.core.diet.DietLink.today(data, now)?.let { s ->
+                    SectionLabel("Not a Twig")
+                    Text(
+                        com.maven.notafraud.core.diet.DietLink.summary(s) + if (s.clarity == null) " · no check-in yet" else "",
+                        color = if (com.maven.notafraud.core.diet.DietLink.lowCheckIn(s)) Palette.amber else Palette.textDim,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 val signals = remember { com.maven.notafraud.core.stats.Burnout.signals(data, now) }
                 if (signals.isNotEmpty()) {
                     SectionLabel("Signs of running low")

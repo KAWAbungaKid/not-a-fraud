@@ -56,6 +56,8 @@ object Workers {
         }
         // Workout app: done / started / at-risk changes re-plan the day.
         if (runCatching { com.maven.notafraud.sense.WorkoutSync.sync(ctx) }.getOrDefault(false)) Graph.replan()
+        // Not a Twig: meals logged tick the routine; its reminders join the routine nags.
+        runCatching { com.maven.notafraud.sense.DietSync.sync(ctx) }
         Graph.update { Planning.ensureToday(it, Graph.now()) }
         Graph.refresh(ctx)
     }

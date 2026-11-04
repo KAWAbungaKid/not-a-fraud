@@ -123,9 +123,17 @@ object Notifier {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setPriority(if (angry) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH)
             .setColor(if (angry) 0xFFFF6B6B.toInt() else 0xFFFFC857.toInt())
-            .setContentIntent(openApp(ctx, MainActivity.TAB_ROUTINE, req = 11))
-            .addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_DONE, a.item.id))
-            .addAction(0, "15 more min", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_SNOOZE, a.item.id))
+        val twig = if (!a.fromDiet) null else ctx.packageManager.getLaunchIntentForPackage(com.maven.notafraud.sense.DietSync.dietPackage(ctx))
+            ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ?.let { PendingIntent.getActivity(ctx, 17, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
+        if (twig != null) {
+            // Logged in Not a Twig; ticked here when Twig says so.
+            b.setContentIntent(twig).addAction(0, "Open Not a Twig", twig)
+        } else {
+            b.setContentIntent(openApp(ctx, MainActivity.TAB_ROUTINE, req = 11))
+                .addAction(0, "Done", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_DONE, a.item.id))
+        }
+        b.addAction(0, "15 more min", ActionReceiver.pending(ctx, ActionReceiver.ROUTINE_SNOOZE, a.item.id))
         runCatching { NotificationManagerCompat.from(ctx).notify(routineNotificationId(a.item.id), b.build()) }
     }
 

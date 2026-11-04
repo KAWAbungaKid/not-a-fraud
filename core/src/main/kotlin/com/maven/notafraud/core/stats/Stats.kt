@@ -69,6 +69,14 @@ object Stats {
         return clamp(10.0 * n / (w.weeklyTarget ?: 6))
     }
 
+    /** Cardio days (runs, climbing, sports) out of the days it's due. */
+    private fun cardioScore(d: AppData, ds: List<LocalDate>): Double? {
+        val c = d.routineFor(com.maven.notafraud.core.model.AutoCheck.CARDIO) ?: return null
+        val due = ds.count { RoutinePolicy.appliesOn(c, it) }.takeIf { it > 0 } ?: return null
+        val n = ds.count { day -> RoutinePolicy.day(d, day).done.containsKey(c.id) }
+        return clamp(10.0 * n / minOf(due, c.weeklyTarget ?: due))
+    }
+
     private fun stepsScore(d: AppData, ds: List<LocalDate>): Double? =
         avg(ds.mapNotNull { day -> d.days.firstOrNull { it.date == day.toString() }?.steps?.toDouble() })?.let { clamp(it / 1000.0) }
 
@@ -86,13 +94,14 @@ object Stats {
     }
 
     private fun body(d: AppData, today: LocalDate): Stat {
-        fun calc(ds: List<LocalDate>) = avg(listOfNotNull(sleepScore(d, ds), workoutScore(d, ds), stepsScore(d, ds), rate(d, ds, RoutineCategory.MEAL)))
+        fun calc(ds: List<LocalDate>) = avg(listOfNotNull(sleepScore(d, ds), workoutScore(d, ds), cardioScore(d, ds), stepsScore(d, ds), rate(d, ds, RoutineCategory.MEAL)))
         val ds = days(today)
         return Stat(
             "body", "Body", calc(ds), calc(days(today, 1)),
             listOfNotNull(
                 sleepScore(d, ds)?.let { "Sleep" to "%.1f".format(it) },
                 workoutScore(d, ds)?.let { "Workouts" to "%.1f".format(it) },
+                cardioScore(d, ds)?.let { "Cardio (incl. sports)" to "%.1f".format(it) },
                 stepsScore(d, ds)?.let { "Steps" to "%.1f".format(it) },
                 rate(d, ds, RoutineCategory.MEAL)?.let { "Meals eaten" to "%.1f".format(it) },
             ),

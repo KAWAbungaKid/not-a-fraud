@@ -49,7 +49,7 @@ object Nagger {
         Graph.init(ctx)
         val nm = ctx.getSystemService(NotificationManager::class.java)
         val nags = Nags.due(Graph.data, Graph.now(), Graph.zone, WorkoutLink.likelyTraining(ctx) ?: true)
-        if (nags.isEmpty()) { nm.cancel(ID); return }
+        if (nags.isEmpty() || !Graph.data.settings.notifyHere) { nm.cancel(ID); return }
         if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val top = nags.maxBy { it.level }
         val open = PendingIntent.getActivity(

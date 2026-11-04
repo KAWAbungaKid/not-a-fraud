@@ -43,7 +43,19 @@ object DayAdvisor {
         val beforeThree = m < 15 * 60
         val sleep = d.days.firstOrNull { it.date == Time.dateOf(now, zone).toString() }?.sleepHours
         val sleepText = sleep?.let { "%.1fh sleep".format(it) } ?: "no sleep data"
+        // Not a Twig: brain fog / low energy in today's check-in, and the basics behind it.
+        val diet = com.maven.notafraud.core.diet.DietLink.today(d, now)
+        val foggy = com.maven.notafraud.core.diet.DietLink.lowCheckIn(diet)
+        val basics = diet?.let { s ->
+            listOfNotNull(
+                s.hoursSinceFood?.takeIf { it >= 5 && s.inEatingWindow }?.let { "eat (%.0f h since food)".format(it) },
+                (s.waterTargetOz - s.waterOz).takeIf { s.waterTargetOz > 0 && it > s.waterTargetOz / 3 }?.let { "drink water ($it oz behind)" },
+            )
+        }.orEmpty()
+        val basicsText = if (basics.isEmpty()) "" else " First: " + basics.joinToString(", ") + "."
         return when {
+            foggy && nights == 0 && beforeThree -> Advice(DayMode.RECHARGE, 20, "Your check-in says foggy / low.$basicsText Then a 20-minute daylight walk, then push.")
+            foggy && nights == 0 -> Advice(DayMode.RESET, 30, "Your check-in says foggy / low.$basicsText Then easy wins and protect tonight's sleep.")
             nights >= 2 && beforeThree -> Advice(DayMode.RECHARGE, 90, "$nights short nights in a row. A 90-minute nap now, then a lighter plan.")
             nights >= 1 && beforeThree -> Advice(DayMode.RECHARGE, 20, "$sleepText. A 20-minute nap or walk, then push.")
             (nights >= 1 || skipped >= 2) && !beforeThree -> Advice(DayMode.RESET, 45, "It's late for a nap. Keep what's due, do easy wins, protect tonight's sleep.")

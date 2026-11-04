@@ -139,6 +139,10 @@ fun SettingsScreen(d: DietData, resumes: Long) {
                 Text("Nag when food / water / weigh-in is late", Modifier.weight(1f))
                 Switch(s.nags, { v -> set { it.copy(nags = v) } })
             }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Show reminders here (turn off if Not a Fraud shows them)", Modifier.weight(1f))
+                Switch(s.notifyHere, { v -> set { it.copy(notifyHere = v) } })
+            }
             Stepper("Get louder every (min)", s.nagEveryMin, 15..120, step = 15) { v -> set { it.copy(nagEveryMin = v) } }
             for ((label, value, apply) in listOf<Triple<String, String, (String) -> Unit>>(
                 Triple("Awake from", s.wake) { v -> set { it.copy(wake = v) } },

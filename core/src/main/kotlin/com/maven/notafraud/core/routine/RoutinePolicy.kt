@@ -1,5 +1,6 @@
 package com.maven.notafraud.core.routine
 
+import com.maven.notafraud.core.diet.DietLink
 import com.maven.notafraud.core.model.AppData
 import com.maven.notafraud.core.model.RoutineCategory
 import com.maven.notafraud.core.model.RoutineDay
@@ -22,9 +23,15 @@ data class RoutineStatus(
     /** Weekly-target items: done this week / target. */
     val weekDone: Int? = null,
     val note: String? = null,
+    /** STREAK items: days in a row so far (today included unless broken) and the best run. */
+    val streak: Int? = null,
+    val best: Int? = null,
+    /** Driven by Not a Twig (a linked meal, or one of its own reminders). */
+    val fromDiet: Boolean = false,
 )
 
-data class RoutineAlert(val item: RoutineItem, val mood: Mood, val title: String, val text: String)
+/** [fromDiet]: a Not a Twig reminder; the notification opens Twig instead of offering "Done". */
+data class RoutineAlert(val item: RoutineItem, val mood: Mood, val title: String, val text: String, val fromDiet: Boolean = false)
 
 /**
  * Daily habits that get angrier the longer they're put off (STATE.md section 10).
@@ -69,13 +76,81 @@ object RoutinePolicy {
         return Time.minuteOfDay(at, Time.zone(d.settings.zoneId)) > st.item.dueMin
     }
 
+    // ---- Streaks (RoutineCategory.STREAK): done every day on their own until broken -------------
+
+    private fun brokenDates(d: AppData, item: RoutineItem): Set<LocalDate> =
+        d.routineDays.filter { item.id in it.broken }.map { LocalDate.parse(it.date) }.toSet()
+
+    private fun streakStart(item: RoutineItem, date: LocalDate): LocalDate =
+        item.streakSince?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.takeIf { !it.isAfter(date) } ?: date
+
+    /** Applicable days in a row up to [date] (included) since the last break. */
+    fun streak(d: AppData, item: RoutineItem, date: LocalDate): Int {
+        val broken = brokenDates(d, item)
+        val start = streakStart(item, date)
+        var n = 0
+        var day = date
+        while (!day.isBefore(start) && n < 20_000) {
+            if (day in broken) break
+            if (appliesOn(item, day)) n++
+            day = day.minusDays(1)
+        }
+        return n
+    }
+
+    /** Longest run since the streak started. */
+    fun bestStreak(d: AppData, item: RoutineItem, date: LocalDate): Int {
+        val broken = brokenDates(d, item)
+        var best = 0
+        var run = 0
+        var day = streakStart(item, date)
+        while (!day.isAfter(date)) {
+            if (day in broken) run = 0 else if (appliesOn(item, day)) run++
+            best = maxOf(best, run)
+            day = day.plusDays(1)
+        }
+        return best
+    }
+
+    fun brokenOn(d: AppData, item: RoutineItem, date: LocalDate) = item.id in day(d, date).broken
+
+    /** A streak item counts as done on [date] unless it was broken (or the streak hadn't started). */
+    fun streakHeld(d: AppData, item: RoutineItem, date: LocalDate) =
+        appliesOn(item, date) && !brokenOn(d, item, date) &&
+            item.streakSince?.let { runCatching { !date.isBefore(LocalDate.parse(it)) }.getOrDefault(true) } != false
+
+    private fun streakStatus(d: AppData, item: RoutineItem, date: LocalDate): RoutineStatus {
+        val best = bestStreak(d, item, date)
+        if (brokenOn(d, item, date)) {
+            val before = streak(d, item, date.minusDays(1))
+            return RoutineStatus(item, Mood.MISSED, streak = 0, best = best, note = "Broken today" + if (before > 0) " (was $before days)" else "")
+        }
+        val n = streak(d, item, date)
+        return RoutineStatus(item, Mood.DONE, streak = n, best = best, note = "$n day" + (if (n == 1) "" else "s") + " in a row" + if (best > n) " · best $best" else "")
+    }
+
+    /** A meal Not a Twig owns: done when Twig has food in that slot, late / angry when Twig says so. */
+    private fun dietMealStatus(d: AppData, item: RoutineItem, now: Long, m: Int): RoutineStatus? {
+        val s = DietLink.today(d, now) ?: return null
+        val slot = item.dietSlot ?: return null
+        if (DietLink.slotLogged(s, slot)) return RoutineStatus(item, Mood.DONE, s.generatedAt, note = "Not a Twig", fromDiet = true)
+        val nag = DietLink.mealNag(s, slot)
+        return when {
+            nag != null -> RoutineStatus(item, if (nag.level >= 2) Mood.ANGRY else Mood.LATE, note = nag.text, fromDiet = true)
+            m < item.startMin -> RoutineStatus(item, Mood.CALM, note = "Not a Twig: $slot", fromDiet = true)
+            else -> RoutineStatus(item, Mood.DUE, note = "Not a Twig: $slot", fromDiet = true)
+        }
+    }
+
     fun status(d: AppData, item: RoutineItem, now: Long): RoutineStatus {
         val zone = Time.zone(d.settings.zoneId)
         val date = Time.dateOf(now, zone)
         val today = day(d, date)
         val week = item.weeklyTarget?.let { weekCount(d, item, date) }
         if (!appliesOn(item, date)) return RoutineStatus(item, Mood.OFF, weekDone = week)
+        if (item.category == RoutineCategory.STREAK) return streakStatus(d, item, date)
         today.done[item.id]?.let { return RoutineStatus(item, Mood.DONE, it, weekDone = week, note = today.notes[item.id]) }
+        if (DietLink.owns(d, item)) dietMealStatus(d, item, now, Time.minuteOfDay(now, zone))?.let { return it }
 
         // Weekly target already met: optional, never angry.
         if (item.weeklyTarget != null && week != null && week >= item.weeklyTarget) {
@@ -101,7 +176,7 @@ object RoutinePolicy {
     /** Past day: anything applicable and not done is missed. */
     fun missedOn(d: AppData, date: LocalDate): List<RoutineItem> {
         val rd = day(d, date)
-        return d.routine.filter { appliesOn(it, date) && it.weeklyTarget == null && it.id !in rd.done }
+        return d.routine.filter { appliesOn(it, date) && it.weeklyTarget == null && it.category != RoutineCategory.STREAK && it.id !in rd.done }
     }
 
     /**
@@ -137,14 +212,29 @@ object RoutinePolicy {
             }
             if (fire) {
                 val (title, text) = message(item, mood, st.minutesLate, Time.clock(now, zone), bedtimeSignal)
-                out += RoutineAlert(item, mood, title, text)
+                out += RoutineAlert(item, mood, title, if (st.fromDiet && st.note != null) st.note else text, st.fromDiet)
             }
+        }
+        // Not a Twig's other reminders (water, weigh-in, check-in…) ride the same escalation.
+        for (n in DietLink.extraNags(d, now)) {
+            val id = DietLink.PREFIX + n.key
+            val last = today.alerted[id]
+            val mood = if (n.level >= 2) Mood.ANGRY else Mood.LATE
+            val fire = last == null || (mood == Mood.ANGRY && now - last >= (d.settings.angryRepeatMin - 1) * Time.MIN)
+            if (fire) out += RoutineAlert(dietItem(n), mood, n.title, n.text, fromDiet = true)
         }
         return out
     }
 
+    /** A stand-in routine item for a Twig reminder (not stored). */
+    fun dietItem(n: com.maven.notafraud.core.diet.SyncNag) =
+        RoutineItem(id = DietLink.PREFIX + n.key, title = n.title, category = RoutineCategory.OTHER, startMin = 0, dueMin = 0, angryMin = 0)
+
     /** Never a wall of notifications: at most this many at once, the most pressing first. */
     const val MAX_AT_ONCE = 2
+
+    /** How often Twig's status is re-read for reminders. */
+    const val DIET_POLL_MIN = 30
 
     /** Next instant at which [alertsDue] could return something new, for the alarm. */
     fun nextAlertAt(d: AppData, now: Long): Long? {
@@ -155,11 +245,19 @@ object RoutinePolicy {
         val candidates = mutableListOf<Long>()
         for (st in statuses(d, now)) {
             if (st.mood == Mood.DONE || st.mood == Mood.OFF) continue
+            if (st.mood == Mood.MISSED || st.item.category == RoutineCategory.STREAK) continue
             if (st.item.weeklyTarget != null && (st.weekDone ?: 0) >= st.item.weeklyTarget) continue
             val i = st.item
-            candidates += Time.at(date, i.dueMin, zone)
-            candidates += Time.at(date, i.angryMin, zone)
+            if (!st.fromDiet) {
+                candidates += Time.at(date, i.dueMin, zone)
+                candidates += Time.at(date, i.angryMin, zone)
+            }
             today.alerted[i.id]?.let { candidates += it + d.settings.angryRepeatMin * Time.MIN }
+        }
+        // Not a Twig connected: look again every half hour (its reminders grow with time, not with changes).
+        if (d.settings.dietNags && d.diet != null) {
+            candidates += now + DIET_POLL_MIN * Time.MIN
+            for (n in DietLink.extraNags(d, now)) today.alerted[DietLink.PREFIX + n.key]?.let { candidates += it + d.settings.angryRepeatMin * Time.MIN }
         }
         // More due than we post at once: come back in a few minutes for the rest.
         if (allDue(d, now, false).size > MAX_AT_ONCE) candidates += now + 5 * Time.MIN
@@ -188,6 +286,7 @@ object RoutinePolicy {
                 Mood.LATE -> "$name ($lateText)" to "Still time. Even a short one counts."
                 else -> "$name still not done" to "It's $clock. Do the short version now rather than none."
             }
+            RoutineCategory.STREAK -> "$name" to "Streak."
             RoutineCategory.OTHER -> when (mood) {
                 Mood.LATE -> "$name" to "Due now."
                 else -> "$name ($lateText)" to "Do it before bed."

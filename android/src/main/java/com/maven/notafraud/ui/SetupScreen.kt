@@ -285,7 +285,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
             }
             NumbersPanel(data)
             Panel {
-                Text("Workout app", style = MaterialTheme.typography.titleSmall)
+                Text("Not a Troglodyte (workouts)", style = MaterialTheme.typography.titleSmall)
                 SwitchRow("When today's workout is needed for the weekly minimum, pause credits until it's started", data.settings.workoutPausesCredits) { on ->
                     val n = Graph.now()
                     Graph.update {
@@ -297,8 +297,22 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (h in listOf(9, 12, 15, 17)) androidx.compose.material3.FilterChip(data.settings.workoutNagFromMin == h * 60, { Graph.update { it.copy(settings = it.settings.copy(workoutNagFromMin = h * 60)) } }, { Text(hm(h * 60)) })
                 }
-                Text(data.workout?.let { "Connected: ${it.program ?: "program"} · week ${it.week}, block ${it.block}" } ?: "Install the Workout app to connect it. The split and days per week come from there.",
+                Text(data.workout?.let { "Connected: ${it.program ?: "program"} · week ${it.week}, block ${it.block}" } ?: "Install Not a Troglodyte to connect it. The split and days per week come from there.",
                     color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                Text("Climbing and other sports count as cardio (they tick Cardio), not toward the workout minimum.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+            Panel {
+                Text("Not a Twig (food)", style = MaterialTheme.typography.titleSmall)
+                SwitchRow("Show Twig's meal, water, weigh-in and check-in reminders here, with the routine nags", data.settings.dietNags) { on ->
+                    Graph.update { it.copy(settings = it.settings.copy(dietNags = on)) }
+                    Graph.refresh(ctx)
+                }
+                Text(
+                    if (data.diet == null) "Install Not a Twig to connect it. Meals logged there tick the routine's meals."
+                    else "Connected. Meals linked to a Twig slot (edit a meal on the Routine page) tick when you log that slot. " +
+                        if (data.settings.dietNags) "Turn off \"Show reminders here\" in Twig's settings so you don't get each one twice." else "Twig keeps its own reminders.",
+                    color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+                )
             }
             Panel {
                 Text("Homework (Homework calendars)", style = MaterialTheme.typography.titleSmall)

@@ -67,16 +67,22 @@ object Actions {
         return sportCountsAsWorkout(logged, a.taskId, minutes, now)
     }
 
-    /** 20+ minutes on a skill in a sport tree (climbing, athletics…) checks today's workout with that sport. */
+    /**
+     * 20+ minutes on a skill in a sport tree (climbing, athletics…) counts as cardio (decided 2026-11-02).
+     * Without Not a Troglodyte it also checks the workout (the old "sport counts after 3 standard" rule);
+     * with it connected, sports never count toward the workout minimum.
+     */
     private fun sportCountsAsWorkout(d: AppData, taskId: String?, minutes: Int, now: Long): AppData {
         if (taskId == null || minutes < d.settings.sportMin) return d
         val skill = d.skills.firstOrNull { it.practiceTaskId == taskId } ?: return d
         val tree = d.skillTrees.firstOrNull { it.id == skill.treeId && it.sport } ?: return d
-        val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT) ?: return d
         val date = Time.dateOf(now, Time.zone(d.settings.zoneId)).toString()
-        if (d.routineDays.firstOrNull { it.date == date }?.done?.containsKey(workout.id) == true) return d
         val note = com.maven.notafraud.core.routine.RoutinePolicy.SPORT_NOTES.firstOrNull { it.equals(tree.name, ignoreCase = true) } ?: "Sport"
-        return checkRoutine(d, workout.id, now, note)
+        fun doneToday(id: String) = d.routineDays.firstOrNull { it.date == date }?.done?.containsKey(id) == true
+        var x = d
+        d.routineFor(com.maven.notafraud.core.model.AutoCheck.CARDIO)?.let { if (!doneToday(it.id)) x = checkRoutine(x, it.id, now, note) }
+        if (d.workout == null) d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT)?.let { if (!doneToday(it.id)) x = checkRoutine(x, it.id, now, note) }
+        return x
     }
 
     /**
@@ -167,6 +173,13 @@ object Actions {
     fun uncheckRoutine(d: AppData, itemId: String, date: LocalDate) =
         editDay(d, date.toString()) { it.copy(done = it.done - itemId, notes = it.notes - itemId) }
 
+    /** A STREAK item was broken on [date]: the count starts over from the next day. */
+    fun breakStreak(d: AppData, itemId: String, date: LocalDate, at: Long) =
+        editDay(d, date.toString()) { it.copy(broken = it.broken + (itemId to at)) }
+
+    fun unbreakStreak(d: AppData, itemId: String, date: LocalDate) =
+        editDay(d, date.toString()) { it.copy(broken = it.broken - itemId) }
+
     fun markAlerted(d: AppData, itemIds: Collection<String>, at: Long): AppData {
         if (itemIds.isEmpty()) return d
         val date = Time.dateOf(at, Time.zone(d.settings.zoneId)).toString()
@@ -191,10 +204,16 @@ object Actions {
             else if (ctx.firstUnlock != null) x = checkRoutine(x, wake.id, ctx.firstUnlock, "first unlock")
         }
         val workout = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT)
-        // With the workout app connected, it alone ticks the workout (not Samsung Health guesses).
+        val zone = Time.zone(d.settings.zoneId)
+        val noon = Time.at(date, 12 * 60, zone).coerceAtMost(System.currentTimeMillis())
+        // With Not a Troglodyte connected, it alone ticks the workout (not Samsung Health guesses)…
         if (workout != null && d.workout == null && (ctx.workoutMin ?: 0) >= 20 && day?.done?.containsKey(workout.id) != true) {
-            val zone = Time.zone(d.settings.zoneId)
-            x = checkRoutine(x, workout.id, Time.at(date, 12 * 60, zone).coerceAtMost(System.currentTimeMillis()), "from Samsung Health")
+            x = checkRoutine(x, workout.id, noon, "from Samsung Health")
+        }
+        // …and Samsung Health exercise (runs, climbs, games) counts as cardio instead.
+        val cardio = d.routineFor(com.maven.notafraud.core.model.AutoCheck.CARDIO)
+        if (cardio != null && d.workout != null && (ctx.workoutMin ?: 0) >= d.settings.sportMin && day?.done?.containsKey(cardio.id) != true) {
+            x = checkRoutine(x, cardio.id, noon, "from Samsung Health")
         }
         return x
     }

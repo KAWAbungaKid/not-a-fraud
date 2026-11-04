@@ -81,6 +81,8 @@ fun RoutineScreen(data: AppData, now: Long) {
     val statuses = remember(data, now / 60_000) { RoutinePolicy.statuses(data, now).filter { it.mood != Mood.OFF } }
     var editing by remember { mutableStateOf<RoutineItem?>(null) }
     var noteFor by remember { mutableStateOf<RoutineStatus?>(null) }
+    var breaking by remember { mutableStateOf<RoutineStatus?>(null) }
+    val twigNags = remember(data, now / 60_000) { com.maven.notafraud.core.diet.DietLink.extraNags(data, now) }
     val done = statuses.count { it.mood == Mood.DONE }
     val angry = statuses.count { it.mood == Mood.ANGRY }
 
@@ -94,9 +96,23 @@ fun RoutineScreen(data: AppData, now: Long) {
                     color = if (angry > 0) Palette.red else Palette.textDim,
                 )
             }
+            val diet = com.maven.notafraud.core.diet.DietLink.today(data, now)
+            if (diet != null && (twigNags.isNotEmpty() || data.settings.dietNags)) item {
+                Panel(highlight = twigNags.any { it.level >= 2 }) {
+                    SectionLabel("Not a Twig")
+                    Text(com.maven.notafraud.core.diet.DietLink.summary(diet), color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    for (n in twigNags) Text(
+                        "${n.title}: ${n.text}",
+                        color = if (n.level >= 2) Palette.red else Palette.amber, style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = { com.maven.notafraud.sense.DietSync.open(ctx) }) { Text("Open Not a Twig") }
+                }
+            }
             items(statuses, key = { it.item.id }) { st ->
                 RoutineRow(st, data, zone, onToggle = {
-                    if (st.mood == Mood.DONE) Graph.update { Actions.uncheckRoutine(it, st.item.id, today) }
+                    if (st.item.category == RoutineCategory.STREAK) {
+                        if (st.mood == Mood.MISSED) Graph.update { Actions.unbreakStreak(it, st.item.id, today) } else breaking = st
+                    } else if (st.mood == Mood.DONE) Graph.update { Actions.uncheckRoutine(it, st.item.id, today) }
                     else if (st.item.weeklyTarget != null) noteFor = st
                     else Graph.update { Actions.checkRoutine(it, st.item.id, Graph.now()) }
                     Graph.refresh(ctx)
@@ -118,9 +134,13 @@ fun RoutineScreen(data: AppData, now: Long) {
             title = { Text(st.item.title) },
             text = {
                 Column {
-                    Text("What was it? Sports (climbing, hike, swim, breaking…) count once you've done ${RoutinePolicy.STANDARD_FIRST} standard workouts this week.")
+                    val trog = data.workout != null && st.item.autoCheck == com.maven.notafraud.core.model.AutoCheck.WORKOUT
+                    Text(
+                        if (trog) "Not a Troglodyte ticks this when you finish a workout there. Climbing and other sports count as cardio, not toward the workout minimum."
+                        else "What was it? Sports (climbing, hike, swim, breaking…) count once you've done ${RoutinePolicy.STANDARD_FIRST} standard workouts this week.",
+                    )
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (o in listOf("Lift", "Run", "Mobility", "Climbing", "Sport", "Hike", "Swim", "Breaking")) FilterChip(note == o, { note = o }, { Text(o) })
+                        for (o in if (trog) listOf("Lift", "Mobility") else listOf("Lift", "Run", "Mobility", "Climbing", "Sport", "Hike", "Swim", "Breaking")) FilterChip(note == o, { note = o }, { Text(o) })
                     }
                 }
             },
@@ -134,11 +154,35 @@ fun RoutineScreen(data: AppData, now: Long) {
         )
     }
 
+    breaking?.let { st ->
+        AlertDialog(
+            onDismissRequest = { breaking = null },
+            title = { Text("Broke it: ${st.item.title}?") },
+            text = { Text("${st.streak ?: 0} days in a row so far. Saying so resets the count; the best run (${st.best ?: 0}) stays on record. Honest beats perfect.") },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = {
+                        Graph.update { Actions.breakStreak(it, st.item.id, today.minusDays(1), Graph.now()) }
+                        Graph.refresh(ctx); breaking = null
+                    }) { Text("Yesterday") }
+                    TextButton(onClick = {
+                        Graph.update { Actions.breakStreak(it, st.item.id, today, Graph.now()) }
+                        Graph.refresh(ctx); breaking = null
+                    }) { Text("Today", color = Palette.red) }
+                }
+            },
+            dismissButton = { TextButton(onClick = { breaking = null }) { Text("Cancel") } },
+        )
+    }
+
     editing?.let { item ->
         RoutineEditor(
             item, isNew = data.routine.none { it.id == item.id },
             onDismiss = { editing = null },
-            onSave = { Graph.changeAndReplan(ctx) { d -> Actions.upsertRoutine(d, it) }; editing = null },
+            onSave = { saved ->
+                val r = if (saved.category == RoutineCategory.STREAK && saved.streakSince == null) saved.copy(streakSince = today.toString(), reserveMin = 0, weeklyTarget = null, autoCheck = null) else saved
+                Graph.changeAndReplan(ctx) { d -> Actions.upsertRoutine(d, r) }; editing = null
+            },
             onDelete = { Graph.changeAndReplan(ctx) { d -> Actions.deleteRoutine(d, item.id) }; editing = null },
         )
     }
@@ -147,19 +191,24 @@ fun RoutineScreen(data: AppData, now: Long) {
 @Composable
 private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, onToggle: () -> Unit, onEdit: () -> Unit) {
     val i = st.item
-    val late = RoutinePolicy.doneLate(d, st)
+    // Meals Not a Twig owns keep Twig's times, not this item's.
+    val late = RoutinePolicy.doneLate(d, st) && !(st.fromDiet || st.note == "Not a Twig")
     val color = if (st.mood == Mood.DONE && late) Palette.amber else moodColor(st.mood)
+    if (i.category == RoutineCategory.STREAK) {
+        StreakRow(st, onToggle, onEdit)
+        return
+    }
     Panel(Modifier.clickable(onClick = onEdit), highlight = st.mood == Mood.ANGRY) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = st.mood == Mood.DONE, onCheckedChange = { onToggle() })
             Column(Modifier.weight(1f)) {
                 Text(i.title, fontWeight = if (st.mood == Mood.ANGRY) FontWeight.Bold else FontWeight.Normal)
                 val line = when (st.mood) {
-                    Mood.DONE -> "Done ${Time.clockAmPm(st.doneAt!!, zone)}" + (if (late) " · late (due ${hm(i.dueMin)})" else " · on time") + (st.note?.let { " · $it" } ?: "")
+                    Mood.DONE -> if (st.doneAt == null) "Done" + (st.note?.let { " · $it" } ?: "") else "Done ${Time.clockAmPm(st.doneAt!!, zone)}" + (if (late) " · late (due ${hm(i.dueMin)})" else " · on time") + (st.note?.let { " · $it" } ?: "")
                     Mood.CALM -> st.note ?: "${hm(i.startMin)}–${hm(i.dueMin)}"
-                    Mood.DUE -> "Now · by ${hm(i.dueMin)}"
-                    Mood.LATE -> "${Time.durationText(st.minutesLate)} late"
-                    Mood.ANGRY -> "${Time.durationText(st.minutesLate)} late. Do it now."
+                    Mood.DUE -> if (st.fromDiet) st.note ?: "Now" else "Now · by ${hm(i.dueMin)}"
+                    Mood.LATE -> if (st.fromDiet) st.note ?: "Late" else "${Time.durationText(st.minutesLate)} late"
+                    Mood.ANGRY -> if (st.fromDiet) (st.note ?: "Late") + " Do it now." else "${Time.durationText(st.minutesLate)} late. Do it now."
                     else -> ""
                 } + (st.weekDone?.let { w ->
                     val tally = RoutinePolicy.weekTally(d, i, Time.dateOf(System.currentTimeMillis(), zone))
@@ -169,6 +218,28 @@ private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, on
                 Text(line, color = color, style = MaterialTheme.typography.bodySmall)
             }
             Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        }
+    }
+}
+
+/** Streak: counts by itself; one button to say it broke (or undo today's break). */
+@Composable
+private fun StreakRow(st: RoutineStatus, onToggle: () -> Unit, onEdit: () -> Unit) {
+    val broken = st.mood == Mood.MISSED
+    Panel(Modifier.clickable(onClick = onEdit), highlight = broken) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${st.streak ?: 0}",
+                Modifier.padding(horizontal = 12.dp),
+                style = MaterialTheme.typography.titleLarge,
+                color = if (broken) Palette.red else Palette.green,
+                fontWeight = FontWeight.Bold,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(st.item.title)
+                Text(st.note ?: "", color = if (broken) Palette.red else Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = onToggle) { Text(if (broken) "Undo" else "Broke it", color = if (broken) Palette.textDim else Palette.red) }
         }
     }
 }
@@ -190,6 +261,11 @@ private fun History(d: AppData, today: java.time.LocalDate) {
                     val rd = RoutinePolicy.day(d, day)
                     val applies = RoutinePolicy.appliesOn(item, day)
                     val c = when {
+                        item.category == RoutineCategory.STREAK -> when {
+                            item.id in rd.broken -> Palette.red.copy(alpha = 0.6f)
+                            RoutinePolicy.streakHeld(d, item, day) -> Palette.green
+                            else -> Color.Transparent
+                        }
                         rd.done.containsKey(item.id) -> Palette.green
                         !applies -> Color.Transparent
                         day == today -> Palette.surfaceHigh
@@ -212,7 +288,10 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
         onDismissRequest = onDismiss,
         title = { Text(if (isNew) "New routine item" else "Edit routine item") },
         confirmButton = {
-            TextButton(onClick = { onSave(r.copy(title = r.title.trim())) }, enabled = r.title.isNotBlank() && r.startMin <= r.dueMin && r.dueMin <= r.angryMin) { Text("Save") }
+            TextButton(
+                onClick = { onSave(r.copy(title = r.title.trim())) },
+                enabled = r.title.isNotBlank() && (r.category == RoutineCategory.STREAK || (r.startMin <= r.dueMin && r.dueMin <= r.angryMin)),
+            ) { Text("Save") }
         },
         dismissButton = {
             Row {
@@ -223,6 +302,44 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(r.title, { r = r.copy(title = it) }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                SectionLabel("Type")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    RoutineCategory.entries.forEach { c ->
+                        FilterChip(r.category == c, {
+                            r = r.copy(category = c, dietSlot = if (c == RoutineCategory.MEAL) r.dietSlot ?: com.maven.notafraud.core.diet.DietLink.guessSlot(r.title) else null)
+                        }, { Text(c.name.lowercase()) })
+                    }
+                }
+                if (r.category == RoutineCategory.STREAK) {
+                    Text("Counts as done every day by itself. No times, no nags: you only tap \"Broke it\" when you break it.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    val today = Time.dateOf(System.currentTimeMillis(), Time.zone(Graph.data.settings.zoneId))
+                    val already = r.streakSince?.let { runCatching { java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.parse(it), today).toInt() + 1 }.getOrNull() } ?: 1
+                    var text by remember { mutableStateOf(already.toString()) }
+                    OutlinedTextField(
+                        text,
+                        { v ->
+                            text = v.filter { it.isDigit() }.take(5)
+                            text.toIntOrNull()?.takeIf { it >= 1 }?.let { n -> r = r.copy(streakSince = today.minusDays((n - 1).toLong()).toString()) }
+                        },
+                        label = { Text("Days in a row so far (today counts)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    )
+                    SectionLabel("Days it applies")
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        for (dow in 1..7) FilterChip(dow in r.days, { r = r.copy(days = if (dow in r.days) r.days - dow else r.days + dow) }, { Text(names[dow]) })
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("On", Modifier.weight(1f))
+                        Switch(r.enabled, { r = r.copy(enabled = it) })
+                    }
+                } else {
+                if (r.category == RoutineCategory.MEAL) {
+                    SectionLabel("Not a Twig meal slot")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(r.dietSlot == null, { r = r.copy(dietSlot = null) }, { Text("none") })
+                        for (slot in com.maven.notafraud.core.diet.DietLink.KNOWN_SLOTS) FilterChip(r.dietSlot.equals(slot, ignoreCase = true), { r = r.copy(dietSlot = slot) }, { Text(slot) })
+                    }
+                    Text("Linked: logging that slot in Not a Twig ticks this, and Twig's reminders decide when it gets loud. Times below only place it in the plan.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
                 SectionLabel("When")
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(onClick = { picking = "start" }) { Text("From ${hm(r.startMin)}") }
@@ -234,16 +351,13 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     for (dow in 1..7) FilterChip(dow in r.days, { r = r.copy(days = if (dow in r.days) r.days - dow else r.days + dow) }, { Text(names[dow]) })
                 }
-                SectionLabel("Type")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    RoutineCategory.entries.forEach { c -> FilterChip(r.category == c, { r = r.copy(category = c) }, { Text(c.name.lowercase()) }) }
-                }
                 SectionLabel("Checks itself when")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(r.autoCheck == null, { r = r.copy(autoCheck = null) }, { Text("only by hand") })
                     for ((a, label) in listOf(
                         com.maven.notafraud.core.model.AutoCheck.WAKE to "you wake up (watch / first unlock)",
                         com.maven.notafraud.core.model.AutoCheck.WORKOUT to "a workout is logged",
+                        com.maven.notafraud.core.model.AutoCheck.CARDIO to "cardio or a sport session (climbing…)",
                         com.maven.notafraud.core.model.AutoCheck.PICK3 to "you pick tomorrow's 3",
                     )) FilterChip(r.autoCheck == a, { r = r.copy(autoCheck = a) }, { Text(label) })
                 }
@@ -257,7 +371,7 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                 }
                 SectionLabel("Times per week")
                 val fromWorkoutApp = r.autoCheck == com.maven.notafraud.core.model.AutoCheck.WORKOUT && com.maven.notafraud.Graph.data.workout != null
-                if (fromWorkoutApp) Text("Set by the Workout app (${com.maven.notafraud.Graph.data.workout?.targetPerWeek} a week, minimum ${com.maven.notafraud.Graph.data.workout?.minPerWeek}). Change it there.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                if (fromWorkoutApp) Text("Set by Not a Troglodyte (${com.maven.notafraud.Graph.data.workout?.targetPerWeek} a week, minimum ${com.maven.notafraud.Graph.data.workout?.minPerWeek}). Change it there.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 else FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(r.weeklyTarget == null, { r = r.copy(weeklyTarget = null) }, { Text("every day listed") })
                     for (n in 2..7) FilterChip(r.weeklyTarget == n, { r = r.copy(weeklyTarget = n) }, { Text("$n") })
@@ -265,6 +379,7 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("On", Modifier.weight(1f))
                     Switch(r.enabled, { r = r.copy(enabled = it) })
+                }
                 }
             }
         },

@@ -221,7 +221,11 @@ data class Anchor(
 )
 
 @Serializable
-enum class RoutineCategory { MEAL, HYGIENE, BODY, SLEEP, OTHER }
+enum class RoutineCategory {
+    MEAL, HYGIENE, BODY, SLEEP, OTHER,
+    /** Counts as done every day on its own until you say you broke it (no nags, no times). */
+    STREAK,
+}
 
 @Serializable
 enum class RoutineTrigger {
@@ -253,6 +257,10 @@ data class RoutineItem(
     val order: Int = 0,
     /** Checks itself off when this happens (no hard-coded item ids). */
     val autoCheck: AutoCheck? = null,
+    /** MEAL items: the Not a Twig meal slot (Lunch, Supper…) that ticks this and drives its nags while Twig is connected. */
+    val dietSlot: String? = null,
+    /** STREAK items: the day the streak started counting (yyyy-mm-dd). */
+    val streakSince: String? = null,
 )
 
 /** What can tick a routine item on its own. */
@@ -264,6 +272,8 @@ enum class AutoCheck {
     WORKOUT,
     /** Picking tomorrow's 3. */
     PICK3,
+    /** A sport / climbing session (20+ min on a sport skill), or exercise from Samsung Health while Not a Troglodyte owns lifting. */
+    CARDIO,
 }
 
 /** A change that loosens blocking, held until the morning (settings lock). One kind per field it touches. */
@@ -299,6 +309,8 @@ data class RoutineDay(
     val notes: Map<String, String> = emptyMap(),
     /** Last nudge per item, so alarms firing late or twice don't double-nag. */
     val alerted: Map<String, Long> = emptyMap(),
+    /** STREAK items broken on this day, and when that was said. */
+    val broken: Map<String, Long> = emptyMap(),
 )
 
 @Serializable
@@ -487,6 +499,8 @@ data class Settings(
     val mindTargetMin: Int = 300,
     /** A session this long on a sport skill counts as the day's workout. */
     val sportMin: Int = 20,
+    /** Not a Twig: its meal / water / weigh-in / check-in reminders come through Not a Fraud's routine nags. */
+    val dietNags: Boolean = true,
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
@@ -602,6 +616,8 @@ data class AppData(
     val semester: Semester? = null,
     /** Last status from the workout app (null = not installed / never read). */
     val workout: com.maven.notafraud.core.workout.WorkoutStatus? = null,
+    /** Last status from Not a Twig (null = not installed / never read). */
+    val diet: com.maven.notafraud.core.diet.DietStatus? = null,
     /** Loosening changes waiting for the morning (settings lock). */
     val pending: List<PendingChange> = emptyList(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */

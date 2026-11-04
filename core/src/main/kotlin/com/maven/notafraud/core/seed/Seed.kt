@@ -144,12 +144,12 @@ object Seed {
             r("r-vitamins", "Vitamins + creatine", RoutineCategory.BODY, t(6, 30), t(9), t(12)),
             r("r-meal1", "Pre-workout meal", RoutineCategory.MEAL, t(7), t(8, 30), t(10, 30), reserve = 20),
             r("r-lunch", "Lunch", RoutineCategory.MEAL, t(12, 15), t(13, 30), t(15), reserve = 30),
-            r("r-workout", "Workout (lift, climb...)", RoutineCategory.BODY, t(17), t(18), t(19, 30), reserve = 60, days = setOf(MON, TUE, WED, THU, FRI, SAT), weekly = 6),
+            r("r-workout", "Workout", RoutineCategory.BODY, t(17), t(18), t(19, 30), reserve = 60, days = setOf(MON, TUE, WED, THU, FRI, SAT), weekly = 6),
             r("r-supper", "Supper", RoutineCategory.MEAL, t(18, 15), t(19, 30), t(20, 30), reserve = 30),
             r("r-pick3", "Pick tomorrow's 3", RoutineCategory.OTHER, t(19, 30), t(21), t(21, 30)),
             r("r-teeth", "Brush teeth", RoutineCategory.HYGIENE, t(21), t(22), t(22, 15), trigger = RoutineTrigger.BEDTIME),
             r("r-bed", "In bed, phone down", RoutineCategory.SLEEP, t(21, 45), t(22), t(22, 15)),
-        )
+        ).map { if (it.category == RoutineCategory.MEAL) it.copy(dietSlot = com.maven.notafraud.core.diet.DietLink.guessSlot(it.title)) else it }
     }
 
     // ---- Fresh install ---------------------------------------------------------------------
@@ -197,13 +197,14 @@ object Seed {
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 8
+    const val CURRENT = 9
 
     /** Seeded routine items that tick themselves (v0.5 replaced the hard-coded ids with RoutineItem.autoCheck). */
     val AUTO_CHECK = mapOf(
         "r-wake" to com.maven.notafraud.core.model.AutoCheck.WAKE,
         "r-workout" to com.maven.notafraud.core.model.AutoCheck.WORKOUT,
         "r-pick3" to com.maven.notafraud.core.model.AutoCheck.PICK3,
+        "r-cardio" to com.maven.notafraud.core.model.AutoCheck.CARDIO,
     )
 
     fun apply(d: AppData, now: Long = System.currentTimeMillis()): AppData {
@@ -215,7 +216,24 @@ object Migration {
         if (x.schema < 6) x = toV6(x)
         if (x.schema < 7) x = toV7(x)
         if (x.schema < 8) x = toV8(x, now)
+        if (x.schema < 9) x = toV9(x)
         return x
+    }
+
+    /**
+     * v0.9: sports count as cardio (not toward the workout minimum), meals link to Not a Twig's slots by name.
+     * The seeded workout item loses "climb" from its name.
+     */
+    private fun toV9(d: AppData): AppData {
+        val hasCardio = d.routine.any { it.autoCheck == com.maven.notafraud.core.model.AutoCheck.CARDIO }
+        val routine = d.routine.map { r ->
+            var x = r
+            if (!hasCardio && x.autoCheck == null && (x.id == "r-cardio" || x.title.trim().equals("Cardio", ignoreCase = true))) x = x.copy(autoCheck = com.maven.notafraud.core.model.AutoCheck.CARDIO)
+            if (x.category == com.maven.notafraud.core.model.RoutineCategory.MEAL && x.dietSlot == null) x = x.copy(dietSlot = com.maven.notafraud.core.diet.DietLink.guessSlot(x.title))
+            if (x.title == "Workout (lift, climb...)") x = x.copy(title = "Workout")
+            x
+        }
+        return d.copy(schema = 9, routine = routine)
     }
 
     /**

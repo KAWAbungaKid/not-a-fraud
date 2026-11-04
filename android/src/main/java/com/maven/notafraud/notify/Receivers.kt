@@ -32,7 +32,8 @@ class ActionReceiver : BroadcastReceiver() {
                 Graph.update { Actions.markAlerted(it, listOf(id), now - 15 * Time.MIN) }
                 Notifier.cancelRoutine(ctx, id)
             }
-            TICK -> Unit
+            // Routine alarm: Twig's reminders grow with time, so look at it again before checking.
+            TICK -> runCatching { com.maven.notafraud.sense.DietSync.sync(ctx, force = false) }
         }
         if (intent.action == START || intent.action == WALK) Notifier.cancelNag(ctx)
         Graph.refresh(ctx)

@@ -175,5 +175,7 @@ data class Settings(
     val weighInBy: String = "09:00",
     val checkInAfter: String = "14:00",
     val nags: Boolean = true,
+    /** Post reminders as Twig's own notifications. Off when Not a Fraud shows them (it still gets the list). */
+    val notifyHere: Boolean = true,
     val nagEveryMin: Int = 45,
 )

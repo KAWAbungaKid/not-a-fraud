@@ -17,6 +17,7 @@ import androidx.test.rule.GrantPermissionRule
 import com.maven.notafraud.guard.BlockActivity
 import com.maven.notafraud.ui.MainActivity
 import org.junit.Assert.assertTrue
+import com.maven.notafraud.Graph
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +34,9 @@ class FlowTest {
 
     @Test
     fun blockScreenShowsWaysOut() {
+        // The brick ladder depends on the clock (bedtime freezes credits): keep it out of this test.
+        Graph.init(ctx)
+        Graph.update { it.copy(settings = it.settings.copy(ladder = it.settings.ladder.copy(enabled = false))) }
         val intent = Intent(ctx, BlockActivity::class.java)
             .putExtra(BlockActivity.EXTRA_PKG, "com.instagram.android")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

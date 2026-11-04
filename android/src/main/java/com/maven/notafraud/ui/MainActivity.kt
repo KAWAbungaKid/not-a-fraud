@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
         setContent {
             val d by Graph.store.state.collectAsState()
-            NafTheme(d.settings.accent) { App() }
+            NafTheme(d.settings.accent, d.settings.textContrast) { App() }
         }
     }
 

@@ -34,8 +34,9 @@ object Palette {
     var greenDim by androidx.compose.runtime.mutableStateOf(Color(0xFF6FB85E))
     val amber = Color(0xFFFFC857)
     val red = Color(0xFFFF6B6B)
-    val text = Color(0xFFE4EDE1)
-    val textDim = Color(0xFFBCC8B8)
+    var text by androidx.compose.runtime.mutableStateOf(Color(0xFFE4EDE1))
+    /** Secondary text; brighter with Look → Text contrast. */
+    var textDim by androidx.compose.runtime.mutableStateOf(Color(0xFFBCC8B8))
 }
 
 /** Accent name -> (bright, dim). */
@@ -80,10 +81,12 @@ private val typography = Typography().run {
 }
 
 @Composable
-fun NafTheme(accent: String = "green", content: @Composable () -> Unit) {
+fun NafTheme(accent: String = "green", contrast: Int = 0, content: @Composable () -> Unit) {
     val (bright, dim) = ACCENTS[accent] ?: ACCENTS.getValue("green")
     Palette.green = bright
     Palette.greenDim = dim
+    Palette.textDim = when (contrast) { 0 -> Color(0xFFBCC8B8); 1 -> Color(0xFFD8E2D4); else -> Color(0xFFF0F5EE) }
+    Palette.text = if (contrast >= 2) Color(0xFFFFFFFF) else Color(0xFFE4EDE1)
     val cs = androidx.compose.runtime.remember(bright) { scheme(bright) }
     MaterialTheme(colorScheme = cs, typography = typography, content = content)
 }

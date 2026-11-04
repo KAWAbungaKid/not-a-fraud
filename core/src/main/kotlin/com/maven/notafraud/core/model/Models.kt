@@ -122,6 +122,14 @@ data class Task(
     val targetAt: Long? = null,
     /** Most minutes per day the planner gives this task, so big assignments spread over days. */
     val dailyCapMin: Int? = null,
+    /**
+     * PRACTICE with a fixed weekly time (what weekly "habit" blocks used to be, merged in v0.11): these days
+     * (1 = Mon) at [fixedStartMin] for [fixedLenMin]. Gives way to a hot deadline. The rest of the weekly
+     * target is sprinkled into gaps as usual.
+     */
+    val fixedDays: Set<Int> = emptySet(),
+    val fixedStartMin: Int? = null,
+    val fixedLenMin: Int? = null,
 )
 
 /** To-do list levels. */
@@ -376,7 +384,8 @@ data class AppRules(
     ),
     val defaultProfile: BlockProfile = BlockProfile(),
 ) {
-    fun profile(pkg: String) = profiles[pkg] ?: defaultProfile
+    /** A site without its own rules uses its app's (youtube.com in Chrome asks "what for?" like the YouTube app). */
+    fun profile(pkg: String) = profiles[pkg] ?: SITE_APPS[pkg.removePrefix("site:")]?.let { profiles[it] } ?: defaultProfile
 
     companion object {
         val DEFAULT_BLOCKED = setOf(
@@ -388,6 +397,10 @@ data class AppRules(
             "com.google.android.youtube",
             "com.snapchat.android",
             "com.facebook.katana",
+        )
+        val SITE_APPS = mapOf(
+            "youtube.com" to "com.google.android.youtube", "instagram.com" to "com.instagram.android", "tiktok.com" to "com.zhiliaoapp.musically",
+            "x.com" to "com.twitter.android", "twitter.com" to "com.twitter.android", "reddit.com" to "com.reddit.frontpage", "facebook.com" to "com.facebook.katana",
         )
         val DEFAULT_SITES = setOf(
             "instagram.com", "tiktok.com", "x.com", "twitter.com", "reddit.com", "youtube.com", "facebook.com",
@@ -541,6 +554,8 @@ data class Settings(
     /** Not a Twig: its meal / water / weigh-in / check-in reminders come through Not a Fraud's routine nags. */
     val dietNags: Boolean = true,
     val ladder: LadderSettings = LadderSettings(),
+    /** Secondary text: 0 normal, 1 brighter, 2 brightest. */
+    val textContrast: Int = 0,
     /** Medium lock: the guard also covers the phone's Settings pages that would switch Not a Fraud off or remove it. */
     val guardSettingsPages: Boolean = true,
 )
@@ -552,7 +567,11 @@ data class SkillTree(
     val name: String,
     val sport: Boolean = false,
     val order: Int = 0,
-)
+    /** Your own constellation, drawn on a [SHAPE_COLS]×[SHAPE_ROWS] grid: strokes of grid points (y·cols + x). */
+    val shape: List<List<Int>> = emptyList(),
+) {
+    companion object { const val SHAPE_COLS = 7; const val SHAPE_ROWS = 9 }
+}
 
 /** One skill node. [parentId] = the skill it builds on. Time comes from its practice task plus manual minutes. */
 @Serializable

@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -162,6 +164,7 @@ fun SkillsScreen(data: AppData) {
 
 @Composable
 private fun Constellation(data: AppData, tree: SkillTree, skills: List<Skill>, selected: String?, onSelect: (String) -> Unit) {
+    if (tree.shape.any { it.size >= 2 }) { DrawnConstellation(data, tree, skills, selected, onSelect); return }
     val (pos, cols) = remember(skills) { layout(skills) }
     val rows = (pos.values.maxOfOrNull { it.row } ?: 0) + 1
     val twinkle = 1f
@@ -297,10 +300,159 @@ private fun SkillEditor(initial: Skill, exists: Boolean, onDismiss: () -> Unit, 
     )
 }
 
+/** A point on the drawing grid, 0..1 both ways. */
+private fun gridPoint(i: Int): Offset = Offset(
+    (i % SkillTree.SHAPE_COLS) / (SkillTree.SHAPE_COLS - 1f),
+    (i / SkillTree.SHAPE_COLS) / (SkillTree.SHAPE_ROWS - 1f),
+)
+
+/** Points [n] evenly along the drawn lines (by length), each 0..1. */
+private fun alongShape(shape: List<List<Int>>, n: Int): List<Offset> {
+    val segs = shape.filter { it.size >= 2 }.flatMap { s -> s.zipWithNext().map { (a, b) -> gridPoint(a) to gridPoint(b) } }
+    if (segs.isEmpty() || n <= 0) return emptyList()
+    val lens = segs.map { (a, b) -> (b - a).getDistance() }
+    val total = lens.sum().coerceAtLeast(0.001f)
+    return (0 until n).map { k ->
+        var d = total * (k + 0.5f) / n
+        var i = 0
+        while (i < segs.lastIndex && d > lens[i]) { d -= lens[i]; i++ }
+        val (a, b) = segs[i]
+        val f = if (lens[i] == 0f) 0f else (d / lens[i]).coerceIn(0f, 1f)
+        a + (b - a) * f
+    }
+}
+
+/**
+ * Your own constellation (backlog § 17): the lines you drew, faint at first. Each skill is a star on the lines;
+ * earned skills (level 1+) shine, and every level earned scatters more stars along the lines, so the shape
+ * fills in denser as you go.
+ */
+@Composable
+private fun DrawnConstellation(data: AppData, tree: SkillTree, skills: List<Skill>, selected: String?, onSelect: (String) -> Unit) {
+    val density = LocalDensity.current
+    val ordered = remember(skills) { skills.sortedWith(compareBy<Skill> { it.parentId != null }.thenBy { it.id }) }
+    val levels = ordered.associate { it.id to Skills.level(Skills.minutes(data, it.id)) }
+    val earned = levels.values.count { it >= 1 }
+    val fraction = if (ordered.isEmpty()) 0f else earned.toFloat() / ordered.size
+    val dust = remember(tree.shape, levels.values.sum()) { alongShape(tree.shape, levels.values.sum() * 3) }
+    val spots = remember(tree.shape, ordered.size) { alongShape(tree.shape, ordered.size) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val top = 70.dp
+        val bottomPad = 200.dp
+        val side = 36.dp
+        val areaW = maxWidth - side * 2
+        val areaH = (maxHeight - top - bottomPad).coerceAtLeast(200.dp)
+        // Keep the grid's aspect ratio.
+        val cell = minOf(areaW / (SkillTree.SHAPE_COLS - 1f), areaH / (SkillTree.SHAPE_ROWS - 1f))
+        val w = cell * (SkillTree.SHAPE_COLS - 1f)
+        val h = cell * (SkillTree.SHAPE_ROWS - 1f)
+        val left = (maxWidth - w) / 2
+        fun dx(p: Offset): Dp = left + w * p.x
+        fun dy(p: Offset): Dp = top + (areaH - h) / 2 + h * p.y
+        Canvas(Modifier.fillMaxSize()) {
+            val r = Random(tree.id.hashCode())
+            repeat(170) {
+                val a = r.nextFloat()
+                drawCircle(STAR.copy(alpha = 0.08f + 0.35f * a * a), radius = (0.6f + r.nextFloat() * 1.3f) * density.density,
+                    center = Offset(r.nextFloat() * size.width, r.nextFloat() * size.height))
+            }
+            fun o(p: Offset) = Offset(dx(p).toPx(), dy(p).toPx())
+            for (stroke in tree.shape) for ((a, b) in stroke.zipWithNext()) drawLine(
+                STAR.copy(alpha = 0.12f + 0.5f * fraction), o(gridPoint(a)), o(gridPoint(b)), strokeWidth = (1f + fraction) * density.density,
+            )
+            val jr = Random(tree.id.hashCode() + 7)
+            for (p in dust) {
+                val c = o(p) + Offset((jr.nextFloat() - 0.5f) * 14f * density.density, (jr.nextFloat() - 0.5f) * 14f * density.density)
+                drawCircle(STAR.copy(alpha = 0.25f + jr.nextFloat() * 0.45f), (0.8f + jr.nextFloat() * 1.2f) * density.density, c)
+            }
+            ordered.forEachIndexed { i, s ->
+                val p = spots.getOrNull(i) ?: return@forEachIndexed
+                val lvl = levels[s.id] ?: 0
+                val c = o(p)
+                val core = (if (lvl == 0) 2.2f else 3.2f + lvl * 0.9f) * density.density
+                if (lvl > 0) {
+                    val glow = (10f + lvl * 7f) * density.density
+                    drawCircle(Brush.radialGradient(listOf(STAR.copy(alpha = 0.55f), Color.Transparent), c, glow), glow, c)
+                }
+                if (s.id == selected) drawCircle(Palette.green, core + 7f * density.density, c, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f * density.density))
+                drawCircle(if (lvl > 0) STAR else STAR.copy(alpha = 0.35f), core, c)
+            }
+        }
+        ordered.forEachIndexed { i, s ->
+            val p = spots.getOrNull(i) ?: return@forEachIndexed
+            val lvl = levels[s.id] ?: 0
+            Box(Modifier.offset(dx(p) - 28.dp, dy(p) - 28.dp).size(56.dp).clip(CircleShape).clickable(remember { MutableInteractionSource() }, null) { onSelect(s.id) })
+            Text(
+                s.name.uppercase(), color = STAR.copy(alpha = if (lvl > 0) 0.85f else 0.35f), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+                style = TextStyle(fontSize = 10.sp, letterSpacing = 1.5.sp), modifier = Modifier.offset(dx(p) - 55.dp, dy(p) + 14.dp).width(110.dp),
+            )
+        }
+        if (skills.isEmpty()) Text("Your shape is drawn. Add skills and they become its stars.", color = STAR.copy(alpha = 0.5f), modifier = Modifier.align(Alignment.Center).padding(24.dp))
+    }
+}
+
+/** Draw a constellation: tap dots to join them; "New line" lifts the pen. */
+@Composable
+private fun ShapeEditor(initial: List<List<Int>>, onDismiss: () -> Unit, onSave: (List<List<Int>>) -> Unit) {
+    var strokes by remember { mutableStateOf(initial.filter { it.isNotEmpty() }.ifEmpty { listOf(emptyList()) }) }
+    val density = LocalDensity.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Draw the constellation") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Tap dots to connect them. Skills become stars along these lines, and it fills in as you earn them.", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                BoxWithConstraints(Modifier.fillMaxWidth().height(320.dp).background(SKY_TOP)) {
+                    val cell = minOf(maxWidth / SkillTree.SHAPE_COLS, maxHeight / SkillTree.SHAPE_ROWS)
+                    val gw = cell * SkillTree.SHAPE_COLS
+                    val gh = cell * SkillTree.SHAPE_ROWS
+                    val ox = (maxWidth - gw) / 2
+                    val oy = (maxHeight - gh) / 2
+                    fun center(i: Int): Offset = with(density) {
+                        Offset((ox + cell * (i % SkillTree.SHAPE_COLS + 0.5f)).toPx(), (oy + cell * (i / SkillTree.SHAPE_COLS + 0.5f)).toPx())
+                    }
+                    Canvas(
+                        Modifier.fillMaxSize().pointerInput(Unit) {
+                            detectTapGestures { tap ->
+                                val n = SkillTree.SHAPE_COLS * SkillTree.SHAPE_ROWS
+                                val hit = (0 until n).minByOrNull { (center(it) - tap).getDistance() } ?: return@detectTapGestures
+                                if ((center(hit) - tap).getDistance() > cell.toPx()) return@detectTapGestures
+                                val cur = strokes.last()
+                                if (cur.lastOrNull() == hit) return@detectTapGestures
+                                strokes = strokes.dropLast(1) + listOf(cur + hit)
+                            }
+                        },
+                    ) {
+                        for (i in 0 until SkillTree.SHAPE_COLS * SkillTree.SHAPE_ROWS) drawCircle(STAR.copy(alpha = 0.3f), 2.5f * density.density, center(i))
+                        for (s in strokes) {
+                            for ((a, b) in s.zipWithNext()) drawLine(STAR.copy(alpha = 0.8f), center(a), center(b), strokeWidth = 2f * density.density)
+                            for (p in s) drawCircle(STAR, 4f * density.density, center(p))
+                        }
+                        strokes.last().lastOrNull()?.let { drawCircle(Palette.green, 7f * density.density, center(it), style = androidx.compose.ui.graphics.drawscope.Stroke(2f * density.density)) }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { if (strokes.last().isNotEmpty()) strokes = strokes + listOf(emptyList()) }) { Text("New line") }
+                    TextButton(onClick = {
+                        val cur = strokes.last()
+                        strokes = if (cur.isNotEmpty()) strokes.dropLast(1) + listOf(cur.dropLast(1)) else if (strokes.size > 1) strokes.dropLast(1) else strokes
+                    }) { Text("Undo") }
+                    TextButton(onClick = { strokes = listOf(emptyList()) }) { Text("Clear") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(strokes.filter { it.size >= 2 }) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
 @Composable
 private fun TreeEditor(initial: SkillTree, exists: Boolean, onDismiss: () -> Unit, onSave: (SkillTree) -> Unit, onDelete: () -> Unit) {
     var name by remember { mutableStateOf(initial.name) }
     var sport by remember { mutableStateOf(initial.sport) }
+    var shape by remember { mutableStateOf(initial.shape) }
+    var drawing by remember { mutableStateOf(false) }
+    if (drawing) ShapeEditor(shape, onDismiss = { drawing = false }) { shape = it; drawing = false }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (exists) "Edit tree" else "New skill tree") },
@@ -308,13 +460,15 @@ private fun TreeEditor(initial: SkillTree, exists: Boolean, onDismiss: () -> Uni
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, singleLine = true, label = { Text("Name") })
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sport (20+ min counts as a workout)", Modifier.weight(1f))
+                    Text("Sport (20+ min counts as cardio)", Modifier.weight(1f))
                     Switch(sport, { sport = it })
                 }
+                TextButton(onClick = { drawing = true }) { Text(if (shape.isEmpty()) "Draw your own constellation…" else "Redraw the constellation…") }
+                if (shape.isNotEmpty()) TextButton(onClick = { shape = emptyList() }) { Text("Use the automatic layout instead", color = Palette.textDim) }
                 if (exists) TextButton(onClick = onDelete) { Text("Delete tree and its skills", color = Palette.red) }
             }
         },
-        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onSave(initial.copy(name = name.trim(), sport = sport)) }) { Text("Save") } },
+        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onSave(initial.copy(name = name.trim(), sport = sport, shape = shape)) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

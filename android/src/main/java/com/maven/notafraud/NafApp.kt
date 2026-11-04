@@ -105,6 +105,24 @@ object Graph {
         }
     }
 
+    /** Sunday from 6 pm: once, a note to look over the week's "what was it for?" answers. */
+    private fun purposeReview(ctx: Context, n: Long) {
+        val today = today()
+        if (today.dayOfWeek != java.time.DayOfWeek.SUNDAY || Time.minuteOfDay(n, zone) < 18 * 60) return
+        val prefs = ctx.getSharedPreferences("review", Context.MODE_PRIVATE)
+        if (prefs.getString("purpose", null) == today.toString()) return
+        val groups = com.maven.notafraud.core.guard.PurposeReview.week(data.ledger, n)
+        if (groups.isEmpty()) return
+        prefs.edit().putString("purpose", today.toString()).apply()
+        val top = groups.first()
+        Notifier.postAlert(
+            ctx, "This week's \"what was it for?\"",
+            groups.joinToString(" · ") { "${com.maven.notafraud.sense.AppLabels.label(ctx, it.pkg)} ${it.count}×" } +
+                ". Most recent for ${com.maven.notafraud.sense.AppLabels.label(ctx, top.pkg)}: \"${top.answers.first().what}\". Tap to read them all (Blocking & credits).",
+            tab = "blocking",
+        )
+    }
+
     /** Open the Tasks page on its To-do tab once. */
     @Volatile var openTodo = false
 
@@ -134,6 +152,7 @@ object Graph {
             store.update { com.maven.notafraud.core.store.Lock.markNotified(it, ready.map { c -> c.id }.toSet()) }
         }
         workoutNag(ctx, n)
+        purposeReview(ctx, n)
         val st = nowState()
         Notifier.postNow(ctx, st)
         ladder(ctx, n, st)

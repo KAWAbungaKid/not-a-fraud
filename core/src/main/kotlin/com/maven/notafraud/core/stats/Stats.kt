@@ -65,7 +65,9 @@ object Stats {
 
     private fun workoutScore(d: AppData, ds: List<LocalDate>): Double? {
         val w = d.routineFor(com.maven.notafraud.core.model.AutoCheck.WORKOUT) ?: return null
-        val n = ds.count { day -> RoutinePolicy.day(d, day).done.containsKey(w.id) }
+        // Not a Troglodyte's own record of finished workouts counts too (days it was trained but not ticked here).
+        val app = d.workout?.doneDates.orEmpty().toSet()
+        val n = ds.count { day -> RoutinePolicy.day(d, day).done.containsKey(w.id) || day.toString() in app }
         return clamp(10.0 * n / (w.weeklyTarget ?: 6))
     }
 
@@ -151,7 +153,30 @@ object Stats {
             }
             return avg(ratios)?.let { clamp(it * 10) }
         }
-        return Stat("discipline", "Discipline", calc(days(today)), calc(days(today, 1)), listOf("Plan followed" to (calc(days(today))?.let { "${(it * 10).roundToInt()}%" } ?: "not enough days yet")), areasFor(d, "discipline"))
+        // Time in blocked apps: 0 a day is a 10, 2¼ h a day is a 1.
+        fun screen(ds: List<LocalDate>): Double? {
+            val per = ds.mapNotNull { day -> d.usage.firstOrNull { it.date == day.toString() && it.device == "phone" }?.minutesByApp?.filterKeys { it in d.rules.blocked }?.values?.sum() }
+            return avg(per.map { it.toDouble() })?.let { clamp(10 - it / 15.0) }
+        }
+        // Homework: nothing left inside the "done N days early" line is a 10; every half hour behind costs a point.
+        val hw = com.maven.notafraud.core.plan.Homework.ahead(d, Time.at(today, 12 * 60, zone)).takeIf { it.openCount > 0 }
+        val hwScore = hw?.let { clamp(10 - it.behindMin / 30.0) }
+        // Not a Troglodyte: a week whose minimum is already gone costs 2.
+        val missed = d.workout?.takeIf { it.weekStart.isNotEmpty() && today.toString() >= it.weekStart && it.risk == com.maven.notafraud.core.workout.WorkoutLink.MISSED } != null
+        fun total(ds: List<LocalDate>, withHw: Boolean): Double? {
+            val parts = listOfNotNull(calc(ds), screen(ds), if (withHw) hwScore else null)
+            return avg(parts)?.let { clamp(it - if (missed && withHw) 2 else 0) }
+        }
+        return Stat(
+            "discipline", "Discipline", total(days(today), true), total(days(today, 1), false),
+            listOfNotNull(
+                "Plan followed" to (calc(days(today))?.let { "${(it * 10).roundToInt()}%" } ?: "not enough days yet"),
+                screen(days(today))?.let { s -> "Blocked apps" to "%.1f".format(s) + (screen(days(today, 1))?.let { p -> if (s >= p) " (better than last week)" else " (worse than last week)" } ?: "") },
+                hw?.let { "Homework" to if (it.behindMin == 0) "ahead (${it.goalDays} days early)" else "${Time.durationText(it.behindMin)} behind your ${it.goalDays}-day lead" },
+                if (missed) "Workout minimum" to "missed this week (−2)" else null,
+            ),
+            areasFor(d, "discipline"),
+        )
     }
 
     private fun checkIn(d: AppData, today: LocalDate, key: String, name: String): Stat {

@@ -56,6 +56,13 @@ object Workers {
         }
         // Workout app: done / started / at-risk changes re-plan the day.
         if (runCatching { com.maven.notafraud.sense.WorkoutSync.sync(ctx) }.getOrDefault(false)) Graph.replan()
+        // Not a Troglodyte: a sport planned tomorrow (climbing) steers today's suggestion away from shoulders & arms.
+        runCatching {
+            if (Graph.data.workout != null) {
+                val tomorrow = Graph.today().plusDays(1)
+                com.maven.notafraud.sense.WorkoutSync.pushHint(ctx, tomorrow.toString(), com.maven.notafraud.core.workout.WorkoutLink.sportOn(Graph.data, tomorrow))
+            }
+        }
         // Not a Twig: meals logged tick the routine; its reminders join the routine nags.
         runCatching { com.maven.notafraud.sense.DietSync.sync(ctx) }
         Graph.update { Planning.ensureToday(it, Graph.now()) }

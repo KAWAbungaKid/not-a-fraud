@@ -205,6 +205,23 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
             }
         }
 
+        val review = com.maven.notafraud.core.guard.PurposeReview.week(data.ledger, Graph.now())
+        if (review.isNotEmpty()) {
+            item { SectionLabel("What it was for (last 7 days)") }
+            item {
+                Panel {
+                    val fmt = java.text.SimpleDateFormat("EEE h:mm", java.util.Locale.US)
+                    for (g in review) {
+                        val idle = com.maven.notafraud.core.guard.PurposeReview.idleShare(g)
+                        Text("${AppLabels.label(ctx, g.pkg)} · ${g.count} times" + if (idle > 0) " · ${(idle * 100).toInt()}% \"just scrolling\"" else "",
+                            style = MaterialTheme.typography.titleSmall, color = if (idle >= 0.5) Palette.amber else MaterialTheme.colorScheme.onSurface)
+                        for (e in g.answers.take(8)) Text("${fmt.format(java.util.Date(e.at))}  ${e.what}", style = MaterialTheme.typography.bodySmall, color = Palette.textDim)
+                    }
+                    Text("Sundays you get a note to look this over. Most of it scrolling? Shorten the purpose time in that app's rules.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
         item { SectionLabel("Settings lock") }
         item {
             var pickingTime by remember { mutableStateOf(false) }
@@ -542,10 +559,12 @@ private fun AnchorEditor(initial: Anchor, data: AppData, isNew: Boolean, onDismi
                 }
                 SectionLabel("How firm")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    com.maven.notafraud.core.model.AnchorMode.entries.forEach { m ->
+                    // Habit blocks are practice tasks with a fixed time since v0.11 (one practice type).
+                    com.maven.notafraud.core.model.AnchorMode.entries.filter { it != com.maven.notafraud.core.model.AnchorMode.HABIT || a.mode == it }.forEach { m ->
                         androidx.compose.material3.FilterChip(a.mode == m, { a = a.copy(mode = m) }, { Text(m.name.lowercase()) })
                     }
                 }
+                Text("Practice you want at a set time every week (CSWE, an instrument…): add a practice task in Tasks and give it a fixed weekly time.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 if (a.mode != com.maven.notafraud.core.model.AnchorMode.HARD) Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Gives way when a deadline is hot", Modifier.weight(1f))
                     Switch(a.yieldsToHot, { a = a.copy(yieldsToHot = it) })

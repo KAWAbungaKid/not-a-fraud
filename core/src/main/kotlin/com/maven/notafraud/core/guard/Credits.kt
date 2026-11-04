@@ -173,3 +173,18 @@ object Credits {
             .let { it.copy(messageWindowUsed = it.messageWindowUsed + (pkg to msg)) }
     }
 }
+
+/** The weekly "what was it for?" review: every answer from the last 7 days, grouped by app or site. */
+object PurposeReview {
+    data class Group(val pkg: String, val count: Int, val answers: List<com.maven.notafraud.core.model.PurposeEntry>)
+
+    fun week(ledger: Ledger, now: Long): List<Group> =
+        ledger.purposeLog.filter { it.at > now - 7 * 24 * 3_600_000L }.groupBy { it.pkg }
+            .map { (pkg, xs) -> Group(pkg, xs.size, xs.sortedByDescending { it.at }) }
+            .sortedByDescending { it.count }
+
+    /** Rough share of answers that admit to scrolling / killing time. */
+    private val IDLE = listOf("scroll", "bored", "nothing", "idk", "just looking", "killing time", "procrast", "random")
+
+    fun idleShare(g: Group): Double = if (g.count == 0) 0.0 else g.answers.count { a -> IDLE.any { a.what.contains(it, ignoreCase = true) } }.toDouble() / g.count
+}

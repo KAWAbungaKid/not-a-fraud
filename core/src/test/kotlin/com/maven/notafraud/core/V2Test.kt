@@ -159,7 +159,7 @@ class V2Test {
     @Test
     fun `hot deadline takes over habit blocks that yield, not hard ones`() {
         val exam = Task(title = "Study for big exam", estMin = 600, dueAt = at(sun.plusDays(1), 9), priority = Priority.HIGH, createdAt = at(tue, 5))
-        val d = data().copy(tasks = listOf(exam))
+        val d = data().let { it.copy(tasks = it.tasks.filter { t -> t.fixedStartMin != null } + exam) }
         val plan = DayPlanner().plan(sun, d, at(sun, 6))
         assertFalse(plan.blocks.any { it.title == "CSWE practice" }, "CSWE gave way")
         assertTrue(plan.blocks.any { it.title.startsWith("Weekly review") }, "review doesn't yield")
@@ -170,8 +170,9 @@ class V2Test {
 
     @Test
     fun `without a hot deadline habits keep their slot`() {
-        val plan = DayPlanner().plan(sun, data().copy(tasks = emptyList()), at(sun, 6))
-        assertTrue(plan.blocks.any { it.title == "CSWE practice" })
+        // Since v0.11 the weekly habit blocks are practice tasks with a fixed time.
+        val plan = DayPlanner().plan(sun, data().let { it.copy(tasks = it.tasks.filter { t -> t.fixedStartMin != null }) }, at(sun, 6))
+        assertTrue(plan.blocks.any { it.title == "CSWE practice" && it.taskId != null })
     }
 
     // ---- Pick 3 ----

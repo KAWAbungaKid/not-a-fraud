@@ -191,13 +191,13 @@ object Seed {
             settings = com.maven.notafraud.core.model.Settings(routineSince = now),
         )
         val (trees, skills) = Migration.skillTrees()
-        return base.copy(tasks = base.tasks + Migration.catchUpTasks(base, now), skillTrees = trees, skills = skills)
+        return Migration.practiceFromHabits(base.copy(tasks = base.tasks + Migration.catchUpTasks(base, now), skillTrees = trees, skills = skills), now)
     }
 }
 
 /** Upgrades data written by older versions. Runs on every load; no-op when current. */
 object Migration {
-    const val CURRENT = 9
+    const val CURRENT = 10
 
     /** Seeded routine items that tick themselves (v0.5 replaced the hard-coded ids with RoutineItem.autoCheck). */
     val AUTO_CHECK = mapOf(
@@ -217,7 +217,36 @@ object Migration {
         if (x.schema < 7) x = toV7(x)
         if (x.schema < 8) x = toV8(x, now)
         if (x.schema < 9) x = toV9(x)
+        if (x.schema < 10) x = toV10(x, now)
         return x
+    }
+
+    /**
+     * v0.11: one practice type. Weekly "habit" blocks (CSWE practice, scout manual) become practice tasks with a
+     * fixed weekly time; the weekly target is the slot length × days, so nothing else changes in the plan.
+     */
+    fun practiceFromHabits(d: AppData, now: Long): AppData = toV10(d, now).copy(schema = d.schema)
+
+    private fun toV10(d: AppData, now: Long): AppData {
+        val habits = d.anchors.filter { it.mode == com.maven.notafraud.core.model.AnchorMode.HABIT && it.dates.isEmpty() && it.kind != com.maven.notafraud.core.model.AnchorKind.CLASS }
+        if (habits.isEmpty()) return d.copy(schema = 10)
+        val project = d.projects.firstOrNull { it.name == "Practice" } ?: com.maven.notafraud.core.model.Project(name = "Practice", kind = com.maven.notafraud.core.model.ProjectKind.PROJECT)
+        val tasks = habits.map { a ->
+            val len = (a.endMin - a.startMin).coerceAtLeast(10)
+            com.maven.notafraud.core.model.Task(
+                title = a.title, projectId = project.id, kind = com.maven.notafraud.core.model.TaskKind.PRACTICE,
+                weeklyTargetMin = len * a.days.size.coerceAtLeast(1), estMin = len * a.days.size.coerceAtLeast(1), maxBlockMin = len, minBlockMin = 10,
+                createdAt = now, fixedDays = a.days, fixedStartMin = a.startMin, fixedLenMin = len, sourceKey = "habit:${a.id}",
+            )
+        }
+        val ids = habits.map { it.id }.toSet()
+        return d.copy(
+            schema = 10,
+            anchors = d.anchors.filterNot { it.id in ids },
+            projects = if (d.projects.any { it.id == project.id }) d.projects else d.projects + project,
+            tasks = d.tasks + tasks.filter { t -> d.tasks.none { it.sourceKey == t.sourceKey } },
+            todayPlan = null, weekPlan = emptyList(),
+        )
     }
 
     /**

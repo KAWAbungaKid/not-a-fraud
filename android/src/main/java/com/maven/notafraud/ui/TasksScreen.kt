@@ -242,6 +242,24 @@ fun TaskEditor(initial: Task, data: AppData, isNew: Boolean, onDismiss: () -> Un
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             for (m in listOf(15, 30, 45, 60, 90)) FilterChip(t.maxBlockMin == m, { t = t.copy(maxBlockMin = m) }, { Text("${m}m") })
                         }
+                        // One practice type (v0.11): a fixed weekly time is optional; the rest of the target fills gaps.
+                        SectionLabel("Fixed weekly time (optional)")
+                        val dayNames = listOf("", "M", "T", "W", "T", "F", "S", "S")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            for (dow in 1..7) FilterChip(dow in t.fixedDays, {
+                                val days = if (dow in t.fixedDays) t.fixedDays - dow else t.fixedDays + dow
+                                t = t.copy(fixedDays = days, fixedStartMin = if (days.isEmpty()) null else t.fixedStartMin ?: 17 * 60, fixedLenMin = if (days.isEmpty()) null else t.fixedLenMin ?: 60)
+                            }, { Text(dayNames[dow]) })
+                        }
+                        if (t.fixedDays.isNotEmpty()) {
+                            var pickingFixed by remember { mutableStateOf(false) }
+                            TextButton(onClick = { pickingFixed = true }) { Text("At ${hm(t.fixedStartMin ?: 17 * 60)}") }
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                for (m in listOf(15, 30, 45, 60, 90, 120)) FilterChip(t.fixedLenMin == m, { t = t.copy(fixedLenMin = m) }, { Text(Time.durationText(m)) })
+                            }
+                            Text("Keeps this slot every week (gives way to a hot deadline). Anything left of the weekly target goes into gaps.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                            if (pickingFixed) TimeDialog(t.fixedStartMin ?: 17 * 60, onDismiss = { pickingFixed = false }) { m -> t = t.copy(fixedStartMin = m); pickingFixed = false }
+                        }
                     }
                     com.maven.notafraud.core.model.TaskKind.WAITING ->
                         OutlinedTextField(t.waitingOn, { t = t.copy(waitingOn = it) }, label = { Text("Waiting on (who/what)") }, singleLine = true, modifier = Modifier.fillMaxWidth())

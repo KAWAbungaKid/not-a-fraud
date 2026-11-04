@@ -41,6 +41,15 @@ object WorkoutSync {
         return before?.copy(generatedAt = 0) != s.copy(generatedAt = 0)
     }
 
+    /**
+     * Tell Not a Troglodyte about a sport tomorrow (climbing…), so today's suggestion spares shoulders & arms.
+     * Older Troglodyte versions ignore it.
+     */
+    fun pushHint(ctx: Context, date: String, sport: String?) = runCatching {
+        val values = android.content.ContentValues().apply { put("date", date); put("sport", sport) }
+        ctx.contentResolver.update(Uri.parse("content://${workoutPackage(ctx)}.sync/hint"), values, null, null) > 0
+    }.getOrDefault(false)
+
     /** "Start workout": opens the workout app. */
     fun open(ctx: Context): Boolean {
         val i = ctx.packageManager.getLaunchIntentForPackage(workoutPackage(ctx)) ?: return false

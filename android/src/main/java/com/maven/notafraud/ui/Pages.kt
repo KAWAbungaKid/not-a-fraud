@@ -115,6 +115,16 @@ val NOW_CARDS = listOf(
 @Composable
 fun LookControls(data: AppData) {
     Panel {
+        Text("Text contrast", style = MaterialTheme.typography.titleSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val names = listOf("Normal", "Brighter", "Brightest")
+            for (i in 0..2) androidx.compose.material3.FilterChip(data.settings.textContrast == i, {
+                Confirm.change("Text contrast", names[data.settings.textContrast.coerceIn(0, 2)], names[i]) { Graph.update { it.copy(settings = it.settings.copy(textContrast = i)) } }
+            }, { Text(names[i]) })
+        }
+        Text("Secondary text, like this line.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+    }
+    Panel {
         Text("Bottom bar (up to 4, More is always there)", style = MaterialTheme.typography.titleSmall)
         val tabs = tabsOf(data).map { it.id }
         for (p in PAGES.filter { !it.setting }) {

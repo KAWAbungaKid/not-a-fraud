@@ -139,7 +139,7 @@ object Notifier {
 
     fun cancelRoutine(ctx: Context, itemId: String) = NotificationManagerCompat.from(ctx).cancel(routineNotificationId(itemId))
 
-    fun postAlert(ctx: Context, title: String, text: String) {
+    fun postAlert(ctx: Context, title: String, text: String, tab: String = MainActivity.TAB_SETUP) {
         if (!canPost(ctx)) return
         val b = NotificationCompat.Builder(ctx, CH_ALERT)
             .setSmallIcon(R.drawable.ic_stat_naf)
@@ -147,7 +147,7 @@ object Notifier {
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
-            .setContentIntent(openApp(ctx, MainActivity.TAB_SETUP, req = 9))
+            .setContentIntent(openApp(ctx, tab, req = 9))
         runCatching { NotificationManagerCompat.from(ctx).notify(ID_ALERT, b.build()) }
     }
 

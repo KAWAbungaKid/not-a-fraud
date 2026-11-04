@@ -65,6 +65,24 @@ object WorkoutLink {
     /** Credits can't open blocked apps until today's workout is started (setting). Emergencies, reply windows, purpose still work. */
     fun creditsPaused(d: AppData, now: Long) = d.settings.workoutPausesCredits && mustToday(d, now)
 
+    /** Words in a calendar entry that mean a sport session (climbing gym, pickup game…). */
+    val SPORT_WORDS = listOf("climb", "boulder", "crag", "game", "match", "pickup", "soccer", "basketball", "volleyball", "hike", "swim")
+
+    /**
+     * What sport is planned for [date], if any: a planned block on a sport-skill's practice, or a calendar entry that
+     * reads like one. Not a Troglodyte uses it to keep the day before free of shoulders & arms.
+     */
+    fun sportOn(d: AppData, date: LocalDate): String? {
+        val zone = Time.zone(d.settings.zoneId)
+        val sportTasks = d.skills.filter { s -> d.skillTrees.any { it.id == s.treeId && it.sport } }.mapNotNull { s ->
+            s.practiceTaskId?.let { it to (d.skillTrees.first { t -> t.id == s.treeId }.name) }
+        }.toMap()
+        val plan = (listOfNotNull(d.todayPlan) + d.weekPlan).firstOrNull { it.date == date.toString() }
+        plan?.blocks?.firstOrNull { it.taskId in sportTasks }?.let { return sportTasks[it.taskId] }
+        val from = Time.at(date, 0, zone)
+        return d.events.firstOrNull { e -> e.start in from until from + Time.DAY && SPORT_WORDS.any { e.title.contains(it, ignoreCase = true) } }?.title
+    }
+
     fun trainedOn(d: AppData, date: LocalDate): Boolean = d.workout?.doneDates?.contains(date.toString()) == true
 
     /** New status in: store it, tick the workout routine item if today's is done. */

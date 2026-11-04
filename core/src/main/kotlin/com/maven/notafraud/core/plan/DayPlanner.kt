@@ -215,13 +215,28 @@ class DayPlanner(
                 anchorId = a.id,
             )
         }
+        // Practice with a fixed weekly time keeps its slot (gives way to a hot deadline, like the old habit blocks).
+        val fixedPractice = HashMap<String, Int>()
+        for (t in open) {
+            val st = t.fixedStartMin ?: continue
+            if (t.kind != TaskKind.PRACTICE || date.dayOfWeek.value !in t.fixedDays) continue
+            if (hotTasks.isNotEmpty() || shedHabits) { gaveWay += t.title; continue }
+            val len = (t.fixedLenMin ?: 60).coerceIn(10, 240)
+            fixed += PlanBlock(
+                start = Time.at(date, st, zone), end = Time.at(date, st + len, zone), kind = BlockKind.TASK,
+                title = t.title, taskId = t.id, projectId = t.projectId, mode = AnchorMode.HABIT,
+            )
+            fixedPractice[t.id] = len
+        }
         val wk = data.workout
         for (r in data.routine) {
             if (r.reserveMin <= 0 || !r.enabled || date.dayOfWeek.value !in r.days) continue
             val isWorkout = r.autoCheck == com.maven.notafraud.core.model.AutoCheck.WORKOUT && wk != null
             // Workout app: no block on a day already trained; on a must-day it stays even on a soft day.
             if (isWorkout && com.maven.notafraud.core.workout.WorkoutLink.trainedOn(data, date)) continue
-            val must = isWorkout && date == Time.dateOf(now, zone) && com.maven.notafraud.core.workout.WorkoutLink.mustToday(data, now)
+            // A must-day or a tight day (one spare day left) keeps its workout block even on a soft day.
+            val must = isWorkout && date == Time.dateOf(now, zone) &&
+                (com.maven.notafraud.core.workout.WorkoutLink.mustToday(data, now) || com.maven.notafraud.core.workout.WorkoutLink.tight(data, now))
             if ((soft || mode == DayMode.WRITEOFF) && r.weeklyTarget != null && !must) continue
             val label = if (isWorkout && date == Time.dateOf(now, zone)) wk?.suggestedToday?.let { "Workout: $it" } else null
             fixed += PlanBlock(
@@ -279,10 +294,17 @@ class DayPlanner(
             }
         }
 
-        val allotted = HashMap<String, Int>()
+        val allotted = HashMap<String, Int>(fixedPractice)
         var focusUsed = 0
         val taskBlocks = mutableListOf<PlanBlock>()
-        val practicedToday = HashSet<String>()
+        val practicedToday = HashSet<String>(fixedPractice.keys)
+
+        /** Fixed practice slots still coming later this week (they'll cover part of the target). */
+        fun fixedLaterThisWeek(task: Task): Int {
+            if (task.fixedStartMin == null) return 0
+            val daysLeft = 7 - date.dayOfWeek.value
+            return (1..daysLeft).count { date.plusDays(it.toLong()).dayOfWeek.value in task.fixedDays } * (task.fixedLenMin ?: 60)
+        }
 
         /** Per-day cap (homework): at least the cap, more only if the target date needs it. */
         fun capToday(task: Task): Int {
@@ -294,7 +316,7 @@ class DayPlanner(
         }
 
         fun need(task: Task): Int = when (task.kind) {
-            TaskKind.PRACTICE -> Practice.need(task, data, date, (carried[task.id] ?: 0) + (allotted[task.id] ?: 0))
+            TaskKind.PRACTICE -> Practice.need(task, data, date, (carried[task.id] ?: 0) + (allotted[task.id] ?: 0) + fixedLaterThisWeek(task))
             else -> minOf(
                 Scorer.minutesLeft(task) - (carried[task.id] ?: 0) - (allotted[task.id] ?: 0),
                 capToday(task) - (allotted[task.id] ?: 0),

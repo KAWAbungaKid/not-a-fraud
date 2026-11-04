@@ -93,4 +93,33 @@ class V10Test {
         assertTrue(m in 4..5)
         assertEquals(m, y.tasks.count { it.sourceKey?.startsWith("makeup:") == true })
     }
+
+    @Test
+    fun `habit blocks became practice with a fixed time`() {
+        val fresh = Seed.data(at(4))
+        assertTrue(fresh.anchors.none { it.mode == com.maven.notafraud.core.model.AnchorMode.HABIT && it.dates.isEmpty() })
+        val cswe = fresh.tasks.first { it.title == "CSWE practice" }
+        assertEquals(com.maven.notafraud.core.model.TaskKind.PRACTICE, cswe.kind)
+        assertEquals(setOf(7), cswe.fixedDays)
+        assertEquals(90, cswe.weeklyTargetMin)
+        val sun = LocalDate.parse("2026-11-08")
+        val plan = com.maven.notafraud.core.plan.DayPlanner().plan(sun, fresh.copy(tasks = listOf(cswe)), at(6, 0, sun))
+        val b = plan.blocks.first { it.taskId == cswe.id }
+        assertEquals(10 * 60, Time.minuteOfDay(b.start, zone))
+        assertEquals(1, plan.blocks.count { it.taskId == cswe.id }, "the fixed slot covers the week's target: no extra sprinkles")
+    }
+
+    @Test
+    fun `old saves migrate habits too`() {
+        val old = Seed.data(at(4)).let { d ->
+            d.copy(schema = 9, tasks = d.tasks.filter { it.sourceKey?.startsWith("habit:") != true }, anchors = d.anchors + com.maven.notafraud.core.model.Anchor(
+                title = "Piano", kind = com.maven.notafraud.core.model.AnchorKind.ROUTINE, startMin = 18 * 60, endMin = 18 * 60 + 30, days = setOf(2, 4),
+                mode = com.maven.notafraud.core.model.AnchorMode.HABIT, yieldsToHot = true,
+            ))
+        }
+        val v = com.maven.notafraud.core.seed.Migration.apply(old, at(4))
+        val piano = v.tasks.first { it.title == "Piano" }
+        assertEquals(60, piano.weeklyTargetMin)
+        assertTrue(v.anchors.none { it.title == "Piano" })
+    }
 }

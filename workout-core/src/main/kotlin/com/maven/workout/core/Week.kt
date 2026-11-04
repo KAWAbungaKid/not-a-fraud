@@ -187,8 +187,9 @@ object Suggest {
         // Not a Fraud says tomorrow is a sport day (climbing): keep shoulders & arms fresh for it.
         val sport = d.sportDays[today.plusDays(1).toString()]
         var finalPick = pick
-        if (sport != null && pick != null && armFocus(d, pick) >= 0.5) {
-            ranked.firstOrNull { armFocus(d, it) < 0.5 }?.let { alt ->
+        if (sport != null && pick != null && armFocus(d, pick) >= ARM_DAY) {
+            // Another day from today's list, else any day not done yet this week (an extra day is fine).
+            (ranked.firstOrNull { armFocus(d, it) < ARM_DAY } ?: p.days.firstOrNull { it.id !in doneThisWeek && it !in ranked && armFocus(d, it) < ARM_DAY })?.let { alt ->
                 finalPick = alt
                 why = "$sport tomorrow: ${alt.name} today, so ${pick.name} doesn't tire you for it."
             }
@@ -197,6 +198,8 @@ object Suggest {
         return Result(finalPick?.let { Pick(it, why) }, others, bal, imbalance(core, bal))
     }
 
+    /** A day this arm-focused gets swapped out the day before a sport. */
+    const val ARM_DAY = 0.6
     private val ARMS = setOf(Muscle.SHOULDERS, Muscle.BICEPS, Muscle.TRICEPS, Muscle.FOREARMS)
     private val BIG = setOf(Muscle.CHEST, Muscle.BACK, Muscle.QUADS, Muscle.HAMSTRINGS, Muscle.GLUTES)
 

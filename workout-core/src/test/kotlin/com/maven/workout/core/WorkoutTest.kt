@@ -306,13 +306,13 @@ class WorkoutTest {
     @Test
     fun `climbing tomorrow steers away from shoulders and arms`() {
         val p = seed.program()!!
-        val arms = p.days.firstOrNull { Suggest.armFocus(seed, it) >= 0.5 } ?: return
+        val arms = p.days.firstOrNull { Suggest.armFocus(seed, it) >= Suggest.ARM_DAY } ?: return
         val done = p.days.filter { it != arms }.take(p.coreDays).map { t ->
             Session(id = t.id, name = t.name, templateId = t.id, date = mon.toString(), startedAt = 0, endedAt = 1, entries = listOf(Entry(t.exerciseIds.first(), listOf(SetLog(done = true)))))
         }
         val d = seed.copy(sessions = done, sportDays = mapOf(mon.plusDays(1).toString() to "Climbing"))
         val pick = Suggest.today(d, mon).pick
-        if (pick != null) assertTrue(Suggest.armFocus(d, pick.template) < 0.5 || p.days.all { Suggest.armFocus(d, it) >= 0.5 }, pick.reason)
+        if (pick != null) assertTrue(Suggest.armFocus(d, pick.template) < Suggest.ARM_DAY || p.days.all { Suggest.armFocus(d, it) >= Suggest.ARM_DAY }, pick.reason)
     }
 
     @Test

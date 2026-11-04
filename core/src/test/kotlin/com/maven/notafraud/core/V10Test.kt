@@ -1,0 +1,96 @@
+package com.maven.notafraud.core
+
+import com.maven.notafraud.core.guard.GuardAction
+import com.maven.notafraud.core.guard.GuardPolicy
+import com.maven.notafraud.core.guard.Ladder
+import com.maven.notafraud.core.guard.SettingsGuard
+import com.maven.notafraud.core.model.ActiveSession
+import com.maven.notafraud.core.model.UsageDay
+import com.maven.notafraud.core.plan.Time
+import com.maven.notafraud.core.seed.Seed
+import com.maven.notafraud.core.store.Actions
+import com.maven.notafraud.core.store.Lock
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class V10Test {
+    private val zone = ZoneId.of("America/Chicago")
+    private val day = LocalDate.parse("2026-11-04")
+    private fun at(h: Int, m: Int = 0, date: LocalDate = day) = Time.at(date, h * 60 + m, zone)
+    private fun base() = Seed.data(at(4)).let { it.copy(routine = emptyList(), settings = it.settings.copy(routineSince = null)) }
+
+    @Test
+    fun `bedtime is level 3 once the list is set up, and only the list opens`() {
+        var d = base()
+        assertEquals(2, Ladder.state(d, at(23)).level, "no list yet: dull, not brick")
+        d = d.copy(settings = d.settings.copy(ladder = d.settings.ladder.copy(allowlist = setOf("com.google.android.apps.maps"), allowlistConfirmed = true)))
+        val s = Ladder.state(d, at(23))
+        assertEquals(3, s.level)
+        assertTrue(s.bedtime && s.creditsFrozen)
+        assertEquals(GuardAction.BLOCK, GuardPolicy.decide("com.reddit.frontpage", d, at(23)).action)
+        assertTrue(GuardPolicy.decide("com.reddit.frontpage", d, at(23)).brick)
+        assertEquals(GuardAction.IGNORE, GuardPolicy.decide("com.google.android.apps.maps", d, at(23)).action)
+        assertEquals(GuardAction.IGNORE, GuardPolicy.decide("com.samsung.android.dialer", d, at(23)).action)
+        assertEquals(GuardAction.IGNORE, GuardPolicy.decide("com.maven.workout", d, at(23)).action)
+        assertEquals(0, Ladder.state(d, at(10)).level)
+    }
+
+    @Test
+    fun `drift climbs the ladder and working drops it`() {
+        var d = base()
+        d = d.copy(usage = listOf(UsageDay(day.toString(), "phone", mapOf("com.instagram.android" to 100))), rules = d.rules.copy(blocked = d.rules.blocked + "com.instagram.android"))
+        assertEquals(1, Ladder.state(d, at(14)).level)
+        d = d.copy(usage = listOf(UsageDay(day.toString(), "phone", mapOf("com.instagram.android" to 160))))
+        assertEquals(1, Ladder.state(d, at(14)).level, "3 points is still friction")
+        d = d.copy(active = ActiveSession(title = "Heat transfer", start = at(14)))
+        assertEquals(0, Ladder.state(d, at(14, 5)).level)
+    }
+
+    @Test
+    fun `ladder loosening waits, tightening applies`() {
+        val d = base()
+        val strict = Lock.setLadder(d, d.settings.ladder.copy(bedMin = 21 * 60), "Bedtime 9", at(12))
+        assertEquals(21 * 60, strict.settings.ladder.bedMin)
+        assertTrue(strict.pending.isEmpty())
+        val loose = Lock.setLadder(d, d.settings.ladder.copy(enabled = false), "Ladder off", at(12))
+        assertTrue(loose.settings.ladder.enabled)
+        assertEquals(1, loose.pending.size)
+        val confirmed = Lock.confirm(loose, loose.pending.first().id)
+        assertFalse(confirmed.settings.ladder.enabled)
+    }
+
+    @Test
+    fun `settings guard protects switching off, not switching on`() {
+        val labels = setOf("Not a Fraud")
+        val appInfo = listOf(SettingsGuard.Node("Not a Fraud"), SettingsGuard.Node("Uninstall"), SettingsGuard.Node("Force stop"))
+        assertTrue(SettingsGuard.protects(appInfo, labels))
+        val onPage = listOf(SettingsGuard.Node("Not a Fraud"), SettingsGuard.Node("On", checkable = true, checked = true))
+        assertTrue(SettingsGuard.protects(onPage, labels))
+        val offPage = listOf(SettingsGuard.Node("Not a Fraud"), SettingsGuard.Node("Off", checkable = true, checked = false))
+        assertFalse(SettingsGuard.protects(offPage, labels))
+        val list = listOf(
+            SettingsGuard.Node("Instagram", top = 0, bottom = 100), SettingsGuard.Node("", true, true, 0, 100),
+            SettingsGuard.Node("Not a Fraud", top = 100, bottom = 200), SettingsGuard.Node("", true, false, 100, 200),
+            SettingsGuard.Node("Snapchat", top = 200, bottom = 300), SettingsGuard.Node("", true, true, 200, 300),
+            SettingsGuard.Node("Spotify", top = 300, bottom = 400), SettingsGuard.Node("", true, true, 300, 400),
+        )
+        assertFalse(SettingsGuard.protects(list, labels), "other apps' switches on a list page are free")
+        assertFalse(SettingsGuard.protects(listOf(SettingsGuard.Node("Wi-Fi"), SettingsGuard.Node("", true, true)), labels))
+    }
+
+    @Test
+    fun `skip several times or until a date`() {
+        val d = base()
+        val trading = d.anchors.first { it.title.contains("Trading", true) || it.title.contains("Market", true) }
+        val (x, n) = Actions.skipAnchorMany(d, trading.id, day, count = 3, until = null, makeUp = false, now = at(8))
+        assertEquals(3, n)
+        assertEquals(3, x.anchors.first { it.id == trading.id }.skipDates.count { it >= day.toString() })
+        val (y, m) = Actions.skipAnchorMany(d, trading.id, day, count = null, until = day.plusDays(6), makeUp = true, now = at(8))
+        assertTrue(m in 4..5)
+        assertEquals(m, y.tasks.count { it.sourceKey?.startsWith("makeup:") == true })
+    }
+}

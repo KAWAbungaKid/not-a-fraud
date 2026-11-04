@@ -293,10 +293,47 @@ data class PendingChange(
     val text: String? = null,
     val profile: BlockProfile? = null,
     val notified: Boolean = false,
+    /** Why you wanted it, typed at the time; shown back in the morning next to "still want this?". */
+    val reason: String? = null,
 )
 
 @Serializable
-enum class ChangeKind { BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME, WORKOUT_PAUSE, NUMBER }
+enum class ChangeKind {
+    BLOCKING, NAGS, ROUTINE_NAGS, UNBLOCK_APPS, UNBLOCK_SITES, FOCUS_APPS, PROFILE, EMERGENCY_MIN, EMERGENCY_PHRASE, LOCK, LOCK_TIME, WORKOUT_PAUSE, NUMBER,
+    /** Ten minutes where the phone's Settings pages for Not a Fraud open normally. */
+    SETTINGS_WINDOW,
+    /** Switch off the guard on Not a Fraud's Settings pages. */
+    SETTINGS_GUARD,
+    /** Looser ladder (off, lower top level, bedtime brick off / shorter). [profile] unused; [ladder] holds it. */
+    LADDER,
+    /** More apps allowed at Level 3 / bedtime. */
+    LADDER_ALLOW,
+    /** Delete or switch off a routine item. */
+    ROUTINE_REMOVE,
+}
+
+/**
+ * The brick ladder (STATE.md § 22). Level 0 = normal; 1 = friction; 2 = dull (grayscale, unlock lands on Now);
+ * 3 = brick (only [allowlist] opens). Bedtime is Level 3 from [bedMin] to [wakeMin].
+ */
+@Serializable
+data class LadderSettings(
+    val enabled: Boolean = true,
+    val maxLevel: Int = 3,
+    /** Apps that still open at Level 3 and at bedtime (phone, texts, Settings and Maven's apps always do). */
+    val allowlist: Set<String> = emptySet(),
+    /** Level 3 only happens once the list has been checked and saved. */
+    val allowlistConfirmed: Boolean = false,
+    /** Extra apps only at bedtime (alarm clock, white noise). */
+    val bedtimeExtra: Set<String> = emptySet(),
+    val bedtimeBrick: Boolean = true,
+    val bedMin: Int = 22 * 60,
+    val wakeMin: Int = 5 * 60 + 30,
+    val grayscaleFrom: Int = 2,
+    val unlockToNowFrom: Int = 2,
+    /** Put the ladder and the next thing to do on the lock screen wallpaper. */
+    val lockWallpaper: Boolean = false,
+)
 
 /** A school term: class blocks run between [start] and [end], except [offDates] (breaks). */
 @Serializable
@@ -503,6 +540,9 @@ data class Settings(
     val sportMin: Int = 20,
     /** Not a Twig: its meal / water / weigh-in / check-in reminders come through Not a Fraud's routine nags. */
     val dietNags: Boolean = true,
+    val ladder: LadderSettings = LadderSettings(),
+    /** Medium lock: the guard also covers the phone's Settings pages that would switch Not a Fraud off or remove it. */
+    val guardSettingsPages: Boolean = true,
 )
 
 /** A Skyrim-style skill tree (Athletics, Climbing, Music, Magic...). [sport]: practice here can stand in for a workout. */
@@ -622,6 +662,8 @@ data class AppData(
     val diet: com.maven.notafraud.core.diet.DietStatus? = null,
     /** Loosening changes waiting for the morning (settings lock). */
     val pending: List<PendingChange> = emptyList(),
+    /** Until then, the phone's Settings pages for Not a Fraud open normally (granted in the morning). */
+    val settingsWindowUntil: Long = 0,
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),

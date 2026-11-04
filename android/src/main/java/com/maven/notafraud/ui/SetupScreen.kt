@@ -221,7 +221,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                     for (c in data.pending) Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(c.label)
-                            Text("asks you ${fmt.format(java.util.Date(c.applyAfter))}", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                            Text("asks you ${fmt.format(java.util.Date(c.applyAfter))}" + (c.reason?.let { " · you said: \"$it\"" } ?: ""), color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                         }
                         TextButton(onClick = { Graph.update { com.maven.notafraud.core.store.Lock.discard(it, c.id) } }) { Text("Cancel") }
                     }
@@ -295,7 +295,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 }
                 Text("Nudges on a must-work-out day start at ${hm(data.settings.workoutNagFromMin)}", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (h in listOf(9, 12, 15, 17)) androidx.compose.material3.FilterChip(data.settings.workoutNagFromMin == h * 60, { Graph.update { it.copy(settings = it.settings.copy(workoutNagFromMin = h * 60)) } }, { Text(hm(h * 60)) })
+                    for (h in listOf(9, 12, 15, 17)) androidx.compose.material3.FilterChip(data.settings.workoutNagFromMin == h * 60, { Confirm.change("Workout nudges start", hm(data.settings.workoutNagFromMin), hm(h * 60)) { Graph.update { it.copy(settings = it.settings.copy(workoutNagFromMin = h * 60)) } } }, { Text(hm(h * 60)) })
                 }
                 Text(data.workout?.let { "Connected: ${it.program ?: "program"} · week ${it.week}, block ${it.block}" } ?: "Install Not a Troglodyte to connect it. The split and days per week come from there.",
                     color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
@@ -320,7 +320,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                 fun chips(label: String, values: List<Int>, cur: Int, fmt: (Int) -> String, set: (com.maven.notafraud.core.model.Settings, Int) -> com.maven.notafraud.core.model.Settings) {
                     Text(label, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
                     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (v in values) androidx.compose.material3.FilterChip(cur == v, { Graph.changeAndReplan(ctx) { it.copy(settings = set(it.settings, v)) } }, { Text(fmt(v)) })
+                        for (v in values) androidx.compose.material3.FilterChip(cur == v, { Confirm.change(label, fmt(cur), fmt(v)) { Graph.changeAndReplan(ctx) { it.copy(settings = set(it.settings, v)) } } }, { Text(fmt(v)) })
                     }
                 }
                 chips("Default length of an assignment (new ones)", listOf(30, 60, 90, 120, 180), data.settings.homeworkMin, { Time.durationText(it) }) { st, v -> st.copy(homeworkMin = v) }
@@ -485,10 +485,10 @@ private fun PermRow(title: String, ok: Boolean, detail: String, extra: (@Composa
 }
 
 @Composable
-private fun SwitchRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
+private fun SwitchRow(label: String, value: Boolean, confirm: Boolean = true, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f))
-        Switch(checked = value, onCheckedChange = onChange)
+        Switch(checked = value, onCheckedChange = { v -> if (confirm) Confirm.switch(label, v) { onChange(v) } else onChange(v) })
     }
 }
 
@@ -508,7 +508,7 @@ private fun AnchorRow(a: Anchor, onEdit: () -> Unit) {
                 )
             }
             Switch(checked = a.enabled, onCheckedChange = { on ->
-                Graph.changeAndReplan(ctx) { d -> d.copy(anchors = d.anchors.map { if (it.id == a.id) it.copy(enabled = on) else it }) }
+                Confirm.switch(a.title, on) { Graph.changeAndReplan(ctx) { d -> d.copy(anchors = d.anchors.map { if (it.id == a.id) it.copy(enabled = on) else it }) } }
             })
         }
     }
@@ -649,7 +649,9 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (m in com.maven.notafraud.core.model.CalMode.entries) {
                     androidx.compose.material3.FilterChip(mode == m, {
-                        Graph.update { it.copy(settings = it.settings.copy(calendarModes = it.settings.calendarModes + (c.id to m), excludedCalendarIds = it.settings.excludedCalendarIds - c.id)) }
+                        Confirm.change("${c.name} calendar", mode.name.lowercase(), m.name.lowercase()) {
+                            Graph.update { it.copy(settings = it.settings.copy(calendarModes = it.settings.calendarModes + (c.id to m), excludedCalendarIds = it.settings.excludedCalendarIds - c.id)) }
+                        }
                     }, { Text(m.name.lowercase()) })
                 }
             }
@@ -657,13 +659,13 @@ private fun CalendarPanel(data: AppData, resumes: Long) {
         SectionLabel("Studying per test (Tests calendars)")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (h in listOf(2, 4, 6, 8, 10)) androidx.compose.material3.FilterChip(data.settings.studyMinPerTest == h * 60, {
-                Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyMinPerTest = h * 60)) }
+                Confirm.change("Studying per test", "${data.settings.studyMinPerTest / 60}h", "${h}h") { Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyMinPerTest = h * 60)) } }
             }, { Text("${h}h") })
         }
         Text("Start studying up to", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (dd in listOf(5, 7, 10, 14)) androidx.compose.material3.FilterChip(data.settings.studyLeadDays == dd, {
-                Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyLeadDays = dd)) }
+                Confirm.change("When studying starts", "${data.settings.studyLeadDays} days before", "$dd days before") { Graph.changeAndReplan(ctx) { it.copy(settings = it.settings.copy(studyLeadDays = dd)) } }
             }, { Text("$dd days before") })
         }
         Text("Changes apply to new tests; existing study tasks can be edited like any task.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
@@ -768,13 +770,13 @@ private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        confirmButton = { TextButton(onClick = { onSave(p) }) { Text("Save") } },
+        confirmButton = { TextButton(onClick = { if (p == initial) onDismiss() else Confirm.ask("Save the new rules for ${title.removeSuffix(" rules")}?") { onSave(p) } }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         text = {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Chips("Reply window when you tap its notification", listOf(0, 2, 3, 5, 10), p.replyWindowMin, { if (it == 0) "off" else "${it}m" }) { p = p.copy(replyWindowMin = it) }
-                SwitchRow("Typing keeps the window open", p.extendWhileTyping) { p = p.copy(extendWhileTyping = it) }
-                SwitchRow("Quick-open tile", p.quickOpen) { p = p.copy(quickOpen = it) }
+                SwitchRow("Typing keeps the window open", p.extendWhileTyping, confirm = false) { p = p.copy(extendWhileTyping = it) }
+                SwitchRow("Quick-open tile", p.quickOpen, confirm = false) { p = p.copy(quickOpen = it) }
                 if (p.quickOpen) {
                     Chips("Quick-open length", listOf(2, 3, 5, 10), p.quickOpenMin, { "${it}m" }) { p = p.copy(quickOpenMin = it) }
                     Chips("Quick-opens per day", listOf(3, 6, 10, 20), p.quickOpenPerDay, { "$it" }) { p = p.copy(quickOpenPerDay = it) }
@@ -782,7 +784,7 @@ private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model
                 Chips("Wait before credits unlock it", listOf(0, 15, 30, 60, 90), p.creditWaitSec, { "${it}s" }) { p = p.copy(creditWaitSec = it) }
                 Chips("Instant emergencies per day", listOf(0, 1, 2, 3, 5), p.emergencyPerDay, { "$it" }) { p = p.copy(emergencyPerDay = it) }
                 Chips("Then more, by typing your phrase", listOf(0, 2, 5, 10), p.extraEmergencyPerDay, { if (it == 0) "none" else "$it" }) { p = p.copy(extraEmergencyPerDay = it) }
-                SwitchRow("Ask \"what are you doing?\" (open it by saying what for)", p.askPurpose) { p = p.copy(askPurpose = it) }
+                SwitchRow("Ask \"what are you doing?\" (open it by saying what for)", p.askPurpose, confirm = false) { p = p.copy(askPurpose = it) }
                 if (p.askPurpose) {
                     Chips("Ask again every", listOf(3, 5, 10, 15), p.purposeCheckMin, { "${it}m" }) { p = p.copy(purposeCheckMin = it) }
                     Chips("Most per day this way", listOf(20, 30, 60, 90, 120), p.purposeDailyMin, { "${it}m" }) { p = p.copy(purposeDailyMin = it) }
@@ -848,7 +850,7 @@ private fun NumbersPanel(data: AppData) {
         Text(label, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (v in options) androidx.compose.material3.FilterChip(cur == v, {
-                Graph.changeAndReplan(ctx) { com.maven.notafraud.core.store.Lock.setNumber(it, key, v, "$label: ${fmt(v)}", Graph.now()) }
+                Confirm.change(label, fmt(cur), fmt(v)) { Graph.changeAndReplan(ctx) { com.maven.notafraud.core.store.Lock.setNumber(it, key, v, "$label: ${fmt(v)}", Graph.now()) } }
             }, { Text(fmt(v)) })
         }
         data.pending.firstOrNull { it.kind == com.maven.notafraud.core.model.ChangeKind.NUMBER && it.pkg == key }?.let {

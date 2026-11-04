@@ -133,6 +133,7 @@ class MainActivity : ComponentActivity() {
                             "stats" -> StatsScreen(data, now)
                             "skills" -> SkillsScreen(data)
                             "classes" -> ClassesScreen(data, now)
+                            "ladder" -> LadderScreen(data, now)
 
                             TAB_MORE -> MoreScreen(data) { tab = it }
                             else -> SetupScreen(data, resumes, section = tab)
@@ -141,6 +142,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        ConfirmHost()
+        ReasonHost(data, now)
     }
 
     companion object {

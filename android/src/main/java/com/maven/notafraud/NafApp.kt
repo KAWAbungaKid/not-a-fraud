@@ -80,6 +80,31 @@ object Graph {
         }
     }
 
+    /**
+     * The brick ladder's side effects: grayscale (with the computer step), a note when it climbs, the guard
+     * re-checking the app in front, the home widget and (if switched on) the lock screen wallpaper.
+     */
+    private fun ladder(ctx: Context, n: Long, st: NowState) {
+        val d = data
+        val lad = com.maven.notafraud.core.guard.Ladder.state(d, n)
+        val l = d.settings.ladder
+        com.maven.notafraud.guard.SecureSettings.setGrayscale(ctx, l.enabled && lad.level >= l.grayscaleFrom)
+        val prefs = ctx.getSharedPreferences("ladder", Context.MODE_PRIVATE)
+        val before = prefs.getInt("level", 0)
+        val beforeBed = prefs.getBoolean("bed", false)
+        if (lad.level != before || lad.bedtime != beforeBed) {
+            prefs.edit().putInt("level", lad.level).putBoolean("bed", lad.bedtime).apply()
+            if (lad.level > before) Notifier.postLadder(ctx, lad)
+            else if (lad.level == 0) Notifier.cancelLadder(ctx)
+            com.maven.notafraud.guard.GuardService.instance?.let { g -> android.os.Handler(android.os.Looper.getMainLooper()).post { g.reevaluate() } }
+        }
+        runCatching { com.maven.notafraud.ui.NowWidget.push(ctx) }
+        if (l.lockWallpaper) {
+            val picks = d.picks[today().toString()].orEmpty().mapNotNull { id -> d.tasks.firstOrNull { it.id == id }?.title }
+            Thread { runCatching { com.maven.notafraud.notify.LockWallpaper.update(ctx, st, lad, picks) } }.start()
+        }
+    }
+
     /** Open the Tasks page on its To-do tab once. */
     @Volatile var openTodo = false
 
@@ -109,7 +134,9 @@ object Graph {
             store.update { com.maven.notafraud.core.store.Lock.markNotified(it, ready.map { c -> c.id }.toSet()) }
         }
         workoutNag(ctx, n)
-        Notifier.postNow(ctx, nowState())
+        val st = nowState()
+        Notifier.postNow(ctx, st)
+        ladder(ctx, n, st)
         com.maven.notafraud.notify.RoutineAlerts.check(ctx)
         Alarms.scheduleNext(ctx)
         com.maven.notafraud.sense.CalendarWriter.syncAsync(ctx)

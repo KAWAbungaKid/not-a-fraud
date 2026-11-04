@@ -112,7 +112,7 @@ fun PlanScreen(data: AppData, now: Long) {
 }
 
 /** What you can do with a block: start / done / later / not today / pick a day / something came up; skip a class (and make it up). */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, today: java.time.LocalDate, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
@@ -122,6 +122,9 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
     var pickTime by remember { mutableStateOf(false) }
     var pickDay by remember { mutableStateOf(false) }
     var sizingTask by remember { mutableStateOf(false) }
+    var skipMany by remember { mutableStateOf(false) }
+    var skipUntil by remember { mutableStateOf(false) }
+    var manyMakeUp by remember { mutableStateOf(true) }
     fun done(fn: (AppData) -> AppData) { Graph.changeAndReplan(ctx) { fn(it) }; onDismiss() }
 
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -158,6 +161,7 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
             } else if (anchor != null && !anchor.protected) {
                 TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = true, now = Graph.now()) } }) { Text("Skip it and make it up later") }
                 TextButton(onClick = { done { Actions.skipAnchor(it, anchor.id, date, makeUp = false, now = Graph.now()) } }) { Text("Skip it (no make-up)") }
+                TextButton(onClick = { skipMany = true }) { Text("Skip several times or until a date…") }
             } else {
                 Text(
                     when (b.kind) {
@@ -177,6 +181,47 @@ private fun BlockActions(b: PlanBlock, d: AppData, date: java.time.LocalDate, to
         pickTime = false
     }
     if (sizingTask && task != null) HowLong(task) { sizingTask = false; onDismiss() }
+    if (skipMany && anchor != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { skipMany = false },
+            title = { Text("Skip ${anchor.title}") },
+            text = {
+                Column {
+                    Text("Starting ${date.format(DateTimeFormatter.ofPattern("EEE MMM d", Locale.US))}.", color = Palette.textDim)
+                    androidx.compose.foundation.layout.FlowRow {
+                        for (n in listOf(2, 3, 5, 10)) TextButton(onClick = {
+                            skipMany = false
+                            done { Actions.skipAnchorMany(it, anchor.id, date, n, null, manyMakeUp, Graph.now()).first }
+                        }) { Text("Next $n") }
+                    }
+                    TextButton(onClick = { skipUntil = true }) { Text("Until a date…") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(manyMakeUp, { manyMakeUp = it })
+                        Text("Make each one up later (a make-up task each)")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { skipMany = false }) { Text("Cancel") } },
+        )
+    }
+    if (skipUntil && anchor != null) {
+        val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = date.plusDays(7).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli())
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { skipUntil = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { utc ->
+                        val until = java.time.Instant.ofEpochMilli(utc).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        skipMany = false
+                        done { Actions.skipAnchorMany(it, anchor.id, date, null, until, manyMakeUp, Graph.now()).first }
+                    }
+                    skipUntil = false
+                }) { Text("Skip through this day") }
+            },
+            dismissButton = { TextButton(onClick = { skipUntil = false }) { Text("Cancel") } },
+        ) { androidx.compose.material3.DatePicker(state) }
+    }
     if (pickDay) {
         val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = today.plusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli())
         androidx.compose.material3.DatePickerDialog(

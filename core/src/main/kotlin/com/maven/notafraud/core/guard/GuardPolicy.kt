@@ -13,7 +13,8 @@ enum class GuardAction {
     BLOCK,
 }
 
-data class GuardDecision(val action: GuardAction, val unlockedUntil: Long = 0L)
+/** [brick]: blocked because of the ladder's Level 3 / bedtime, not because the app is on the blocked list. */
+data class GuardDecision(val action: GuardAction, val unlockedUntil: Long = 0L, val brick: Boolean = false)
 
 object GuardPolicy {
 
@@ -47,6 +48,14 @@ object GuardPolicy {
             else GuardDecision(GuardAction.BLOCK)
         }
         if (pkg.startsWith(ownPackagePrefix) || pkg in SAFE || pkg in rules.alwaysAllowed) return GuardDecision(GuardAction.IGNORE)
+        // The ladder at the top (or bedtime): only the Level 3 list opens. Emergency unlocks still count.
+        if (rules.blockingEnabled) {
+            val lad = Ladder.state(data, now)
+            if (lad.level >= 3 && !Ladder.allowedAtTop(data, pkg, lad.bedtime)) {
+                return if (Credits.isUnlocked(data.ledger, pkg, now)) GuardDecision(GuardAction.UNLOCKED, Credits.unlockedUntil(data.ledger, pkg), brick = true)
+                else GuardDecision(GuardAction.BLOCK, brick = true)
+            }
+        }
         if (pkg in rules.focus) return GuardDecision(GuardAction.EARN)
         if (!rules.blockingEnabled || pkg !in rules.blocked) return GuardDecision(GuardAction.IGNORE)
         return if (Credits.isUnlocked(data.ledger, pkg, now)) {

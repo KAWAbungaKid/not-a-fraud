@@ -18,6 +18,7 @@ import com.maven.notafraud.core.guard.GuardAction
 import com.maven.notafraud.core.guard.GuardPolicy
 import com.maven.notafraud.core.guard.NagPolicy
 import com.maven.notafraud.core.guard.Sites
+import com.maven.notafraud.core.guard.SettingsGuard
 import com.maven.notafraud.core.plan.Time
 import com.maven.notafraud.notify.Notifier
 import com.maven.notafraud.notify.RoutineAlerts
@@ -55,6 +56,15 @@ class GuardService : AccessibilityService() {
                 Intent.ACTION_USER_PRESENT -> {
                     val n = System.currentTimeMillis()
                     Graph.update { d -> Actions.autoFromHealth(Actions.recordFirstUnlock(d, n), Graph.today()) }
+                    // Ladder Level 2+: unlocking lands on Now first (what to do, and why the phone is dull).
+                    val lad = com.maven.notafraud.core.guard.Ladder.state(Graph.data, n)
+                    if (lad.level >= Graph.data.settings.ladder.unlockToNowFrom && lad.level > 0 && !inCall()) {
+                        runCatching {
+                            startActivity(Intent(this@GuardService, com.maven.notafraud.ui.MainActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                .putExtra(com.maven.notafraud.ui.MainActivity.EXTRA_TAB, com.maven.notafraud.ui.MainActivity.TAB_NOW))
+                        }
+                    }
                     rootInActiveWindow?.packageName?.toString()?.let { onForeground(it) }
                 }
             }
@@ -112,8 +122,12 @@ class GuardService : AccessibilityService() {
                 lastEventAt = System.currentTimeMillis()
                 if (pkg in KEYBOARDS) onTyping()
                 onForeground(pkg)
+                if (pkg in SettingsGuard.PACKAGES) checkSettings(pkg, force = true)
             }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> if (pkg == foregroundPkg && pkg in Sites.BROWSERS) checkUrl(pkg)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> when {
+                pkg == foregroundPkg && pkg in Sites.BROWSERS -> checkUrl(pkg)
+                pkg in SettingsGuard.PACKAGES -> checkSettings(pkg)
+            }
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> if (keyboardUp()) onTyping()
         }
     }
@@ -123,6 +137,7 @@ class GuardService : AccessibilityService() {
         if (pkg == foregroundPkg) return
         foregroundPkg = pkg
         browserInFront = pkg in Sites.BROWSERS
+        settingsInFront = pkg in SettingsGuard.PACKAGES
         updateEvents()
         if (pkg in Sites.BROWSERS) {
             // Judge the browser itself until the address bar says otherwise.
@@ -164,6 +179,44 @@ class GuardService : AccessibilityService() {
     }
 
     private var browserInFront = false
+    private var settingsInFront = false
+    private var lastSettingsCheck = 0L
+
+    /**
+     * Medium lock (STATE.md § 22): a Settings screen that would switch Not a Fraud off or remove it (its accessibility
+     * switch, app info with Uninstall / Force stop, notification / usage access, battery, the uninstall dialog) is
+     * stepped back from, unless a morning settings window is open. Switching things ON is never stopped.
+     */
+    private fun checkSettings(pkg: String, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastSettingsCheck < 400) return
+        lastSettingsCheck = now
+        val d = Graph.data
+        if (com.maven.notafraud.core.store.Lock.settingsOpen(d, now)) return
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != pkg) return
+        val nodes = ArrayList<SettingsGuard.Node>()
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        val r = android.graphics.Rect()
+        while (queue.isNotEmpty() && nodes.size < 500) {
+            val n = queue.removeFirst()
+            n.getBoundsInScreen(r)
+            val text = (n.text ?: n.contentDescription)?.toString().orEmpty()
+            if (text.isNotEmpty() || n.isCheckable) nodes += SettingsGuard.Node(text, n.isCheckable, n.isChecked, r.top, r.bottom)
+            for (i in 0 until n.childCount) n.getChild(i)?.let { queue.add(it) }
+        }
+        val labels = setOf(label(packageName), getString(com.maven.notafraud.R.string.app_name), "NaF dev").filter { it.isNotBlank() }.toSet()
+        if (!SettingsGuard.protects(nodes, labels)) return
+        GuardLog.add("Settings", "stepped back: that page would switch Not a Fraud off")
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        startActivity(
+            Intent(this, BlockActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                .putExtra(BlockActivity.EXTRA_PKG, pkg)
+                .putExtra(BlockActivity.EXTRA_MODE, BlockActivity.MODE_SETTINGS)
+        )
+    }
     private var watchingKeyboard = false
     private var appliedEvents = -1
 
@@ -173,7 +226,7 @@ class GuardService : AccessibilityService() {
      */
     private fun updateEvents() {
         val types = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
-            (if (browserInFront) AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED else 0) or
+            (if (browserInFront || (settingsInFront && Graph.data.settings.guardSettingsPages)) AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED else 0) or
             (if (watchingKeyboard) AccessibilityEvent.TYPE_WINDOWS_CHANGED else 0)
         if (types == appliedEvents) return
         appliedEvents = types

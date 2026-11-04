@@ -53,6 +53,7 @@ import kotlinx.coroutines.delay
 class BlockActivity : ComponentActivity() {
 
     private var pkg by mutableStateOf("")
+    private var mode by mutableStateOf("")
     private var returnTo: String? = null
     val subject: String get() = pkg
 
@@ -66,16 +67,18 @@ class BlockActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Graph.init(this)
         pkg = intent.getStringExtra(EXTRA_PKG).orEmpty()
+        mode = intent.getStringExtra(EXTRA_MODE).orEmpty()
         returnTo = intent.getStringExtra(EXTRA_RETURN_TO)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goHome()
         })
-        setContent { NafTheme { BlockScreen(pkg) } }
+        setContent { NafTheme { if (mode == MODE_SETTINGS) SettingsLockScreen() else BlockScreen(pkg) } }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         pkg = intent.getStringExtra(EXTRA_PKG).orEmpty()
+        mode = intent.getStringExtra(EXTRA_MODE).orEmpty()
         returnTo = intent.getStringExtra(EXTRA_RETURN_TO)
     }
 
@@ -99,12 +102,53 @@ class BlockActivity : ComponentActivity() {
         finish()
     }
 
+    /** Medium lock: a Settings page that would switch Not a Fraud off. It opens in the morning window, if you still want it. */
+    @Composable
+    private fun SettingsLockScreen() {
+        val data by Graph.store.state.collectAsState()
+        val waiting = data.pending.firstOrNull { it.kind == com.maven.notafraud.core.model.ChangeKind.SETTINGS_WINDOW }
+        var why by remember { mutableStateOf("") }
+        Column(
+            Modifier.fillMaxSize().background(Palette.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Spacer(Modifier.height(24.dp))
+            Text("That page switches Not a Fraud off", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Uninstall, force stop, its accessibility switch, notification and usage access and battery limits are locked until the morning. " +
+                    "The rest of Settings works as usual, and turning things ON is never stopped.",
+                color = Palette.textDim,
+            )
+            if (waiting != null) Panel(highlight = true) {
+                SectionLabel("Already asked")
+                Text("Opens for ${com.maven.notafraud.core.store.Lock.SETTINGS_WINDOW_MIN} minutes after ${java.text.SimpleDateFormat("EEE h:mm a", java.util.Locale.US).format(java.util.Date(waiting.applyAfter))}, if you still want it then.")
+                waiting.reason?.let { Text("You said: \"$it\"", color = Palette.amber) }
+            } else Panel(highlight = true) {
+                SectionLabel("Need it anyway?")
+                OutlinedTextField(why, { why = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Why? (shown back to you in the morning)") })
+                Button(onClick = {
+                    val n = Graph.now()
+                    Graph.update { com.maven.notafraud.core.store.Lock.requestSettingsWindow(it, why.trim().ifEmpty { "(no reason given)" }, n) }
+                }, enabled = why.trim().length >= 3, modifier = Modifier.fillMaxWidth()) { Text("Open these pages tomorrow morning") }
+            }
+            Text("Truly stuck (a real emergency): restart the phone in Safe Mode, which turns off all downloaded apps until the next restart.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { goHome() }) { Text("Go home") }
+        }
+    }
+
     @Composable
     private fun BlockScreen(pkg: String) {
         val data by Graph.store.state.collectAsState()
         val label = remember(pkg) { AppLabels.label(this, pkg) }
         val now = remember(data) { Graph.nowState() }
-        val profile = data.rules.profile(pkg)
+        val lad = remember(data) { com.maven.notafraud.core.guard.Ladder.state(data, Graph.now()) }
+        val brick = lad.level >= 3 && !com.maven.notafraud.core.guard.Ladder.allowedAtTop(data, pkg, lad.bedtime)
+        val base = data.rules.profile(pkg)
+        // Friction and dull: credits wait longer, the purpose question comes back sooner.
+        val profile = base.copy(
+            creditWaitSec = com.maven.notafraud.core.guard.Ladder.creditWaitSec(base.creditWaitSec, lad.level),
+            purposeCheckMin = com.maven.notafraud.core.guard.Ladder.purposeEveryMin(base.purposeCheckMin, lad.level),
+        )
         val balance = data.ledger.balanceMin
         val stillTexting = remember(data) { Credits.canStillTexting(data.ledger, pkg, Graph.now()) }
         var paying by remember { mutableIntStateOf(0) }
@@ -119,8 +163,20 @@ class BlockActivity : ComponentActivity() {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Spacer(Modifier.height(24.dp))
-            Text("$label is locked", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                when {
+                    brick && lad.bedtime -> "Bedtime: $label is off until morning"
+                    brick -> "Level 3: only your Level 3 apps open"
+                    else -> "$label is locked"
+                },
+                style = MaterialTheme.typography.headlineSmall,
+            )
             Text(data.settings.creed, color = Palette.textDim)
+            if (lad.level > 0) Panel(highlight = brick) {
+                SectionLabel("Level ${lad.level}: ${com.maven.notafraud.core.guard.Ladder.NAMES[lad.level]}")
+                if (lad.reasons.isNotEmpty()) Text("Why: " + lad.reasons.joinToString("; "), color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                if (lad.wayDown.isNotBlank()) Text("Way down: " + lad.wayDown, style = MaterialTheme.typography.bodySmall)
+            }
 
             if (stillTexting) {
                 Panel(highlight = true) {
@@ -134,7 +190,7 @@ class BlockActivity : ComponentActivity() {
                 }
             }
 
-            if (profile.askPurpose) PurposePanel(pkg, label, profile)
+            if (profile.askPurpose && !brick) PurposePanel(pkg, label, profile)
 
             Panel(highlight = !stillTexting && !profile.askPurpose) {
                 SectionLabel("Right now")
@@ -148,7 +204,10 @@ class BlockActivity : ComponentActivity() {
             }
 
             val paused = com.maven.notafraud.core.workout.WorkoutLink.creditsPaused(data, Graph.now())
-            if (paused) Panel(highlight = true) {
+            if (lad.creditsFrozen) Panel {
+                SectionLabel("Credits are frozen")
+                Text(if (lad.bedtime) "Until morning. ${balance.toInt()} min stay banked." else "At Level 3. Start something and the ladder comes back down; your ${balance.toInt()} min stay banked.", color = Palette.textDim)
+            } else if (paused) Panel(highlight = true) {
                 SectionLabel("Credits are paused")
                 Text("Today's workout is what keeps this week's minimum. " + (data.workout?.message ?: ""), color = Palette.textDim)
                 Button(onClick = { com.maven.notafraud.sense.WorkoutSync.open(this@BlockActivity); finish() }, modifier = Modifier.fillMaxWidth()) {
@@ -258,6 +317,8 @@ class BlockActivity : ComponentActivity() {
     companion object {
         const val EXTRA_PKG = "pkg"
         const val EXTRA_RETURN_TO = "returnTo"
+        const val EXTRA_MODE = "mode"
+        const val MODE_SETTINGS = "settings"
         @Volatile var current: BlockActivity? = null
             private set
     }

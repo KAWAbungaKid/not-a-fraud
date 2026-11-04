@@ -193,12 +193,24 @@ fun RoutineScreen(data: AppData, now: Long) {
                     val old = item.dietSlot?.takeIf { item.category == RoutineCategory.MEAL && data.routine.any { it.id == item.id } }
                     com.maven.notafraud.sense.DietSync.pushMeal(ctx, old, r.dietSlot, r.dueMin)
                 }
-                Graph.changeAndReplan(ctx) { d -> Actions.upsertRoutine(d, r.copy(pausedByDiet = false)) }; editing = null
+                // Switching an item off loosens the routine: with the settings lock on it waits for the morning.
+                val queueOff = item.enabled && !r.enabled && data.settings.settingsLock && data.routine.any { it.id == item.id }
+                Graph.changeAndReplan(ctx) { d ->
+                    val saved2 = Actions.upsertRoutine(d, r.copy(pausedByDiet = false, enabled = if (queueOff) true else r.enabled))
+                    if (queueOff) com.maven.notafraud.core.store.Lock.removeRoutine(saved2, item.id, delete = false, now = Graph.now()) else saved2
+                }
+                editing = null
                 Thread { com.maven.notafraud.sense.DietSync.sync(ctx); Graph.refresh(ctx) }.start()
             },
             onDelete = {
-                if (data.diet != null && item.category == RoutineCategory.MEAL && item.dietSlot != null) com.maven.notafraud.sense.DietSync.pushMeal(ctx, item.dietSlot, null, null, remove = true)
-                Graph.changeAndReplan(ctx) { d -> Actions.deleteRoutine(d, item.id) }; editing = null
+                if (data.settings.settingsLock) {
+                    // Deleting a routine item waits for the morning like any other loosening (and asks why).
+                    Graph.update { d -> com.maven.notafraud.core.store.Lock.removeRoutine(d, item.id, delete = true, now = Graph.now()) }
+                } else {
+                    if (data.diet != null && item.category == RoutineCategory.MEAL && item.dietSlot != null) com.maven.notafraud.sense.DietSync.pushMeal(ctx, item.dietSlot, null, null, remove = true)
+                    Graph.changeAndReplan(ctx) { d -> Actions.deleteRoutine(d, item.id) }
+                }
+                editing = null
             },
         )
     }

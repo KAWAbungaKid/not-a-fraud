@@ -40,7 +40,56 @@ object Lock {
 
     fun markNotified(d: AppData, ids: Set<String>) = d.copy(pending = d.pending.map { if (it.id in ids) it.copy(notified = true) else it })
 
+    /** Attach the typed reason to a waiting change. */
+    fun setReason(d: AppData, id: String, reason: String) =
+        d.copy(pending = d.pending.map { if (it.id == id) it.copy(reason = reason.trim().ifEmpty { null } ?: "(no reason given)") else it })
+
+    /** Morning window on the phone's Settings pages for Not a Fraud. */
+    const val SETTINGS_WINDOW_MIN = 10
+
+    fun settingsOpen(d: AppData, now: Long) = !d.settings.guardSettingsPages || !d.settings.settingsLock || d.settingsWindowUntil > now
+
+    fun requestSettingsWindow(d: AppData, reason: String?, now: Long) = request(
+        d, PendingChange(kind = ChangeKind.SETTINGS_WINDOW, label = "Open Not a Fraud's phone settings for $SETTINGS_WINDOW_MIN min", createdAt = now, applyAfter = now, reason = reason), now,
+    )
+
+    /** Ladder changes: anything that gives more access waits; anything stricter applies now. */
+    fun setLadder(d: AppData, new: com.maven.notafraud.core.model.LadderSettings, label: String, now: Long): AppData {
+        val old = d.settings.ladder
+        val looser = (old.enabled && !new.enabled) || new.maxLevel < old.maxLevel || (old.bedtimeBrick && !new.bedtimeBrick) ||
+            bedLength(new) < bedLength(old) || new.grayscaleFrom > old.grayscaleFrom || new.unlockToNowFrom > old.unlockToNowFrom ||
+            (old.allowlistConfirmed && (!(new.allowlist - old.allowlist).isEmpty() || !(new.bedtimeExtra - old.bedtimeExtra).isEmpty()))
+        val c = PendingChange(kind = ChangeKind.LADDER, label = label, createdAt = now, applyAfter = now, text = LADDER_JSON.encodeToString(com.maven.notafraud.core.model.LadderSettings.serializer(), new))
+        if (!looser) return apply(d, c).copy(pending = d.pending.filterNot { it.kind == ChangeKind.LADDER })
+        // Stricter parts now: removals from the lists, higher levels, longer bedtime.
+        val strictNow = old.copy(
+            allowlist = old.allowlist.intersect(new.allowlist),
+            bedtimeExtra = old.bedtimeExtra.intersect(new.bedtimeExtra),
+            maxLevel = maxOf(old.maxLevel, new.maxLevel),
+            grayscaleFrom = minOf(old.grayscaleFrom, new.grayscaleFrom),
+            unlockToNowFrom = minOf(old.unlockToNowFrom, new.unlockToNowFrom),
+            lockWallpaper = new.lockWallpaper,
+        )
+        return request(d.copy(settings = d.settings.copy(ladder = strictNow)), c, now)
+    }
+
+    private fun bedLength(l: com.maven.notafraud.core.model.LadderSettings) = if (!l.bedtimeBrick) 0 else ((l.wakeMin - l.bedMin + 24 * 60) % (24 * 60))
+    private val LADDER_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+    /** Deleting or switching off a routine item waits like any other loosening. */
+    fun removeRoutine(d: AppData, itemId: String, delete: Boolean, now: Long): AppData {
+        val item = d.routine.firstOrNull { it.id == itemId } ?: return d
+        return request(d, PendingChange(kind = ChangeKind.ROUTINE_REMOVE, label = (if (delete) "Delete" else "Switch off") + " routine: ${item.title}", createdAt = now, applyAfter = now, pkg = itemId, flag = delete), now)
+    }
+
     fun apply(d: AppData, c: PendingChange): AppData = when (c.kind) {
+        ChangeKind.SETTINGS_WINDOW -> d.copy(settingsWindowUntil = System.currentTimeMillis() + SETTINGS_WINDOW_MIN * Time.MIN)
+        ChangeKind.SETTINGS_GUARD -> d.copy(settings = d.settings.copy(guardSettingsPages = c.flag ?: true))
+        ChangeKind.LADDER -> c.text?.let { runCatching { LADDER_JSON.decodeFromString(com.maven.notafraud.core.model.LadderSettings.serializer(), it) }.getOrNull() }
+            ?.let { d.copy(settings = d.settings.copy(ladder = it)) } ?: d
+        ChangeKind.LADDER_ALLOW -> d.copy(settings = d.settings.copy(ladder = d.settings.ladder.copy(allowlist = d.settings.ladder.allowlist + c.items)))
+        ChangeKind.ROUTINE_REMOVE -> if (c.flag == true) d.copy(routine = d.routine.filterNot { it.id == c.pkg })
+            else d.copy(routine = d.routine.map { if (it.id == c.pkg) it.copy(enabled = false) else it })
         ChangeKind.BLOCKING -> d.copy(rules = d.rules.copy(blockingEnabled = c.flag ?: true))
         ChangeKind.NAGS -> d.copy(settings = d.settings.copy(nagsEnabled = c.flag ?: true))
         ChangeKind.ROUTINE_NAGS -> d.copy(settings = d.settings.copy(routineNagsEnabled = c.flag ?: true))

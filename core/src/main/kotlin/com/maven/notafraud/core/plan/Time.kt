@@ -38,6 +38,12 @@ object Time {
         return ((ms + step - 1) / step) * step
     }
 
+    /** 1320 → "10:00 pm". */
+    fun clockText(minuteOfDay: Int): String {
+        val h = (minuteOfDay / 60) % 24
+        return "%d:%02d %s".format((h + 11) % 12 + 1, minuteOfDay % 60, if (h < 12) "am" else "pm")
+    }
+
     fun durationText(min: Int): String = when {
         min < 60 -> "${min}m"
         min % 60 == 0 -> "${min / 60}h"

@@ -137,8 +137,15 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                 SectionLabel("You asked for these yesterday. Still want them?")
                 for (c in ready) {
                     Text(c.label, style = MaterialTheme.typography.titleSmall)
+                    c.reason?.let { Text("You said: \"$it\"", color = Palette.amber, style = MaterialTheme.typography.bodySmall) }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { act { com.maven.notafraud.core.store.Lock.confirm(it, c.id) } }) { Text("Yes, change it") }
+                        OutlinedButton(onClick = {
+                            // A deleted meal that Not a Twig owns goes from Twig's schedule too.
+                            if (c.kind == com.maven.notafraud.core.model.ChangeKind.ROUTINE_REMOVE && c.flag == true) data.routine.firstOrNull { it.id == c.pkg }?.dietSlot?.let { slot ->
+                                if (data.diet != null) com.maven.notafraud.sense.DietSync.pushMeal(ctx, slot, null, null, remove = true)
+                            }
+                            act { com.maven.notafraud.core.store.Lock.confirm(it, c.id) }
+                        }) { Text("Yes, change it") }
                         Button(onClick = { act { com.maven.notafraud.core.store.Lock.discard(it, c.id) } }) { Text("No, keep it") }
                     }
                 }

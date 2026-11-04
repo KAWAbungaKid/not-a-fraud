@@ -83,6 +83,11 @@ object Alarms {
         val next = listOfNotNull(
             plan?.boundaries?.firstOrNull { it > now + 30_000 },
             com.maven.notafraud.core.routine.RoutinePolicy.nextAlertAt(Graph.data, now),
+            // The brick ladder's bedtime starts and ends on the clock.
+            Graph.data.settings.ladder.takeIf { it.enabled && it.bedtimeBrick }?.let { l ->
+                listOf(l.bedMin, l.wakeMin).flatMap { m -> listOf(Time.at(Graph.today(), m, Graph.zone), Time.at(Graph.today().plusDays(1), m, Graph.zone)) }
+                    .filter { it > now + 30_000 }.minOrNull()
+            },
             tomorrow,
         ).min()
         val pi = ActionReceiver.pending(ctx, ActionReceiver.TICK)

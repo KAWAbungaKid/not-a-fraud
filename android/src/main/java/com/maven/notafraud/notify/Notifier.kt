@@ -222,4 +222,26 @@ object Notifier {
     }
 
     fun cancelWorkout(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(7)
+
+    /** The ladder climbed: why, and the way back down. */
+    fun postLadder(ctx: Context, s: com.maven.notafraud.core.guard.Ladder.State) {
+        if (!canPost(ctx)) return
+        val name = com.maven.notafraud.core.guard.Ladder.NAMES[s.level]
+        val title = if (s.bedtime) "Bedtime: the phone is winding down" else "Level ${s.level}: $name"
+        val text = (if (s.reasons.isNotEmpty()) "Why: " + s.reasons.joinToString("; ") + "." else "") +
+            (if (s.wayDown.isNotBlank()) " Way down: ${s.wayDown}." else "") +
+            when (s.level) { 1 -> " Credits wait longer."; 2 -> " Grayscale, and unlocking opens Now first."; 3 -> " Only your Level 3 apps open."; else -> "" }
+        val b = NotificationCompat.Builder(ctx, CH_NAG)
+            .setSmallIcon(R.drawable.ic_stat_naf)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setColor(if (s.level >= 3) 0xFFFF6B6B.toInt() else 0xFFFFC857.toInt())
+            .setContentIntent(openApp(ctx, MainActivity.TAB_NOW, req = 18))
+        runCatching { NotificationManagerCompat.from(ctx).notify(8, b.build()) }
+    }
+
+    fun cancelLadder(ctx: Context) = NotificationManagerCompat.from(ctx).cancel(8)
 }

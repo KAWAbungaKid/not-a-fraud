@@ -71,7 +71,11 @@ class HourlyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         Graph.init(ctx)
-        if (!Perms.accessibility(ctx)) {
+        // With the computer step done, the guard switches itself back on instead of asking.
+        if (!Perms.accessibility(ctx) && com.maven.notafraud.guard.SecureSettings.reEnableGuard(ctx)) {
+            com.maven.notafraud.guard.GuardLog.init(ctx)
+            com.maven.notafraud.guard.GuardLog.add("Guard", "was off: switched back on")
+        } else if (!Perms.accessibility(ctx)) {
             Notifier.postAlert(ctx, "Blocking is off", "The Not a Fraud guard isn't enabled. Tap to turn it back on.")
         } else if (GuardService.instance == null && run { kotlinx.coroutines.delay(8_000); GuardService.instance == null }) {
             Notifier.postAlert(

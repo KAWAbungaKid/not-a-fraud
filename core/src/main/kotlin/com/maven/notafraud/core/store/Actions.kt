@@ -322,6 +322,27 @@ object Actions {
         return x
     }
 
+    /**
+     * Skip several in a row: the next [count] times this block happens from [from] (included), or every time up to
+     * [until] (included). Each skip can make a make-up task. Returns the data and how many were skipped.
+     */
+    fun skipAnchorMany(d: AppData, anchorId: String, from: LocalDate, count: Int?, until: LocalDate?, makeUp: Boolean, now: Long): Pair<AppData, Int> {
+        val a = d.anchors.firstOrNull { it.id == anchorId } ?: return d to 0
+        val limit = until ?: from.plusDays(366)
+        var x = d
+        var n = 0
+        var day = from
+        while (!day.isAfter(limit) && (count == null || n < count)) {
+            val cur = x.anchors.firstOrNull { it.id == a.id } ?: break
+            if (com.maven.notafraud.core.plan.Anchors.on(day, listOf(cur)).isNotEmpty()) {
+                x = skipAnchor(x, a.id, day, makeUp, now)
+                n++
+            }
+            day = day.plusDays(1)
+        }
+        return x to n
+    }
+
     // ---- Importance ----------------------------------------------------------------------
 
     /** One priority level up (v0.7: permanent, no more week-long bumps). */

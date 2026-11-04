@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Restaurant
@@ -57,6 +58,7 @@ val PAGES = listOf(
     PageDef("classes", "Classes", Icons.Filled.School, false, "Semester dates and class times"),
     PageDef("setup", "Setup checks", Icons.Filled.Checklist, true, "Permissions the app needs"),
     PageDef("blocking", "Blocking & credits", Icons.Filled.Shield, true, "Blocked apps and sites, rules, why wasn't I blocked"),
+    PageDef("ladder", "Brick ladder", Icons.Filled.Lock, true, "Gets stricter as the day drifts; bedtime; Level 3 apps; settings lock"),
     PageDef("calendar", "Calendar & health", Icons.Filled.CalendarMonth, true, "Google Calendar, Samsung Health sleep"),
     PageDef("blocks", "Weekly blocks", Icons.Filled.Event, true, "Trading, craft blocks, protected time"),
     PageDef("planning", "Planning", Icons.Filled.Tune, true, "Re-planning, stats, recharge ideas"),

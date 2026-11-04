@@ -1,6 +1,6 @@
 # Not a Fraud (formerly Project Max) — state of the build
 
-Living doc. Read this first in any new chat about the app. Last updated 2026-11-03 (v0.9.0: Not a Twig link, streaks, sports → cardio — § 21).
+Living doc. Read this first in any new chat about the app. Last updated 2026-11-03 (v0.9.1: one meal schedule with Twig — § 21).
 Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notafraud`.
 
 ---
@@ -528,8 +528,17 @@ streaks that count automatically unless he says he broke them.
   with "Broke it" (today / yesterday) and Undo; editor takes "days in a row so far".
 
 **Open / to check:**
-- NaF's "Pre-workout meal" is 7:00 but Twig's Pre-workout slot is 4:30 pm and the eating window is 12–8; the
-  link makes Twig's timing win for nags, but the plan still reserves 20 min at 7:00. Ask Maven whether to retime
-  or drop it.
-- If the watch logs a lift as a Samsung Health exercise, it would tick Cardio (only with Troglodyte connected).
+- ~~7:00 pre-workout meal vs Twig's 4:30 slot~~ → 0.9.1 meal sync below.
+- A lift logged on the watch as Samsung Health exercise ticks Cardio: **Maven is fine with it** (random runs
+  ticking it is the point: the more automatic, the more consistent).
 - Still from § 16/19: TIGHT-day protection of the workout block, MISSED → Discipline, Twig sleep hand-off.
+
+### v0.9.1 (2026-11-03): one meal schedule
+
+Maven: "if someone only has one or the other app, it should work independently, but if they have both, they
+need to auto sync together as best possible." Twig 0.2.2's status carries `slots` (name, `by`) and the eating
+window; its provider accepts `update content://…diet.sync/meal` (old / name / by / remove, `MealSync.apply`,
+write permission = SYNC). `DietLink.syncMeals`: each timed slot ↔ one MEAL item (by `dietSlot`, else by name),
+due = slot time, keeping the item's lead-in and anger gaps; a new slot creates an item; meals without a slot get
+`pausedByDiet` (off, listed on Routine); `disconnect` turns them back on. Editing a linked meal here pushes to
+Twig first (`DietSync.pushMeal`), deleting removes the slot; a schedule change from Twig re-plans.

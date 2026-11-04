@@ -108,4 +108,27 @@ class V9Test {
         assertTrue(rd.done.containsKey(d.routineFor(AutoCheck.CARDIO)!!.id))
         assertFalse(rd.done.containsKey(d.routineFor(AutoCheck.WORKOUT)!!.id))
     }
+
+    @Test
+    fun `with both apps the meal schedule is Twig's`() {
+        val slots = listOf(
+            com.maven.notafraud.core.diet.MealSlot("Lunch", "13:00"), com.maven.notafraud.core.diet.MealSlot("Pre-workout", "16:30"),
+            com.maven.notafraud.core.diet.MealSlot("Supper", "19:30"), com.maven.notafraud.core.diet.MealSlot("Snacks"),
+        )
+        val custom = RoutineItem(id = "m-x", title = "Second breakfast", category = RoutineCategory.MEAL, startMin = 9 * 60, dueMin = 10 * 60, angryMin = 11 * 60)
+        var d = Actions.upsertRoutine(base(), custom)
+        d = DietLink.receive(d, DietStatus(today = day.toString(), slots = slots), at(9))
+        val pre = d.routine.first { it.id == "r-meal1" }
+        assertEquals(16 * 60 + 30, pre.dueMin)
+        assertEquals(15 * 60, pre.startMin, "keeps its 90-minute lead-in")
+        assertEquals(13 * 60, d.routine.first { it.id == "r-lunch" }.dueMin)
+        val paused = d.routine.first { it.id == "m-x" }
+        assertTrue(paused.pausedByDiet && !paused.enabled)
+        assertEquals(3, d.routine.count { it.category == RoutineCategory.MEAL && it.enabled })
+        // A new slot in Twig becomes a routine meal; Twig going away brings the paused one back.
+        d = DietLink.receive(d, DietStatus(today = day.toString(), slots = slots + com.maven.notafraud.core.diet.MealSlot("Breakfast", "08:00")), at(9, 5))
+        assertTrue(d.routine.any { it.dietSlot == "Breakfast" && it.dueMin == 8 * 60 && it.enabled })
+        d = DietLink.disconnect(d)
+        assertTrue(d.routine.first { it.id == "m-x" }.enabled)
+    }
 }

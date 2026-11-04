@@ -35,7 +35,16 @@ data class DietStatus(
     /** Today's 1–5 check-in, null until done. */
     val clarity: Int? = null,
     val energy: Int? = null,
+    /** Twig's meal schedule (older Twig: empty, and nothing is synced). */
+    val slots: List<MealSlot> = emptyList(),
+    /** Eating window when fasting is on ("HH:mm"), else null. */
+    val windowStart: String? = null,
+    val windowEnd: String? = null,
 )
+
+/** One Twig meal slot; [by] "HH:mm" = late after this, null = untimed (Snacks). */
+@Serializable
+data class MealSlot(val name: String = "", val by: String? = null)
 
 /** kind MEAL / WATER / WEIGH_IN / CHECK_IN; key "meal:Lunch", "water", "weigh", "checkin"; level 1–3. */
 @Serializable
@@ -76,6 +85,7 @@ object DietLink {
 
     /** One-line summary for "How's today?" and the Now page. */
     fun summary(s: DietStatus): String = listOfNotNull(
+        if (s.windowStart != null && s.windowEnd != null) "eating ${s.windowStart}–${s.windowEnd}" else null,
         s.clarity?.let { "clarity $it/5" },
         s.energy?.let { "energy $it/5" },
         "${s.kcal} of ${s.kcalTarget} kcal",
@@ -87,9 +97,59 @@ object DietLink {
     /** Today's check-in says brain fog or low energy (1–2 of 5). */
     fun lowCheckIn(s: DietStatus?): Boolean = s != null && ((s.clarity ?: 5) <= 2 || (s.energy ?: 5) <= 2)
 
-    /** New status in: store it, tick meal items whose Twig slot has food logged. */
+    fun minuteOf(hhmm: String?): Int? = hhmm?.split(":")?.takeIf { it.size == 2 }?.let { (h, m) -> h.toIntOrNull()?.let { hh -> m.toIntOrNull()?.let { hh * 60 + it } } }
+
+    fun hhmm(min: Int) = "%02d:%02d".format((min / 60) % 24, min % 60)
+
+    /**
+     * Both apps installed: Twig's meal schedule is the one schedule. Each timed slot gets a routine meal due at its
+     * time (keeping that item's own lead-in and anger gaps); meals with no Twig slot are paused, not deleted.
+     * Edits made here go to Twig first (Android side), so the next read agrees with them.
+     */
+    fun syncMeals(d: AppData, s: DietStatus): AppData {
+        val timed = s.slots.mapNotNull { sl -> minuteOf(sl.by)?.let { sl.name to it } }
+        if (timed.isEmpty()) return d
+        val routine = d.routine.toMutableList()
+        val used = mutableSetOf<String>()
+        for ((name, due) in timed) {
+            val i = routine.indexOfFirst { it.category == RoutineCategory.MEAL && it.id !in used && it.dietSlot.equals(name, ignoreCase = true) }
+                .takeIf { it >= 0 }
+                ?: routine.indexOfFirst { it.category == RoutineCategory.MEAL && it.id !in used && it.dietSlot == null && guessSlot(it.title).equals(name, ignoreCase = true) }
+            if (i >= 0) {
+                val r = routine[i]
+                val lead = (r.dueMin - r.startMin).coerceIn(15, 180)
+                val anger = (r.angryMin - r.dueMin).coerceIn(30, 240)
+                val start = (due - lead).coerceAtLeast(0)
+                routine[i] = r.copy(
+                    dietSlot = name, startMin = start, dueMin = due, angryMin = (due + anger).coerceAtMost(23 * 60 + 59),
+                    enabled = if (r.pausedByDiet) true else r.enabled, pausedByDiet = false,
+                )
+                used += r.id
+            } else {
+                val item = RoutineItem(
+                    title = name, category = RoutineCategory.MEAL, startMin = (due - 45).coerceAtLeast(0), dueMin = due,
+                    angryMin = (due + 90).coerceAtMost(23 * 60 + 59), reserveMin = 30, dietSlot = name,
+                    order = (routine.maxOfOrNull { it.order } ?: 0) + 1,
+                )
+                routine += item
+                used += item.id
+            }
+        }
+        for ((i, r) in routine.withIndex()) {
+            if (r.category == RoutineCategory.MEAL && r.enabled && r.id !in used) routine[i] = r.copy(enabled = false, pausedByDiet = true)
+        }
+        return if (routine == d.routine) d else d.copy(routine = routine)
+    }
+
+    /** Twig went away: meals it paused come back on their own times. */
+    fun disconnect(d: AppData): AppData = d.copy(
+        diet = null,
+        routine = d.routine.map { if (it.pausedByDiet) it.copy(enabled = true, pausedByDiet = false) else it },
+    )
+
+    /** New status in: store it, sync the meal schedule, tick meal items whose Twig slot has food logged. */
     fun receive(d: AppData, status: DietStatus, now: Long): AppData {
-        var x = d.copy(diet = status)
+        var x = syncMeals(d.copy(diet = status), status)
         val date = Time.dateOf(now, Time.zone(d.settings.zoneId))
         if (status.today != date.toString()) return x
         val done = x.routineDays.firstOrNull { it.date == date.toString() }?.done ?: emptyMap()

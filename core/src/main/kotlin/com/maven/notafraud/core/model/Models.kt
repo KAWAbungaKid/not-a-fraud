@@ -261,6 +261,8 @@ data class RoutineItem(
     val dietSlot: String? = null,
     /** STREAK items: the day the streak started counting (yyyy-mm-dd). */
     val streakSince: String? = null,
+    /** Switched off because Not a Twig's meal schedule has no slot for it; switched back on if Twig goes away. */
+    val pausedByDiet: Boolean = false,
 )
 
 /** What can tick a routine item on its own. */

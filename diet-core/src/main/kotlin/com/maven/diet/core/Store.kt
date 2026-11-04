@@ -87,7 +87,31 @@ data class DietStatus(
     val nags: List<SyncNag>,
     val clarity: Int?,
     val energy: Int?,
+    /** The meal schedule Not a Fraud mirrors: every slot with its "by" time (null = no time, like Snacks). */
+    val slots: List<Slot> = emptyList(),
+    val windowStart: String? = null,
+    val windowEnd: String? = null,
 )
+
+/**
+ * Meal-slot edits coming from Not a Fraud (it mirrors the schedule; either app can change it).
+ * [old] = the slot being changed (null = new), [name] = its name after, [by] = "HH:mm" or null, [remove] deletes [old].
+ */
+object MealSync {
+    fun apply(s: Settings, old: String?, name: String?, by: String?, remove: Boolean): Settings {
+        fun same(a: String, b: String?) = b != null && a.equals(b.trim(), ignoreCase = true)
+        if (remove) return if (old == null || s.slots.size <= 1) s else s.copy(slots = s.slots.filterNot { same(it.name, old) })
+        val target = name?.trim()?.takeIf { it.isNotEmpty() } ?: old?.trim() ?: return s
+        val time = by?.takeIf { Regex("\\d{1,2}:\\d{2}").matches(it) }?.let { val (h, m) = it.split(":"); "%02d:%02d".format(h.toInt(), m.toInt()) }
+        return when {
+            // Already have a slot by that name: just move its time.
+            s.slots.any { same(it.name, target) } -> s.copy(slots = s.slots.map { if (same(it.name, target)) it.copy(by = time) else it })
+            // Renaming an existing slot.
+            old != null && s.slots.any { same(it.name, old) } -> s.copy(slots = s.slots.map { if (same(it.name, old)) Slot(target, time) else it })
+            else -> s.copy(slots = s.slots + Slot(target, time))
+        }
+    }
+}
 
 @Serializable
 data class SyncNag(val kind: String, val key: String, val title: String, val text: String, val level: Int)
@@ -115,6 +139,9 @@ object Sync {
             nags = Nags.due(d, now, zone, t.training).sortedByDescending { it.level }
                 .map { SyncNag(it.kind.name, it.key, it.title, it.text, it.level) },
             clarity = c?.clarity, energy = c?.energy,
+            slots = d.settings.slots,
+            windowStart = d.settings.windowStart.takeIf { d.settings.fasting },
+            windowEnd = d.settings.windowEnd.takeIf { d.settings.fasting },
         )
     }
 }

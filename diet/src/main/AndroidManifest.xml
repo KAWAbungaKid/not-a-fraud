@@ -60,7 +60,8 @@
             android:name=".sync.SyncProvider"
             android:authorities="${applicationId}.sync"
             android:exported="true"
-            android:readPermission="com.maven.permission.SYNC" />
+            android:readPermission="com.maven.permission.SYNC"
+            android:writePermission="com.maven.permission.SYNC" />
 
         <!-- Camera writes the label photo here (cache/labels/). -->
         <provider

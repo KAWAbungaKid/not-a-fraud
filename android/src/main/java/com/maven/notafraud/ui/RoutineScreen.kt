@@ -105,6 +105,11 @@ fun RoutineScreen(data: AppData, now: Long) {
                         "${n.title}: ${n.text}",
                         color = if (n.level >= 2) Palette.red else Palette.amber, style = MaterialTheme.typography.bodySmall,
                     )
+                    val paused = data.routine.filter { it.pausedByDiet }
+                    if (paused.isNotEmpty()) Text(
+                        "Meal times come from Twig. Paused (no Twig slot): " + paused.joinToString { it.title } + ". Add the slot in Twig, or link it to one, to bring it back.",
+                        color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+                    )
                     TextButton(onClick = { com.maven.notafraud.sense.DietSync.open(ctx) }) { Text("Open Not a Twig") }
                 }
             }
@@ -181,9 +186,20 @@ fun RoutineScreen(data: AppData, now: Long) {
             onDismiss = { editing = null },
             onSave = { saved ->
                 val r = if (saved.category == RoutineCategory.STREAK && saved.streakSince == null) saved.copy(streakSince = today.toString(), reserveMin = 0, weeklyTarget = null, autoCheck = null) else saved
-                Graph.changeAndReplan(ctx) { d -> Actions.upsertRoutine(d, r) }; editing = null
+                // Both apps installed: a linked meal's time or slot goes to Not a Twig too (one schedule).
+                if (data.diet != null && r.category == RoutineCategory.MEAL && r.dietSlot != null &&
+                    (r.dietSlot != item.dietSlot || r.dueMin != item.dueMin || item.category != RoutineCategory.MEAL)
+                ) {
+                    val old = item.dietSlot?.takeIf { item.category == RoutineCategory.MEAL && data.routine.any { it.id == item.id } }
+                    com.maven.notafraud.sense.DietSync.pushMeal(ctx, old, r.dietSlot, r.dueMin)
+                }
+                Graph.changeAndReplan(ctx) { d -> Actions.upsertRoutine(d, r.copy(pausedByDiet = false)) }; editing = null
+                Thread { com.maven.notafraud.sense.DietSync.sync(ctx); Graph.refresh(ctx) }.start()
             },
-            onDelete = { Graph.changeAndReplan(ctx) { d -> Actions.deleteRoutine(d, item.id) }; editing = null },
+            onDelete = {
+                if (data.diet != null && item.category == RoutineCategory.MEAL && item.dietSlot != null) com.maven.notafraud.sense.DietSync.pushMeal(ctx, item.dietSlot, null, null, remove = true)
+                Graph.changeAndReplan(ctx) { d -> Actions.deleteRoutine(d, item.id) }; editing = null
+            },
         )
     }
 }
@@ -338,7 +354,11 @@ private fun RoutineEditor(initial: RoutineItem, isNew: Boolean, onDismiss: () ->
                         FilterChip(r.dietSlot == null, { r = r.copy(dietSlot = null) }, { Text("none") })
                         for (slot in com.maven.notafraud.core.diet.DietLink.KNOWN_SLOTS) FilterChip(r.dietSlot.equals(slot, ignoreCase = true), { r = r.copy(dietSlot = slot) }, { Text(slot) })
                     }
-                    Text("Linked: logging that slot in Not a Twig ticks this, and Twig's reminders decide when it gets loud. Times below only place it in the plan.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (Graph.data.diet != null) "Synced with Not a Twig: the due time below is the slot's time in Twig (change it in either app). Logging that slot ticks this."
+                        else "Linked: once Not a Twig is installed, this follows its slot's time and logging there ticks it.",
+                        color = Palette.textDim, style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 SectionLabel("When")
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

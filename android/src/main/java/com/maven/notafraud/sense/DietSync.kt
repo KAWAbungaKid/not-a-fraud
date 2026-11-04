@@ -40,13 +40,30 @@ object DietSync {
         if (!force && n - lastRead < MIN_GAP_MS) return false
         lastRead = n
         val s = read(ctx) ?: run {
-            if (Graph.data.diet != null && !installed(ctx)) Graph.update { it.copy(diet = null) }
+            if (Graph.data.diet != null && !installed(ctx)) {
+                Graph.update { DietLink.disconnect(it) }
+                Graph.replan()
+            }
             return false
         }
         val before = Graph.data.diet
+        val routineBefore = Graph.data.routine
         Graph.update { DietLink.receive(it, s, n) }
+        // The meal schedule moved (edited in Twig): the plan's meal blocks move with it.
+        if (Graph.data.routine.map { Triple(it.id, it.startMin, it.enabled) } != routineBefore.map { Triple(it.id, it.startMin, it.enabled) }) Graph.replan()
         return before?.copy(generatedAt = 0) != s.copy(generatedAt = 0)
     }
+
+    /**
+     * A meal edited here goes to Twig first, so both apps keep one schedule. [old] = Twig slot before, [name] after,
+     * [dueMin] its time; [remove] deletes [old]. False if Twig isn't there or refused (the edit then stays local).
+     */
+    fun pushMeal(ctx: Context, old: String?, name: String?, dueMin: Int?, remove: Boolean = false): Boolean = runCatching {
+        val values = android.content.ContentValues().apply {
+            put("old", old); put("name", name); put("by", dueMin?.let { DietLink.hhmm(it) }); put("remove", remove)
+        }
+        ctx.contentResolver.update(Uri.parse("content://${dietPackage(ctx)}.sync/meal"), values, null, null) > 0
+    }.getOrDefault(false)
 
     fun open(ctx: Context): Boolean {
         val i = ctx.packageManager.getLaunchIntentForPackage(dietPackage(ctx)) ?: return false

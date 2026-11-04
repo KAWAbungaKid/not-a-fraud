@@ -278,4 +278,15 @@ class UnitsAndLabelTest {
         val r = LabelParser.parse("Calories 90\nProtein 20g")
         assertEquals(listOf("carbs", "fat"), r.missing)
     }
+
+    @Test
+    fun `meal slot edits from Not a Fraud`() {
+        val s = Settings()
+        assertEquals("16:05", MealSync.apply(s, "Pre-workout", "Pre-workout", "16:05", false).slots.first { it.name == "Pre-workout" }.by)
+        val added = MealSync.apply(s, null, "Breakfast", "7:30", false)
+        assertEquals("07:30", added.slots.first { it.name == "Breakfast" }.by)
+        val renamed = MealSync.apply(s, "Supper", "Dinner", "19:00", false)
+        assertTrue(renamed.slots.none { it.name == "Supper" } && renamed.slots.any { it.name == "Dinner" && it.by == "19:00" })
+        assertTrue(MealSync.apply(s, "Lunch", null, null, true).slots.none { it.name == "Lunch" })
+    }
 }

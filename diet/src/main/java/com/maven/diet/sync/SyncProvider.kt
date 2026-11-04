@@ -10,13 +10,16 @@ import android.net.Uri
 import com.maven.diet.Graph
 import com.maven.diet.core.DietData
 import com.maven.diet.core.DietStatus
+import com.maven.diet.core.Actions
 import com.maven.diet.core.DietStore
+import com.maven.diet.core.MealSync
 import com.maven.diet.core.Sync
 import com.maven.diet.link.WorkoutLink
 
 /**
- * Read-only data for Not a Fraud, guarded by signature permission com.maven.permission.SYNC.
- *   content://com.maven.diet.sync/status → one row, column "json" = DietStatus   (debug: com.maven.diet.dev.sync)
+ * Data for Not a Fraud, guarded by signature permission com.maven.permission.SYNC (read and write).
+ *   query  content://com.maven.diet.sync/status → one row, column "json" = DietStatus   (debug: com.maven.diet.dev.sync)
+ *   update content://com.maven.diet.sync/meal   values old / name / by / remove → change one meal slot (MealSync)
  */
 class SyncProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
@@ -32,7 +35,18 @@ class SyncProvider : ContentProvider() {
     override fun getType(uri: Uri): String = "application/json"
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
     override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int = 0
-    override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int = 0
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int {
+        val ctx = context ?: return 0
+        if (uri.lastPathSegment != "meal" || values == null) return 0
+        Graph.init(ctx)
+        val before = Graph.data.settings
+        Graph.update { d ->
+            Actions.settings(d) {
+                MealSync.apply(it, values.getAsString("old"), values.getAsString("name"), values.getAsString("by"), values.getAsBoolean("remove") == true)
+            }
+        }
+        return if (Graph.data.settings != before) 1 else 0
+    }
 }
 
 /** Broadcast com.maven.diet.CHANGED to Not a Fraud when something it shows changed (meal logged, water, weigh-in…). */

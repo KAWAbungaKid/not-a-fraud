@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.material.icons.filled.CalendarMonth
 import com.maven.diet.Graph
 import com.maven.diet.link.Health
 import com.maven.diet.link.WorkoutLink
@@ -111,6 +112,7 @@ class MainActivity : ComponentActivity() {
                             null -> when (tab) {
                                 "today" -> TodayScreen(d, onOpen = ::open)
                                 "foods" -> FoodsScreen(d, onOpen = ::open)
+                                "plan" -> PlanScreen(d)
                                 "progress" -> ProgressScreen(d)
                                 else -> SettingsScreen(d, resumes)
                             }
@@ -128,6 +130,7 @@ class MainActivity : ComponentActivity() {
         private val TABS = listOf(
             Triple("today", "Today", Icons.Filled.Today),
             Triple("foods", "Foods", Icons.Filled.Restaurant),
+            Triple("plan", "Plan", Icons.Filled.CalendarMonth),
             Triple("progress", "Progress", Icons.Filled.MonitorWeight),
             Triple("settings", "Settings", Icons.Filled.Settings),
         )

@@ -42,6 +42,8 @@ fun ProgressScreen(d: DietData) {
     val comparisons = remember(d) { Insights.comparisons(d, Graph.zone, today) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Spacer(Modifier.height(4.dp)) }
+        item { WeeklyReviewPanel(d) }
+        item { ExperimentsPanel(d) }
         item {
             Panel {
                 SectionLabel("Weight")

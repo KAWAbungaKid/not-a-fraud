@@ -133,6 +133,7 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
         }
 
         if (isToday) item { CheckInPanel(d, now) }
+        if (isToday) item { ExperimentToday(d) }
 
         item { WaterPanel(d, date, t.waterOz) }
         item { WeightPanel(d, date) }

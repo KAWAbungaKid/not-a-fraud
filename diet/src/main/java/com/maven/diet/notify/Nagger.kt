@@ -45,8 +45,29 @@ object Nagger {
         am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 30 * 60_000L, pi(ctx, ACTION_TICK, 1))
     }
 
+    /** Monday after 8 am, once: last week's review (trend vs goal, one suggested change). */
+    private fun weeklyReview(ctx: Context) {
+        val today = Graph.today()
+        if (today.dayOfWeek != java.time.DayOfWeek.MONDAY || java.time.LocalTime.now().hour < 8) return
+        val prefs = ctx.getSharedPreferences("review", Context.MODE_PRIVATE)
+        if (prefs.getString("week", null) == today.toString()) return
+        if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        prefs.edit().putString("week", today.toString()).apply()
+        val r = com.maven.diet.core.WeeklyReview.build(Graph.data, com.maven.diet.core.WeeklyReview.lastWeekStart(today), today)
+        val open = PendingIntent.getActivity(ctx, 3, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val b = NotificationCompat.Builder(ctx, QUIET)
+            .setSmallIcon(R.drawable.ic_stat_diet)
+            .setContentTitle("Last week: ${r.completeDays}/7 complete days")
+            .setContentText(r.suggestion)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(r.suggestion + " Details on Progress."))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+        ctx.getSystemService(NotificationManager::class.java).notify(12, b.build())
+    }
+
     fun check(ctx: Context) {
         Graph.init(ctx)
+        runCatching { weeklyReview(ctx) }
         val nm = ctx.getSystemService(NotificationManager::class.java)
         val nags = Nags.due(Graph.data, Graph.now(), Graph.zone, WorkoutLink.likelyTraining(ctx) ?: true)
         if (nags.isEmpty() || !Graph.data.settings.notifyHere) { nm.cancel(ID); return }

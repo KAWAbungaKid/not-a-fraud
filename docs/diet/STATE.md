@@ -1,7 +1,7 @@
 # Not a Twig (diet app) — state of the build
 
 Living doc for Maven's diet app. Read this first in any chat about it. The other apps: Not a Fraud
-(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-03 (v0.2.1).
+(`docs/STATE.md`), Not a Troglodyte (workout, `docs/workout/STATE.md`). Last updated 2026-11-04 (v0.3.0).
 
 - **Lives in:** the Not a Fraud repo, modules `diet-core/` (pure Kotlin) + `diet/` (Android). Same signing key.
 - **App ID** `com.maven.diet` (label "Not a Twig"); debug `com.maven.diet.dev` ("Twig dev").
@@ -110,6 +110,16 @@ times, water, nag times, Health Connect + workout link status, backup).
   empties the list for both). Not a Fraud ticks linked meal routine items from `slotsLogged`, shows the
   check-in in "How's today" and uses clarity / energy ≤ 2 as a burnout signal (Not a Fraud STATE § 21).
 
+### v0.2.2 – v0.3.0 (2026-11-03/04)
+
+- 0.2.2: `DietStatus.slots` / window; provider `update …/meal` (`MealSync`) so Not a Fraud mirrors and edits the meal schedule.
+- 0.3.0: `DayActivity.sleepH` (Health Connect sleep sessions ending 3 am–2 pm, minus awake stages); Insights "Sleep"
+  split; short-night remedy. `MealPlanner` (candidates = saved meals + foods logged 2+ times in 45 days at the
+  median amount; timed open slots share the remaining kcal; top-4 random by seed; leanest protein added if short;
+  `Food.price` for "Cheaper"; `groceries`). `WeeklyReview.build` (+ Monday notification, Progress card).
+  `Experiment` / `Experiments` (alternate A/B by day from start, followed days only, Welch-style strength).
+  `OpenFoodFacts.parse` + `ui/Barcode.kt` (ML Kit barcode-scanning, one HTTPS lookup; INTERNET permission).
+
 ## 4. Links between the apps
 
 - **Reads Not a Troglodyte** (`content://com.maven.workout.sync/status`, `/sessions?since=`): training day, lift
@@ -132,11 +142,10 @@ Body stats; pass **sleep hours** to Twig later so bad-day remedies and the insig
    fasting, check-in, remedies, insights v1, nags, Health Connect, workout link, sync. *Start logging now —
    2 weeks of weigh-ins + complete days unlock the real maintenance number.*
 2. **Food data:** ~~label scan~~ (0.2.0) · Maven's own foods and recipes · USDA FoodData Central subset bundled
-   offline for full micronutrients · barcode scan (ML Kit + Open Food Facts) for name/brand.
-3. **Weekly review:** Monday summary — trend vs goal, maintenance estimate, suggested change, adherence.
-4. **Meal planner (Eat This Much):** generate a day from his foods/recipes to hit targets within budget;
-   recipe breakdown; grocery list.
-5. **Experiments:** pick a question (pre-workout chocolate milk 15 min vs meal 3 h before; 16:8 vs 12:12 fasting),
+   offline for full micronutrients · ~~barcode scan~~ (0.3.0).
+3. ~~**Weekly review**~~ (0.3.0).
+4. ~~**Meal planner**~~ (0.3.0; budget via optional prices).
+5. **Experiments** (v1 in 0.3.0; gym performance from Troglodyte e1RM still to come): pick a question (pre-workout chocolate milk 15 min vs meal 3 h before; 16:8 vs 12:12 fasting),
    the app alternates conditions and compares gym performance (from Troglodyte: e1RM vs plan, reps) and
    energy/clarity ratings; reports with uncertainty.
 6. **Cross-app bad-day help** through Not a Fraud (sleep, screen time, workouts, food, water together);

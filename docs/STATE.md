@@ -1,6 +1,6 @@
 # Not a Fraud (formerly Project Max) — state of the build
 
-Living doc. Read this first in any new chat about the app. Last updated 2026-11-03 (v0.9.1: one meal schedule with Twig — § 21).
+Living doc. Read this first in any new chat about the app. Last updated 2026-11-04 (v0.10–0.11: brick ladder, settings lock, practice merge; Twig 0.3, Troglodyte 0.2 — § 22).
 Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notafraud`.
 
 ---
@@ -542,3 +542,45 @@ write permission = SYNC). `DietLink.syncMeals`: each timed slot ↔ one MEAL ite
 due = slot time, keeping the item's lead-in and anger gaps; a new slot creates an item; meals without a slot get
 `pausedByDiet` (off, listed on Routine); `disconnect` turns them back on. Editing a linked meal here pushes to
 Twig first (`DietSync.pushMeal`), deleting removes the slot; a schedule change from Twig re-plans.
+
+
+## 22. v0.10.0 – v0.11.0 (2026-11-03/04): the brick ladder and the § 19 backlog
+
+**Maven (2026-11-03):** sleep now arrives from Samsung Health (it needed time to sync; § 19 item 1 done). Build
+everything from the § 19 list except "ready for other people" and phone/PC sync. Brick the phone progressively;
+bedtime bricks it; no NFC key for now; his own morning routine turns grayscale on and he turns it off when
+needed (keep it). Level 3 apps are entered by hand with suggestions. Lock level: **Medium**. Practice: **merge
+into one**. Trading stays at 8:30 during ME 3411: skip-and-make-up for several times / until a date. Snap: keep
+typed extra emergencies. Lifts logged on the watch ticking Cardio: fine (the more automatic the better).
+
+**0.10.0 built:**
+- `guard/Ladder.kt`: points from today only (slipped blocks ≤3, angry routine ≤2, blocked-app minutes 45/90/150
+  → 1/2/3, must-workout 1–2; −2 for 25+ min of work in 90 min; running session = 0). 2/4/6 → levels 1/2/3, capped
+  by `LadderSettings.maxLevel`; Level 3 only once `allowlistConfirmed`; protected time caps at 1. Bedtime
+  (`bedMin`–`wakeMin`) = Level 3 + `bedtimeExtra`. Effects: credit wait ×2 / ×3, purpose every ½, credits frozen
+  at 3 and bedtime, grayscale from `grayscaleFrom` (only with WRITE_SECURE_SETTINGS; only undoes grayscale it set),
+  unlock → Now from `unlockToNowFrom`, `GuardPolicy` blocks non-allowlisted apps at 3 (`GuardDecision.brick`),
+  climb notification, home widget (`ui/NowWidget`), optional lock-screen wallpaper (`notify/LockWallpaper`),
+  bedtime start/end alarms. Allowlist suggestions: `Ladder.ESSENTIALS` + 7-day usage. Page: More → Brick ladder.
+- Confirm dialog on every settings control (`ui/Confirm.kt`); `PendingChange.reason` asked when a loosening
+  change is queued and shown in the morning. Routine delete / switch-off go through the lock (`ROUTINE_REMOVE`).
+- Medium lock: `SettingsGuard` + GuardService reads Settings / package-installer windows (guard description
+  updated honestly); NaF's own pages with Uninstall / Force stop, or a switch for it that's on, step back to a
+  block screen offering a 10-min morning window (`SETTINGS_WINDOW`). Turning things on is never stopped.
+  `guard/SecureSettings.kt`: optional `adb shell pm grant … WRITE_SECURE_SETTINGS` → grayscale + guard self-repair.
+- `Actions.skipAnchorMany` (next N / until date, make-up optional).
+
+**0.11.0 built:** one practice type (`Task.fixedDays/fixedStartMin/fixedLenMin`; migration v10 turns yielding
+HABIT anchors into practice tasks; fixed slots count toward the weekly target); tight-day workout block survives
+soft days; Discipline = plan followed + blocked-app minutes + homework lead, −2 for a missed workout week; Body
+counts Troglodyte's `doneDates`; `WorkoutLink.sportOn` → Troglodyte hint; site subjects use their app's profile
+(`AppRules.SITE_APPS`, YouTube in Chrome asks "what for?"); `PurposeReview` panel + Sunday note; text contrast;
+draw-your-own constellation (`SkillTree.shape`, `ShapeEditor`, `DrawnConstellation`).
+
+**Other apps the same round:** Not a Twig 0.3.0 (sleep, meal planner + groceries, barcode, weekly review,
+experiments — `docs/diet/STATE.md`), Not a Troglodyte 0.2.0 (Hevy import, warm-ups + plates, rest notification,
+Health Connect write, edit finished, supersets, weekly volume, climbing tomorrow — `docs/workout/STATE.md`).
+
+**Still open from § 19 (not asked for now):** "ready for other people" (onboarding, neutral templates, editable
+fixed lists), phone/PC sync, Obtainium. Samsung "never sleeping" step still unconfirmed. Stale web-app task review
+exists (Now → review queue). Ideas: NFC key for the ladder; ladder tuning after a week of use.

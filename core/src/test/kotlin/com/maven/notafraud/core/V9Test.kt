@@ -83,11 +83,11 @@ class V9Test {
         assertEquals(10, st.streak)
         assertTrue(RoutinePolicy.alertsDue(d, at(23 - 2)).none { it.item.id == "s1" })
         assertTrue(RoutinePolicy.missedOn(d, day.minusDays(1)).none { it.id == "s1" })
-        // Broke it 3 days ago: today is day 3 again, best stays 7.
+        // Broke it 3 days ago: today is day 3 again, best (the 6 days before) stays.
         d = Actions.breakStreak(d, "s1", day.minusDays(3), at(20, 0, day.minusDays(3)))
         st = RoutinePolicy.status(d, d.routine.first { it.id == "s1" }, at(9))
         assertEquals(3, st.streak)
-        assertEquals(7, st.best)
+        assertEquals(6, st.best)
         // Broken today.
         d = Actions.breakStreak(d, "s1", day, at(9))
         st = RoutinePolicy.status(d, d.routine.first { it.id == "s1" }, at(9, 5))

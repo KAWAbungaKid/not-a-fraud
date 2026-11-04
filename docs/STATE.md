@@ -1,6 +1,6 @@
 # Not a Fraud (formerly Project Max) — state of the build
 
-Living doc. Read this first in any new chat about the app. Last updated 2026-10-26 (workout app added — § 16 and `docs/workout/STATE.md`).
+Living doc. Read this first in any new chat about the app. Last updated 2026-11-03 (v0.9.0: Not a Twig link, streaks, sports → cardio — § 21).
 Repo: **github.com/KAWAbungaKid/not-a-fraud** (private). App ID `com.maven.notafraud`.
 
 ---
@@ -500,3 +500,36 @@ energy check-in) and broadcasts `com.maven.diet.CHANGED` to Not a Fraud.
 water / weigh-in nags into the routine "anger" so there's one nag system; tick meal routine items from
 `slotsLogged`; show clarity/energy in "How's today"; later hand Twig sleep hours for bad-day help and insights.
 Sports/climbing → cardio (§ 16).
+
+
+## 21. v0.9.0 (2026-11-03): Not a Twig link, streaks, sports → cardio
+
+**Asked (Maven):** update Not a Fraud for what changed in Not a Troglodyte and Not a Twig; add a routine type for
+streaks that count automatically unless he says he broke them.
+
+**Built:**
+- `core/diet/DietLink.kt` (`DietStatus`, `SyncNag`: Twig's contract with defaults), `sense/DietSync.kt` +
+  `DietChangedReceiver` (manifest `<queries>` for `com.maven.diet` / `.dev`, receiver for `com.maven.diet.CHANGED`
+  guarded by `com.maven.permission.SYNC`). Read on app open, hourly, on the broadcast, and on the routine alarm
+  (throttled 4 min; `RoutinePolicy.DIET_POLL_MIN` = 30 keeps an alarm coming while Twig is connected).
+- `RoutineItem.dietSlot` links a MEAL item to a Twig slot (migration v9 links by name: Lunch, Supper,
+  "Pre-workout meal" → Pre-workout). Linked + connected + `Settings.dietNags`: `slotsLogged` ticks the item
+  (note "Not a Twig"); its mood comes from Twig's nag level (1 = late, 2–3 = angry), not the item's clock.
+  Twig's other nags (water, weigh-in, check-in, unlinked slots) become alerts with ids `twig:<key>`; the
+  notification opens Twig instead of "Done". Twig 0.2.1 adds `notifyHere` so its own notifications can be off
+  while still sending the list (its `nags` switch empties the list).
+- How's today shows Twig's line; clarity or energy ≤ 2 is a burnout signal and makes `DayAdvisor` suggest
+  recharge (before 3 pm) / reset with basics first (eat if 5 h+ since food in window, water if > 1/3 behind).
+- `AutoCheck.CARDIO` (r-cardio in v9). Sport-skill sessions tick Cardio; they tick Workout only when
+  Troglodyte isn't connected. With Troglodyte connected, Samsung Health exercise ≥ `sportMin` ticks Cardio.
+  Body stat gains "Cardio (incl. sports)". "Workout (lift, climb...)" renamed "Workout". UI says Not a Troglodyte.
+- `RoutineCategory.STREAK` + `RoutineItem.streakSince` + `RoutineDay.broken`: done every applicable day by
+  itself, no times / nags / plan time; `RoutinePolicy.streak/bestStreak/streakHeld`; Routine row shows the count
+  with "Broke it" (today / yesterday) and Undo; editor takes "days in a row so far".
+
+**Open / to check:**
+- NaF's "Pre-workout meal" is 7:00 but Twig's Pre-workout slot is 4:30 pm and the eating window is 12–8; the
+  link makes Twig's timing win for nags, but the plan still reserves 20 min at 7:00. Ask Maven whether to retime
+  or drop it.
+- If the watch logs a lift as a Samsung Health exercise, it would tick Cardio (only with Troglodyte connected).
+- Still from § 16/19: TIGHT-day protection of the workout block, MISSED → Discipline, Twig sleep hand-off.

@@ -134,13 +134,22 @@ HealthKit, App Group storage; entitlement request early (it's the long pole).
 
 ---
 
-## 7. Decisions needed
+## 7. Decisions (2026-11-05)
 
-1. One app with modules, or keep three apps? (recommend one)
-2. Public name(s): keep "Not a Fraud / Troglodyte / Twig", or a new umbrella name?
-3. Code repo stays private with a public releases repo, or open-source it?
-4. iPhone: now (Phase 4 right after 1), later, or not at all?
-5. Play: worth the 12-tester test, or GitHub/Obtainium only for now?
+1. **Keep three separate apps** (Maven: the menu layout is the main concern; separate keeps each app's own menu).
+   Each gets its own onboarding; the first one installed offers the others, and onboarding answers already given
+   (goals, wake / bed) are shared through the sync provider so nobody answers twice. Modules still exist *inside*
+   Not a Fraud (blocking, planner, routine, stats, skills) so people can switch off what they don't use.
+2. Names stay (Not a Fraud / Not a Troglodyte / Not a Twig); code repo stays **private**, with a public releases repo.
+3. **GitHub first, then Play** (buddies become the 12 testers).
+4. **iPhone in parallel**: start the Kotlin Multiplatform conversion of the three cores and the Apple
+   Family Controls request (only Not a Fraud needs it) alongside Phase 1. On iOS the three apps share data through
+   an App Group instead of content providers.
+
+**Size (2026-11-05 release APKs, universal, not shrunk):** Not a Fraud 51 MB, Troglodyte 48 MB, Twig 113 MB
+(ML Kit text + barcode models). Turning on R8 shrinking and shipping per-device splits (Play does this with App
+Bundles; GitHub can publish arm64-only) should bring them to roughly 10–15, 10–15 and 25–35 MB. One merged app
+would be ~30–45 MB, smaller than the three together because Compose / Kotlin are only included once.
 
 Sources: Google Play AccessibilityService policy (support.google.com/googleplay/android-developer/answer/10964491);
 Play testing requirements for new personal accounts (…/answer/14151465); dev.to report of a screen-time app's Play

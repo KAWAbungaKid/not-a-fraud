@@ -57,6 +57,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
         (data.active?.let { ((now - it.start) / Time.MIN).toInt() } ?: 0)
     val ranked = remember(data, now / 60_000) { Scorer.rank(data.liveTasks(), now, 60, withPlan.todayPlan!!.energy).take(5) }
 
+    val guardOk = remember(now / 60_000) { com.maven.notafraud.guard.GuardHealth.state(ctx) == com.maven.notafraud.guard.GuardHealth.State.RUNNING }
     val hidden = data.settings.nowHidden
     fun act(fn: (AppData) -> AppData) { Graph.update(fn); Graph.refresh(ctx) }
 
@@ -71,10 +72,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
         }
 
         // Blocking switched on but not actually running: say so at the top, with the fix.
-        if (data.rules.blockingEnabled) {
-            val guardOk = remember(now / 60_000) { com.maven.notafraud.guard.GuardHealth.state(ctx).let { it == com.maven.notafraud.guard.GuardHealth.State.RUNNING } }
-            if (!guardOk) item { GuardStatusPanel() }
-        }
+        if (data.rules.blockingEnabled && !guardOk) item { GuardStatusPanel() }
 
         item {
             Panel(highlight = true) {

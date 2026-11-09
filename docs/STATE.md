@@ -595,3 +595,15 @@ per my routine, make it open the app when my phone is unlocked. Just build the f
 on USER_PRESENT launches it (takes precedence over unlock → Now); `Actions.routineAppTime` from `leave()` adds the
 minutes and ticks at `openDoneMin`. Routine-open apps are always allowed at Level 3 / bedtime (`Ladder.allowedAtTop`).
 No seeded items use it.
+
+
+## 24. v0.12.1 (2026-11-09): guard switched on but dead
+
+Maven: blocking stopped; the "why" log hadn't updated since Sunday ~2 pm. The accessibility switch stayed on but the
+service wasn't running/hearing events; `Perms.accessibility` only reads the switch, so the hourly worker said nothing.
+Fix: `GuardService` catches every event / receiver / timer error (`guardError` → `CrashLog` + GuardLog) instead of
+crashing the process; `CrashLog` also installs a default uncaught handler (filesDir/crashes.txt, last 8);
+`GuardHealth.state` = OFF / NOT_RUNNING (instance null) / NOT_HEARING (no event for 20 min while UsageStats shows an
+app resumed) / RUNNING; hourly check restarts via WRITE_SECURE_SETTINGS (remove + re-add the component) or notifies;
+status panel with Copy errors on Blocking & credits, red on Now when not running. Root cause still unknown: next step
+is the copied error text if it happens again.

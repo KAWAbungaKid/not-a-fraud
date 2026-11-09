@@ -46,6 +46,19 @@ object AppLabels {
 
 /** Per-app foreground time from UsageStatsManager. Queried on demand, never polled. */
 object UsageReader {
+    /** Last time any app came to the front (null = no usage access or nothing). For the hung-guard check. */
+    fun lastResumeAt(ctx: Context, since: Long): Long? {
+        if (!Perms.usageAccess(ctx)) return null
+        val events = ctx.getSystemService(UsageStatsManager::class.java).queryEvents(since, System.currentTimeMillis())
+        val e = UsageEvents.Event()
+        var last: Long? = null
+        while (events.hasNextEvent()) {
+            events.getNextEvent(e)
+            if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED && !e.packageName.startsWith("com.maven.notafraud")) last = e.timeStamp
+        }
+        return last
+    }
+
     fun today(ctx: Context): Map<String, Int> {
         if (!Perms.usageAccess(ctx)) return emptyMap()
         val usm = ctx.getSystemService(UsageStatsManager::class.java)

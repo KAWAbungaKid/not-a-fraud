@@ -84,11 +84,8 @@ class HourlyWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             com.maven.notafraud.guard.GuardLog.add("Guard", "was off: switched back on")
         } else if (!Perms.accessibility(ctx)) {
             Notifier.postAlert(ctx, "Blocking is off", "The Not a Fraud guard isn't enabled. Tap to turn it back on.")
-        } else if (GuardService.instance == null && run { kotlinx.coroutines.delay(8_000); GuardService.instance == null }) {
-            Notifier.postAlert(
-                ctx, "Guard was stopped",
-                "Android stopped the guard. Exempt Not a Fraud from battery optimization and Sleeping apps (Setup tab).",
-            )
+        } else {
+            com.maven.notafraud.guard.GuardHealth.check(ctx)
         }
         runCatching { Workers.syncSensors(ctx) }
         return Result.success()

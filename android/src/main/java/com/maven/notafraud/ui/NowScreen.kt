@@ -70,6 +70,12 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
             Text(data.settings.creed, color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
         }
 
+        // Blocking switched on but not actually running: say so at the top, with the fix.
+        if (data.rules.blockingEnabled) {
+            val guardOk = remember(now / 60_000) { com.maven.notafraud.guard.GuardHealth.state(ctx).let { it == com.maven.notafraud.guard.GuardHealth.State.RUNNING } }
+            if (!guardOk) item { GuardStatusPanel() }
+        }
+
         item {
             Panel(highlight = true) {
                 SectionLabel(if (state.working) "Working" else "Right now")

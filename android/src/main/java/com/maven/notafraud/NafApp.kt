@@ -18,6 +18,7 @@ import java.time.ZoneId
 class NafApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.maven.notafraud.guard.CrashLog.install(this)
         Graph.init(this)
         Notifier.createChannels(this)
         Workers.schedule(this)

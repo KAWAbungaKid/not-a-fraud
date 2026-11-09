@@ -287,6 +287,7 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
         }
 
         item { SectionLabel("Why wasn't I blocked?") }
+        item { GuardStatusPanel() }
         item { GuardLogPanel() }
 
         }
@@ -814,6 +815,41 @@ private fun ProfileEditor(title: String, initial: com.maven.notafraud.core.model
     )
 }
 
+
+/** Is the guard really running (not just switched on)? Plus any crashes it caught, to copy and send. */
+@Composable
+fun GuardStatusPanel() {
+    val c = LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    val state = remember(tick) { com.maven.notafraud.guard.GuardHealth.state(c) }
+    val crashes = remember(tick) { com.maven.notafraud.guard.CrashLog.entries(c) }
+    val ok = state == com.maven.notafraud.guard.GuardHealth.State.RUNNING
+    Panel(highlight = !ok) {
+        Text("Guard: " + com.maven.notafraud.guard.GuardHealth.describe(c), style = MaterialTheme.typography.titleSmall, color = if (ok) Palette.green else Palette.red)
+        if (!ok) {
+            Text("Fix: switch Not a Fraud off and on in Accessibility (or restart the phone).", style = MaterialTheme.typography.bodySmall)
+            Row {
+                TextButton(onClick = {
+                    if (com.maven.notafraud.guard.GuardHealth.restart(c)) tick++
+                    else c.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }) { Text(if (com.maven.notafraud.guard.SecureSettings.granted(c)) "Restart the guard" else "Open Accessibility") }
+                TextButton(onClick = { tick++ }) { Text("Check again") }
+            }
+        }
+        if (crashes.isNotEmpty()) {
+            Text("${crashes.size} error${if (crashes.size == 1) "" else "s"} recorded (newest: ${crashes.first().lineSequence().first()})",
+                color = Palette.amber, style = MaterialTheme.typography.bodySmall)
+            Row {
+                TextButton(onClick = {
+                    val text = "Not a Fraud ${runCatching { c.packageManager.getPackageInfo(c.packageName, 0).versionName }.getOrNull()}\n" +
+                        com.maven.notafraud.guard.GuardHealth.describe(c) + "\n\n" + crashes.joinToString("\n=====\n")
+                    c.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("errors", text))
+                }) { Text("Copy errors") }
+                TextButton(onClick = { com.maven.notafraud.guard.CrashLog.clear(c); tick++ }) { Text("Clear") }
+            }
+        }
+    }
+}
 
 @Composable
 private fun GuardLogPanel() {

@@ -47,6 +47,10 @@ class GuardService : AccessibilityService() {
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
+            try { onScreen(i) } catch (t: Throwable) { guardError("screen ${i.action?.substringAfterLast('.')}", t) }
+        }
+
+        private fun onScreen(i: Intent) {
             when (i.action) {
                 Intent.ACTION_SCREEN_OFF -> {
                     leave(); currentPkg = null; foregroundPkg = null
@@ -121,8 +125,22 @@ class GuardService : AccessibilityService() {
         }
     }
 
+    /**
+     * One bad event must never take blocking down with it (an exception here kills the whole app process, and
+     * Android may then leave the guard unbound): errors are caught, logged, and the guard carries on.
+     */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        try { handle(event) } catch (t: Throwable) { guardError("event", t) }
+    }
+
+    private fun guardError(where: String, t: Throwable) {
+        CrashLog.record(where, t)
+        GuardLog.add("Guard", "error in $where: ${t.javaClass.simpleName}: ${t.message?.take(80)}")
+    }
+
+    private fun handle(event: AccessibilityEvent?) {
         event ?: return
+        lastAnyEventAt = System.currentTimeMillis()
         val pkg = event.packageName?.toString() ?: return
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
@@ -378,7 +396,7 @@ class GuardService : AccessibilityService() {
     }
 
     private fun post(delayMs: Long, block: () -> Unit) {
-        val r = Runnable(block)
+        val r = Runnable { try { block() } catch (t: Throwable) { guardError("timer", t) } }
         pending += r
         handler.postDelayed(r, delayMs.coerceAtLeast(0))
     }
@@ -391,6 +409,7 @@ class GuardService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
+        GuardLog.add("Guard", "stopped")
         runCatching { audio?.removeOnModeChangedListener(modeListener) }
         leave()
         runCatching { unregisterReceiver(screenReceiver) }
@@ -402,6 +421,8 @@ class GuardService : AccessibilityService() {
         @Volatile var instance: GuardService? = null
             private set
         @Volatile var lastEventAt = 0L
+        /** Any event at all (heartbeat for the hung-guard check). */
+        @Volatile var lastAnyEventAt = 0L
         @Volatile var lastConnectedAt = 0L
 
         val KEYBOARDS = setOf("com.samsung.android.honeyboard", "com.google.android.inputmethod.latin", "com.touchtype.swiftkey")

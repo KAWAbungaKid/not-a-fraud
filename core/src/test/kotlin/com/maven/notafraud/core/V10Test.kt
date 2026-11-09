@@ -168,10 +168,10 @@ class V10Test {
         assertFalse(fresh.settings.onboarded)
         assertTrue(fresh.anchors.isEmpty() && fresh.goals.isEmpty() && fresh.routine.isEmpty() && fresh.tasks.isEmpty())
         val t = com.maven.notafraud.core.seed.Templates
-        val a = t.Answers(
+        val a = com.maven.notafraud.core.seed.Templates.Answers(
             name = "Sam", goals = mapOf("fitness" to 5, "faith" to 4), customGoals = listOf("Learn guitar"),
             modules = t.suggestedModules(setOf("fitness", "faith")), wakeMin = 7 * 60, bedMin = 23 * 60,
-            schedule = t.Schedule.WORK, starters = t.suggestedStarters(setOf("fitness", "faith")), workoutsPerWeek = 4,
+            schedule = com.maven.notafraud.core.seed.Templates.Schedule.WORK, starters = t.suggestedStarters(setOf("fitness", "faith")), workoutsPerWeek = 4,
         )
         val d = t.apply(fresh, a, at(9))
         assertTrue(d.settings.onboarded)

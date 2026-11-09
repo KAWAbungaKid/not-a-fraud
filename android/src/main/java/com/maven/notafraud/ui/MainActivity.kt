@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
     private fun App() {
         val ctx = LocalContext.current
         val data by Graph.store.state.collectAsState()
+        if (!data.settings.onboarded) { OnboardingScreen(resumes); ConfirmHost(); return }
         val now by produceState(Graph.now()) {
             while (true) { value = Graph.now(); delay(20_000) }
         }
@@ -124,6 +125,7 @@ class MainActivity : ComponentActivity() {
                             Text(p.label, style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
                         }
                     }
+                    PageTip(tab, data)
                     Box(Modifier.weight(1f)) {
                         when (tab) {
                             TAB_NOW -> NowScreen(data, now, onOpenTab = { tab = it })
@@ -134,6 +136,7 @@ class MainActivity : ComponentActivity() {
                             "skills" -> SkillsScreen(data)
                             "classes" -> ClassesScreen(data, now)
                             "ladder" -> LadderScreen(data, now)
+                            "modules" -> ModulesScreen(data)
 
                             TAB_MORE -> MoreScreen(data) { tab = it }
                             else -> SetupScreen(data, resumes, section = tab)

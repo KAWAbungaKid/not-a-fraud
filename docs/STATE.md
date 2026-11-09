@@ -607,3 +607,21 @@ crashing the process; `CrashLog` also installs a default uncaught handler (files
 app resumed) / RUNNING; hourly check restarts via WRITE_SECURE_SETTINGS (remove + re-add the component) or notifies;
 status panel with Copy errors on Blocking & credits, red on Now when not running. Root cause still unknown: next step
 is the copied error text if it happens again.
+
+
+## 25. v0.13.0 (2026-11-09): streak numbers; Phase 1 of going public (PUBLIC.md)
+
+Maven: add a small streak number to each routine item. Keep the three apps separate. Start the next steps (PUBLIC.md
+phases).
+- `RoutinePolicy.consistency` (days in a row over applicable days; weekly items = weeks meeting target; today counts
+  once done) → number on each Routine row (green when it's the best run).
+- `Module` (PLANNER, ROUTINE, BLOCKING, STATS, SKILLS) in `Settings.modules`; pages hidden via `moduleOf` / `moduleOn`;
+  ROUTINE off silences `alertsDue`, BLOCKING off makes `GuardPolicy` ignore and the ladder 0. `Lock.setModule`
+  (Blocking / Routine off wait for the morning: `ChangeKind.MODULE_OFF`). More → Modules.
+- `seed/Templates.kt`: `fresh` (empty, `onboarded = false`, phone's zone) is the new-install seed on Android and desktop;
+  `apply(Answers)` builds goals/areas (stat per goal), a Life area/project, starter routine from wake/bed offsets,
+  a Work block, Sunday review, tabs, ladder bed/wake. `Settings.onboarded` defaults to true so existing saves skip it.
+  `ui/Onboarding.kt`: the flow, permission steps (accessibility = Play prominent disclosure with consent checkbox +
+  sideload "restricted settings" hint), `ModulesScreen`, `TIPS` / `PageTip`. A test checks no Maven strings end up
+  in a new setup. `Seed` (Maven's data) is still in the app for tests and old-save migrations: move it out of the
+  release build before publishing (next round). Emulator tests load `Seed` via `TestData.loadFull()`.

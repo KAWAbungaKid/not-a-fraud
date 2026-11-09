@@ -11,7 +11,7 @@ object Time {
     const val HOUR = 3_600_000L
     const val DAY = 86_400_000L
 
-    fun zone(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.of("America/Chicago"))
+    fun zone(id: String): ZoneId = runCatching { ZoneId.of(id) }.getOrDefault(ZoneId.systemDefault())
 
     fun dateOf(ms: Long, zone: ZoneId): LocalDate = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
 

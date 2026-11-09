@@ -56,6 +56,7 @@ val PAGES = listOf(
     PageDef("stats", "Stats", Icons.Filled.Insights, false, "Scores from sleep, workouts, focus"),
     PageDef("skills", "Skills", Icons.Filled.AutoAwesome, false, "Skill constellations"),
     PageDef("classes", "Classes", Icons.Filled.School, false, "Semester dates and class times"),
+    PageDef("modules", "Modules", Icons.Filled.Tune, true, "Switch parts of the app on and off"),
     PageDef("setup", "Setup checks", Icons.Filled.Checklist, true, "Permissions the app needs"),
     PageDef("blocking", "Blocking & credits", Icons.Filled.Shield, true, "Blocked apps and sites, rules, why wasn't I blocked"),
     PageDef("ladder", "Brick ladder", Icons.Filled.Lock, true, "Gets stricter as the day drifts; bedtime; Level 3 apps; settings lock"),
@@ -70,20 +71,26 @@ val PAGES = listOf(
 fun page(id: String) = PAGES.firstOrNull { it.id == id }
 
 /** Bottom-bar pages from settings (at most 4; More is always added). */
-fun tabsOf(d: AppData): List<PageDef> = d.settings.tabs.mapNotNull { page(it) }.filter { !it.setting }.distinctBy { it.id }.take(4).ifEmpty { listOf(PAGES.first()) }
+fun tabsOf(d: AppData): List<PageDef> = d.settings.tabs.mapNotNull { page(it) }.filter { !it.setting && moduleOn(d, it.id) }.distinctBy { it.id }.take(4).ifEmpty { listOf(PAGES.first()) }
+
+/** Pages of a switched-off module are hidden everywhere. */
+fun moduleOn(d: AppData, page: String) = moduleOf(page)?.let { it in d.settings.modules } ?: true
 
 @Composable
 fun MoreScreen(data: AppData, onOpen: (String) -> Unit) {
     val inBar = tabsOf(data).map { it.id }.toSet()
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { Spacer(Modifier.height(8.dp)) }
-        val pages = PAGES.filter { !it.setting && it.id !in inBar }
+        val pages = PAGES.filter { !it.setting && it.id !in inBar && moduleOn(data, it.id) }
         if (pages.isNotEmpty()) {
             item { SectionLabel("Pages") }
             items(pages, key = { it.id }) { p -> MoreRow(p) { onOpen(p.id) } }
         }
         item { SectionLabel("Settings") }
-        items(PAGES.filter { it.setting }, key = { it.id }) { p -> MoreRow(p) { onOpen(p.id) } }
+        items(PAGES.filter { it.setting && moduleOn(data, it.id) }, key = { it.id }) { p -> MoreRow(p) { onOpen(p.id) } }
+        if (data.settings.tipsSeen.isNotEmpty()) item {
+            TextButton(onClick = { Graph.update { it.copy(settings = it.settings.copy(tipsSeen = emptySet())) } }) { Text("Show the page tips again") }
+        }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }

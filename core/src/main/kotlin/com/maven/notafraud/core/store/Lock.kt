@@ -82,7 +82,20 @@ object Lock {
         return request(d, PendingChange(kind = ChangeKind.ROUTINE_REMOVE, label = (if (delete) "Delete" else "Switch off") + " routine: ${item.title}", createdAt = now, applyAfter = now, pkg = itemId, flag = delete), now)
     }
 
+    /**
+     * Modules: switching one on is immediate; switching Blocking or Routine off loosens things, so it waits for the
+     * morning like any other loosening change. Planner / Stats / Skills just hide, so they switch off right away.
+     */
+    fun setModule(d: AppData, m: com.maven.notafraud.core.model.Module, on: Boolean, now: Long): AppData {
+        val c = PendingChange(kind = ChangeKind.MODULE_OFF, label = "Switch off ${m.label}", createdAt = now, applyAfter = now, pkg = m.name)
+        if (on) return d.copy(settings = d.settings.copy(modules = d.settings.modules + m), pending = d.pending.filterNot { it.kind == ChangeKind.MODULE_OFF && it.pkg == m.name })
+        val strict = m == com.maven.notafraud.core.model.Module.BLOCKING || m == com.maven.notafraud.core.model.Module.ROUTINE
+        return if (strict) request(d, c, now) else apply(d, c)
+    }
+
     fun apply(d: AppData, c: PendingChange): AppData = when (c.kind) {
+        ChangeKind.MODULE_OFF -> runCatching { com.maven.notafraud.core.model.Module.valueOf(c.pkg ?: "") }.getOrNull()
+            ?.let { m -> d.copy(settings = d.settings.copy(modules = d.settings.modules - m)) } ?: d
         ChangeKind.SETTINGS_WINDOW -> d.copy(settingsWindowUntil = System.currentTimeMillis() + SETTINGS_WINDOW_MIN * Time.MIN)
         ChangeKind.SETTINGS_GUARD -> d.copy(settings = d.settings.copy(guardSettingsPages = c.flag ?: true))
         ChangeKind.LADDER -> c.text?.let { runCatching { LADDER_JSON.decodeFromString(com.maven.notafraud.core.model.LadderSettings.serializer(), it) }.getOrNull() }

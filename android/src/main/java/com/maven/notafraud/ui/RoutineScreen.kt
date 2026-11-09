@@ -247,6 +247,13 @@ private fun RoutineRow(st: RoutineStatus, d: AppData, zone: java.time.ZoneId, on
                     (if (i.openPkg != null && st.mood != Mood.DONE) " · opens " + com.maven.notafraud.sense.AppLabels.label(LocalContext.current, i.openPkg!!) + " on unlock" else "")
                 Text(line, color = color, style = MaterialTheme.typography.bodySmall)
             }
+            // How long you've been consistent: days (or weeks, for weekly targets) in a row.
+            val c = remember(d.routineDays, i) { RoutinePolicy.consistency(d, i, Time.dateOf(System.currentTimeMillis(), zone)) }
+            if (c.count > 0) Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("${c.count}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    color = if (c.count >= c.best && c.count >= 3) Palette.green else MaterialTheme.colorScheme.onSurface)
+                Text(if (c.weeks) "wk" else "d", style = MaterialTheme.typography.labelSmall, color = Palette.textDim)
+            }
             Box(Modifier.size(10.dp).clip(CircleShape).background(color))
         }
     }

@@ -70,6 +70,45 @@ object RoutinePolicy {
 
     fun weekCount(d: AppData, item: RoutineItem, date: LocalDate): Int = weekTally(d, item, date).counted
 
+    /**
+     * How long you've been consistent with an item, for the little number on its row.
+     * Daily items: days in a row it was done, counting only days it applies; today counts once done, and not
+     * being done yet today doesn't break it. Weekly-target items: weeks in a row the target was met (this week
+     * counts once met). Streak items have their own count. [weeks] tells which unit.
+     */
+    data class Consistency(val count: Int, val weeks: Boolean, val best: Int)
+
+    fun consistency(d: AppData, item: RoutineItem, today: LocalDate, maxDays: Int = 400): Consistency {
+        val byDate = d.routineDays.associateBy { it.date }
+        fun done(day: LocalDate) = byDate[day.toString()]?.done?.containsKey(item.id) == true
+        val first = d.routineDays.minOfOrNull { it.date }?.let { LocalDate.parse(it) } ?: today
+        if (item.weeklyTarget != null) {
+            val target = item.weeklyTarget
+            var monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            fun met(m: LocalDate) = weekCount(d, item, m) >= target
+            var run = 0; var best = 0; var cur = -1
+            if (!met(monday)) monday = monday.minusWeeks(1)
+            var w = 0
+            while (w < maxDays / 7 && !monday.plusDays(6).isBefore(first)) {
+                if (met(monday)) { run++ } else { if (cur < 0) cur = run; best = maxOf(best, run); run = 0 }
+                monday = monday.minusWeeks(1); w++
+            }
+            if (cur < 0) cur = run
+            return Consistency(cur, true, maxOf(best, run, cur))
+        }
+        var day = if (done(today)) today else today.minusDays(1)
+        var run = 0; var best = 0; var cur = -1
+        var n = 0
+        while (n < maxDays && !day.isBefore(first)) {
+            if (item.enabled && day.dayOfWeek.value in item.days) {
+                if (done(day)) run++ else { if (cur < 0) cur = run; best = maxOf(best, run); run = 0 }
+            }
+            day = day.minusDays(1); n++
+        }
+        if (cur < 0) cur = run
+        return Consistency(cur, false, maxOf(best, run, cur))
+    }
+
     /** Done, but after its due time (woke at 6:40 when due by 6:00). */
     fun doneLate(d: AppData, st: RoutineStatus): Boolean {
         val at = st.doneAt ?: return false
@@ -189,7 +228,7 @@ object RoutinePolicy {
             .take(MAX_AT_ONCE)
 
     private fun allDue(d: AppData, now: Long, bedtimeSignal: Boolean): List<RoutineAlert> {
-        if (!d.settings.routineNagsEnabled) return emptyList()
+        if (!d.settings.routineNagsEnabled || com.maven.notafraud.core.model.Module.ROUTINE !in d.settings.modules) return emptyList()
         val zone = Time.zone(d.settings.zoneId)
         val m = Time.minuteOfDay(now, zone)
         if (m >= QUIET_AFTER_MIN) return emptyList()
@@ -211,7 +250,7 @@ object RoutinePolicy {
                 else -> false
             }
             if (fire) {
-                val (title, text) = message(item, mood, st.minutesLate, Time.clock(now, zone), bedtimeSignal)
+                val (title, text) = message(item, mood, st.minutesLate, Time.clock(now, zone), bedtimeSignal, Time.clockText(d.settings.wakeMin))
                 out += RoutineAlert(item, mood, title, if (st.fromDiet && st.note != null) st.note else text, st.fromDiet)
             }
         }
@@ -290,7 +329,7 @@ object RoutinePolicy {
         return candidates.filter { it > now + 30_000 && it < quiet }.minOrNull()
     }
 
-    fun message(item: RoutineItem, mood: Mood, minutesLate: Int, clock: String, bedtime: Boolean = false): Pair<String, String> {
+    fun message(item: RoutineItem, mood: Mood, minutesLate: Int, clock: String, bedtime: Boolean = false, wakeText: String = "early"): Pair<String, String> {
         val name = item.title
         val lateText = if (minutesLate >= 60) Time.durationText(minutesLate) + " late" else "$minutesLate min late"
         return when (item.category) {
@@ -305,7 +344,7 @@ object RoutinePolicy {
             }
             RoutineCategory.SLEEP -> when (mood) {
                 Mood.LATE -> "$name" to "It's $clock. Wrap up."
-                else -> "$clock: phone down" to "Lights out. Tomorrow starts at 5:30."
+                else -> "$clock: phone down" to "Lights out. Tomorrow starts at $wakeText."
             }
             RoutineCategory.BODY -> when (mood) {
                 Mood.LATE -> "$name ($lateText)" to "Still time. Even a short one counts."

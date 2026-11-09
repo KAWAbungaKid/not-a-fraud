@@ -33,7 +33,8 @@ object Graph {
 
     fun init(ctx: Context) {
         if (::store.isInitialized) return
-        store = DataStore(File(ctx.filesDir, "data.json")) { Seed.data(System.currentTimeMillis()) }
+        // New installs start empty and go through onboarding (STATE.md § 25); Maven's own setup isn't used.
+        store = DataStore(File(ctx.filesDir, "data.json")) { com.maven.notafraud.core.seed.Templates.fresh(System.currentTimeMillis(), java.time.ZoneId.systemDefault().id) }
     }
 
     val data: AppData get() = store.current

@@ -35,7 +35,7 @@ class FlowTest {
     @Test
     fun blockScreenShowsWaysOut() {
         // The brick ladder depends on the clock (bedtime freezes credits): keep it out of this test.
-        Graph.init(ctx)
+        TestData.loadFull()
         Graph.update { it.copy(settings = it.settings.copy(ladder = it.settings.ladder.copy(enabled = false))) }
         val intent = Intent(ctx, BlockActivity::class.java)
             .putExtra(BlockActivity.EXTRA_PKG, "com.instagram.android")
@@ -55,6 +55,7 @@ class FlowTest {
 
     @Test
     fun addTaskAppearsInList() {
+        TestData.loadFull()
         ActivityScenario.launch(MainActivity::class.java).use {
             rule.waitForIdle()
             rule.onNodeWithText("Tasks").performClick()
@@ -85,6 +86,7 @@ class FlowTest {
 
     @Test
     fun mapAndRoutineRender() {
+        TestData.loadFull()
         ActivityScenario.launch(MainActivity::class.java).use {
             rule.waitForIdle()
             rule.onNodeWithText("Tasks").performClick()

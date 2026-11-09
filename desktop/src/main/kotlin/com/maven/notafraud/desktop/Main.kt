@@ -98,7 +98,7 @@ fun dataDir(): File {
 }
 
 fun main(args: Array<String>) {
-    val store = DataStore(File(dataDir(), "data.json")) { Seed.data(System.currentTimeMillis()) }
+    val store = DataStore(File(dataDir(), "data.json")) { com.maven.notafraud.core.seed.Templates.fresh(System.currentTimeMillis(), java.time.ZoneId.systemDefault().id).let { it.copy(settings = it.settings.copy(onboarded = true)) } }
     val startMinimized = "--minimized" in args
 
     application {

@@ -185,7 +185,7 @@ data class Idea(
 )
 
 @Serializable
-enum class AnchorKind { CLASS, FITNESS, MARKET, RESEARCH, REVIEW, CRAFT, PROTECTED, ROUTINE }
+enum class AnchorKind { CLASS, FITNESS, MARKET, RESEARCH, REVIEW, CRAFT, PROTECTED, ROUTINE, WORK }
 
 /**
  * How firmly a block holds its time.
@@ -329,6 +329,18 @@ enum class ChangeKind {
     LADDER_ALLOW,
     /** Delete or switch off a routine item. */
     ROUTINE_REMOVE,
+    /** Switch a module off ([PendingChange.pkg] = module name). */
+    MODULE_OFF,
+}
+
+/** Parts of Not a Fraud someone can switch off (STATE.md § 25). */
+@Serializable
+enum class Module(val label: String, val blurb: String) {
+    PLANNER("Planner", "Plans your day around fixed times, deadlines and goals; Now tells you what's next"),
+    ROUTINE("Routine", "Daily habits with times that nudge you, then get angry when late"),
+    BLOCKING("Blocking", "Locks distracting apps and sites; earn time by focusing; the brick ladder"),
+    STATS("Stats", "Scores for body, mind, work and more, from what you actually do"),
+    SKILLS("Skills", "Skill constellations that fill in as you practice"),
 }
 
 /**
@@ -569,6 +581,16 @@ data class Settings(
     /** Not a Twig: its meal / water / weigh-in / check-in reminders come through Not a Fraud's routine nags. */
     val dietNags: Boolean = true,
     val ladder: LadderSettings = LadderSettings(),
+    /** Parts of the app in use (onboarding picks them; Settings → Modules). Off = hidden and silent; data kept. */
+    val modules: Set<Module> = Module.entries.toSet(),
+    /** First-run setup done. Missing in older saves = true (they were set up by hand). */
+    val onboarded: Boolean = true,
+    val userName: String = "",
+    /** Usual wake-up and bedtime (minutes after midnight), from onboarding. */
+    val wakeMin: Int = 6 * 60,
+    val bedMin: Int = 22 * 60,
+    /** Pages whose first-visit tip was dismissed. */
+    val tipsSeen: Set<String> = emptySet(),
     /** Secondary text: 0 normal, 1 brighter, 2 brightest. */
     val textContrast: Int = 0,
     /** Medium lock: the guard also covers the phone's Settings pages that would switch Not a Fraud off or remove it. */

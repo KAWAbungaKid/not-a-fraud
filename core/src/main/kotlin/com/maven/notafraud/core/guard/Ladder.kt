@@ -44,7 +44,7 @@ object Ladder {
 
     fun state(d: AppData, now: Long): State {
         val l = d.settings.ladder
-        if (!l.enabled) return State(0, 0, emptyList(), false, "")
+        if (!l.enabled || com.maven.notafraud.core.model.Module.BLOCKING !in d.settings.modules) return State(0, 0, emptyList(), false, "")
         val top = if (l.allowlistConfirmed) l.maxLevel.coerceIn(0, 3) else l.maxLevel.coerceIn(0, 2)
         if (isBedtime(d, now)) {
             val lvl = minOf(3, if (l.allowlistConfirmed) 3 else 2)

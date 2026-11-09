@@ -146,4 +146,56 @@ class V10Test {
         val locked = d.copy(settings = d.settings.copy(ladder = d.settings.ladder.copy(allowlistConfirmed = true)))
         assertTrue(Ladder.allowedAtTop(locked, "com.sirma.mobile.bible.android", true))
     }
+
+    @Test
+    fun `consistency counts days in a row and skips days it doesn't apply`() {
+        val wkdays = com.maven.notafraud.core.model.RoutineItem(id = "w", title = "Wake", startMin = 300, dueMin = 330, angryMin = 360, days = setOf(1, 2, 3, 4, 5))
+        var d = base().copy(routine = listOf(wkdays))
+        // day = Wed Nov 4. Done Mon, Tue, plus the previous Thu, Fri; weekend doesn't apply.
+        for (k in listOf(1L, 2L, 5L, 6L)) d = Actions.checkRoutine(d, "w", at(5, 20, day.minusDays(k)), null)
+        val c = com.maven.notafraud.core.routine.RoutinePolicy.consistency(d, d.routine.first(), day)
+        assertEquals(4, c.count, "today not done yet doesn't break it")
+        d = Actions.checkRoutine(d, "w", at(5, 20), null)
+        assertEquals(5, com.maven.notafraud.core.routine.RoutinePolicy.consistency(d, d.routine.first(), day).count)
+        // A missed Monday breaks it.
+        d = Actions.uncheckRoutine(d, "w", day.minusDays(2))
+        assertEquals(2, com.maven.notafraud.core.routine.RoutinePolicy.consistency(d, d.routine.first(), day).count)
+    }
+
+    @Test
+    fun `onboarding builds a setup with nothing of Maven's`() {
+        val fresh = com.maven.notafraud.core.seed.Templates.fresh(at(4), "America/New_York")
+        assertFalse(fresh.settings.onboarded)
+        assertTrue(fresh.anchors.isEmpty() && fresh.goals.isEmpty() && fresh.routine.isEmpty() && fresh.tasks.isEmpty())
+        val t = com.maven.notafraud.core.seed.Templates
+        val a = t.Answers(
+            name = "Sam", goals = mapOf("fitness" to 5, "faith" to 4), customGoals = listOf("Learn guitar"),
+            modules = t.suggestedModules(setOf("fitness", "faith")), wakeMin = 7 * 60, bedMin = 23 * 60,
+            schedule = t.Schedule.WORK, starters = t.suggestedStarters(setOf("fitness", "faith")), workoutsPerWeek = 4,
+        )
+        val d = t.apply(fresh, a, at(9))
+        assertTrue(d.settings.onboarded)
+        assertEquals(listOf("Get fit and strong", "Grow in my faith", "Learn guitar"), d.goals.map { it.name })
+        assertEquals(5, d.areas.first { it.name == "Fitness" }.importance)
+        val wake = d.routine.first { it.title == "Wake up" }
+        assertEquals(7 * 60 + 30, wake.dueMin)
+        assertEquals(23 * 60, d.routine.first { it.title == "In bed, phone down" }.dueMin)
+        assertEquals(4, d.routine.first { it.title == "Workout" }.weeklyTarget)
+        assertTrue(d.anchors.any { it.title == "Work" })
+        val all = kotlinx.serialization.json.Json.encodeToString(com.maven.notafraud.core.model.AppData.serializer(), d)
+        for (w in listOf("ME 3411", "Trading", "CSWE", "Biosensor", "scout", "Chicago", "creatine", "Date night")) assertFalse(all.contains(w, ignoreCase = true), w)
+    }
+
+    @Test
+    fun `switched-off modules go quiet`() {
+        var d = base().copy(settings = base().settings.copy(modules = com.maven.notafraud.core.model.Module.entries.toSet() - com.maven.notafraud.core.model.Module.BLOCKING))
+        assertEquals(GuardAction.IGNORE, GuardPolicy.decide("com.instagram.android", d, at(12)).action)
+        assertEquals(0, Ladder.state(d, at(23)).level)
+        // Turning Routine off waits for the morning; Stats goes right away.
+        d = Lock.setModule(d, com.maven.notafraud.core.model.Module.ROUTINE, false, at(12))
+        assertTrue(com.maven.notafraud.core.model.Module.ROUTINE in d.settings.modules)
+        assertEquals(1, d.pending.size)
+        d = Lock.setModule(d, com.maven.notafraud.core.model.Module.STATS, false, at(12))
+        assertFalse(com.maven.notafraud.core.model.Module.STATS in d.settings.modules)
+    }
 }

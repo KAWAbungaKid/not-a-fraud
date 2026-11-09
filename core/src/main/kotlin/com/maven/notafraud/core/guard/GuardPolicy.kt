@@ -42,6 +42,8 @@ object GuardPolicy {
 
     fun decide(pkg: String, data: AppData, now: Long, ownPackagePrefix: String = "com.maven.notafraud"): GuardDecision {
         val rules = data.rules
+        // Blocking switched off as a module: the guard only watches (calls, usage), never blocks.
+        if (com.maven.notafraud.core.model.Module.BLOCKING !in data.settings.modules) return GuardDecision(GuardAction.IGNORE)
         if (pkg.startsWith(Sites.PREFIX)) {
             if (!rules.blockingEnabled || Sites.label(pkg) !in rules.blockedSites) return GuardDecision(GuardAction.IGNORE)
             return if (Credits.isUnlocked(data.ledger, pkg, now)) GuardDecision(GuardAction.UNLOCKED, Credits.unlockedUntil(data.ledger, pkg))

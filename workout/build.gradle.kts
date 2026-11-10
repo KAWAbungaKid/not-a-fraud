@@ -60,6 +60,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":feedback"))
     implementation(project(":workout-core"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)

@@ -625,3 +625,14 @@ phases).
   sideload "restricted settings" hint), `ModulesScreen`, `TIPS` / `PageTip`. A test checks no Maven strings end up
   in a new setup. `Seed` (Maven's data) is still in the app for tests and old-save migrations: move it out of the
   release build before publishing (next round). Emulator tests load `Seed` via `TestData.loadFull()`.
+
+
+## 26. Feedback mode (2026-11-10; NaF 0.13.1, Troglodyte 0.2.2, Twig 0.3.1)
+
+Maven wants to go through the apps and note tweaks in the moment. New shared Android library `:feedback`
+(`com.maven.feedback`, first module shared by all three apps): `FeedbackButton` (draggable small FAB, BoxScope,
+PixelCopy screenshot of the window, then a comment dialog), notes saved to filesDir/feedback (`<stamp>_<page>.txt` +
+half-size png), `FeedbackSettings` (switch, count, Share → zip notes.md + pngs via its own FileProvider
+`${applicationId}.feedback`, Clear). Maven shares the zip into chat (decided over pulling from the repo: no GitHub
+token on the phone). Pages: NaF tab id, Troglodyte/Twig route class name or tab. The library is where shared
+onboarding / tips / crash log should go next (PUBLIC.md).

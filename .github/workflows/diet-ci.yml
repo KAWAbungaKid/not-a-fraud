@@ -2,7 +2,7 @@ name: diet-ci
 on:
   push:
     branches: [main]
-    paths: ['diet/**', 'diet-core/**', '.github/workflows/diet-ci.yml', 'gradle/**', 'settings.gradle.kts']
+    paths: ['diet/**', 'diet-core/**', 'feedback/**', '.github/workflows/diet-ci.yml', 'gradle/**', 'settings.gradle.kts']
   workflow_dispatch:
 permissions:
   contents: write

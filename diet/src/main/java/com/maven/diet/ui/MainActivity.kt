@@ -6,6 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import com.maven.feedback.FeedbackButton
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -62,7 +64,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Graph.init(this)
-        setContent { DietTheme { App() } }
+        com.maven.feedback.Feedback.init(this)
+        setContent {
+            DietTheme {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                    App()
+                    FeedbackButton("Not a Twig", stack.lastOrNull()?.let { it::class.simpleName } ?: tab)
+                }
+            }
+        }
     }
 
     override fun onResume() {

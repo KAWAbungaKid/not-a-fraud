@@ -2,7 +2,7 @@ name: workout-ci
 on:
   push:
     branches: [main]
-    paths: ['workout/**', 'workout-core/**', '.github/workflows/workout-ci.yml', 'gradle/**', 'settings.gradle.kts']
+    paths: ['workout/**', 'workout-core/**', 'feedback/**', '.github/workflows/workout-ci.yml', 'gradle/**', 'settings.gradle.kts']
   workflow_dispatch:
 permissions:
   contents: write

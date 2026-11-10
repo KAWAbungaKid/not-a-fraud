@@ -125,6 +125,7 @@ fun SettingsScreen(d: WorkoutData) {
             OutlinedButton(onClick = { pick.launch(arrayOf("text/*", "text/csv", "text/comma-separated-values", "application/octet-stream")) }) { Text("Pick Hevy CSV…") }
             result?.let { Text(it, color = Palette.green) }
         }
+        Panel { com.maven.feedback.FeedbackSettings("Not a Troglodyte") }
         Panel {
             SectionLabel("Not a Fraud link")
             val st = Sync.status(d, Graph.today(), Graph.now())

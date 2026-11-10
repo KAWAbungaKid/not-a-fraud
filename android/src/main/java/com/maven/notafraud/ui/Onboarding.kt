@@ -251,6 +251,7 @@ private fun PermRow(title: String, why: String, granted: Boolean, onGrant: () ->
 @Composable
 fun ModulesScreen(data: com.maven.notafraud.core.model.AppData) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Panel { com.maven.feedback.FeedbackSettings("Not a Fraud") }
         for (m in Module.entries) Panel {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

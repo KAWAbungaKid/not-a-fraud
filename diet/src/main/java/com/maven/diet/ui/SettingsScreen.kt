@@ -75,6 +75,7 @@ fun SettingsScreen(d: DietData, resumes: Long) {
     val workout = remember(resumes) { WorkoutLink.connected(ctx) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Panel { com.maven.feedback.FeedbackSettings("Not a Twig") }
         Panel {
             SectionLabel("You")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

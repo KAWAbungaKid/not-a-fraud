@@ -14,6 +14,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "not-a-fraud"
 include(":core")
+if (file("feedback/build.gradle.kts").exists()) include(":feedback")
 if (file("android/build.gradle.kts").exists()) include(":android")
 if (file("desktop/build.gradle.kts").exists()) include(":desktop")
 // Workout app (separate APK, same repo + signing key so the two apps can share data).

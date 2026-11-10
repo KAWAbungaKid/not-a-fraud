@@ -60,6 +60,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":feedback"))
     implementation(project(":diet-core"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)

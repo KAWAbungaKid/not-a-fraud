@@ -19,6 +19,7 @@ class NafApp : Application() {
     override fun onCreate() {
         super.onCreate()
         com.maven.notafraud.guard.CrashLog.install(this)
+        com.maven.feedback.Feedback.init(this)
         Graph.init(this)
         Notifier.createChannels(this)
         Workers.schedule(this)

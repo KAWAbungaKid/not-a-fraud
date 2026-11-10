@@ -59,6 +59,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":feedback"))
     implementation(project(":core"))
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.core.ktx)

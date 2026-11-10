@@ -56,7 +56,7 @@ val PAGES = listOf(
     PageDef("stats", "Stats", Icons.Filled.Insights, false, "Scores from sleep, workouts, focus"),
     PageDef("skills", "Skills", Icons.Filled.AutoAwesome, false, "Skill constellations"),
     PageDef("classes", "Classes", Icons.Filled.School, false, "Semester dates and class times"),
-    PageDef("modules", "Modules", Icons.Filled.Tune, true, "Switch parts of the app on and off"),
+    PageDef("modules", "Modules & feedback", Icons.Filled.Tune, true, "Switch parts of the app on and off; feedback mode"),
     PageDef("setup", "Setup checks", Icons.Filled.Checklist, true, "Permissions the app needs"),
     PageDef("blocking", "Blocking & credits", Icons.Filled.Shield, true, "Blocked apps and sites, rules, why wasn't I blocked"),
     PageDef("ladder", "Brick ladder", Icons.Filled.Lock, true, "Gets stricter as the day drifts; bedtime; Level 3 apps; settings lock"),

@@ -6,6 +6,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import com.maven.feedback.FeedbackButton
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
@@ -57,7 +59,12 @@ class MainActivity : ComponentActivity() {
         if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
         setContent {
             val d by Graph.store.state.collectAsState()
-            NafTheme(d.settings.accent, d.settings.textContrast) { App() }
+            NafTheme(d.settings.accent, d.settings.textContrast) {
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                    App()
+                    FeedbackButton("Not a Fraud", tab) { runCatching { "Now: " + Graph.nowState().headline }.getOrDefault("") }
+                }
+            }
         }
     }
 

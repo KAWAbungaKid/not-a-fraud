@@ -1,0 +1,131 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :diet:assembleDebug :diet:assembleDebugAndroidTest
+> Task :diet-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :diet:preBuild UP-TO-DATE
+> Task :diet:preDebugBuild UP-TO-DATE
+> Task :diet:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :diet-core:processResources NO-SOURCE
+> Task :diet:generateDebugBuildConfig
+> Task :diet:generateDebugResources FROM-CACHE
+> Task :diet:packageDebugResources FROM-CACHE
+> Task :feedback:preBuild UP-TO-DATE
+> Task :feedback:preDebugBuild UP-TO-DATE
+> Task :feedback:processDebugNavigationResources FROM-CACHE
+> Task :diet:processDebugNavigationResources FROM-CACHE
+> Task :diet:parseDebugLocalResources FROM-CACHE
+> Task :diet:generateDebugRFile FROM-CACHE
+> Task :feedback:generateDebugResources FROM-CACHE
+> Task :feedback:packageDebugResources FROM-CACHE
+> Task :feedback:parseDebugLocalResources FROM-CACHE
+> Task :feedback:generateDebugRFile FROM-CACHE
+> Task :feedback:compileDebugKotlin FROM-CACHE
+> Task :feedback:javaPreCompileDebug FROM-CACHE
+> Task :feedback:compileDebugJavaWithJavac NO-SOURCE
+> Task :feedback:bundleLibCompileToJarDebug
+> Task :diet:javaPreCompileDebug FROM-CACHE
+> Task :diet:generateDebugAssets UP-TO-DATE
+> Task :feedback:generateDebugAssets UP-TO-DATE
+> Task :feedback:mergeDebugAssets
+> Task :diet:mergeDebugAssets
+> Task :diet:compressDebugAssets FROM-CACHE
+> Task :diet:generateDebugGlobalSynthetics FROM-CACHE
+> Task :feedback:processDebugJavaRes
+> Task :diet:checkDebugDuplicateClasses
+> Task :diet:desugarDebugFileDependencies FROM-CACHE
+> Task :diet:mergeExtDexDebug FROM-CACHE
+> Task :feedback:bundleLibRuntimeToDirDebug
+> Task :feedback:writeDebugAarMetadata
+> Task :diet:checkDebugAarMetadata
+> Task :diet:mapDebugSourceSetPaths
+> Task :diet:compileDebugNavigationResources FROM-CACHE
+> Task :diet:mergeDebugResources FROM-CACHE
+> Task :diet:createDebugCompatibleScreenManifests
+> Task :diet:extractDeepLinksDebug FROM-CACHE
+> Task :feedback:extractDeepLinksDebug FROM-CACHE
+> Task :feedback:processDebugManifest FROM-CACHE
+> Task :diet:processDebugMainManifest
+> Task :diet:processDebugManifest
+> Task :diet:processDebugManifestForPackage
+> Task :feedback:mapDebugSourceSetPaths
+> Task :feedback:compileDebugLibraryResources FROM-CACHE
+> Task :diet:processDebugResources
+> Task :diet:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugNativeLibs NO-SOURCE
+> Task :feedback:copyDebugJniLibsProjectOnly
+> Task :diet:validateSigningDebug
+> Task :diet:writeDebugAppMetadata
+> Task :diet:writeDebugSigningConfigVersions
+> Task :diet:preDebugAndroidTestBuild SKIPPED
+> Task :diet:mergeDebugAndroidTestManifest
+> Task :diet:processDebugAndroidTestManifest
+> Task :diet:generateDebugAndroidTestBuildConfig FROM-CACHE
+> Task :diet:generateDebugAndroidTestResources FROM-CACHE
+> Task :diet:packageDebugAndroidTestResources FROM-CACHE
+> Task :diet:processDebugAndroidTestNavigationResources FROM-CACHE
+> Task :diet:parseDebugAndroidTestLocalResources FROM-CACHE
+> Task :diet:generateDebugAndroidTestRFile FROM-CACHE
+> Task :diet:javaPreCompileDebugAndroidTest FROM-CACHE
+> Task :diet:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :diet:mergeDebugAndroidTestAssets
+> Task :diet:compressDebugAndroidTestAssets FROM-CACHE
+> Task :diet:generateDebugAndroidTestGlobalSynthetics FROM-CACHE
+> Task :diet:checkDebugAndroidTestDuplicateClasses
+> Task :diet:desugarDebugAndroidTestFileDependencies FROM-CACHE
+> Task :diet:mergeExtDexDebugAndroidTest FROM-CACHE
+> Task :diet:checkDebugAndroidTestAarMetadata
+> Task :diet:mapDebugAndroidTestSourceSetPaths
+> Task :diet:compileDebugAndroidTestNavigationResources FROM-CACHE
+> Task :diet:mergeDebugAndroidTestResources FROM-CACHE
+> Task :diet:processDebugAndroidTestResources FROM-CACHE
+> Task :diet:mergeDebugAndroidTestJniLibFolders
+> Task :diet:validateSigningDebugAndroidTest
+> Task :diet:writeDebugAndroidTestSigningConfigVersions
+> Task :diet-core:compileKotlin
+> Task :diet-core:compileJava NO-SOURCE
+> Task :diet-core:classes UP-TO-DATE
+> Task :diet-core:jar
+> Task :diet:mergeLibDexDebug
+> Task :diet:mergeDebugNativeLibs
+
+> Task :diet:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libmlkit_google_ocr_pipeline.so. Run with --info option to learn more.
+
+> Task :diet:mergeLibDexDebugAndroidTest FROM-CACHE
+> Task :diet:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :diet:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :diet:compileDebugKotlin
+> Task :diet:processDebugJavaRes
+> Task :diet:mergeDebugJavaResource
+> Task :diet:compileDebugJavaWithJavac
+> Task :diet:bundleDebugClassesToCompileJar
+
+> Task :diet:compileDebugAndroidTestKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/diet/src/androidTest/java/com/maven/diet/SmokeTest.kt:34:16 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+
+> Task :diet:compileDebugAndroidTestJavaWithJavac
+> Task :diet:processDebugAndroidTestJavaRes
+> Task :diet:mergeDebugAndroidTestJavaResource
+> Task :diet:dexBuilderDebugAndroidTest FROM-CACHE
+> Task :diet:mergeProjectDexDebugAndroidTest FROM-CACHE
+> Task :diet:packageDebugAndroidTest
+> Task :diet:createDebugAndroidTestApkListingFileRedirect
+> Task :diet:assembleDebugAndroidTest
+> Task :diet:dexBuilderDebug
+> Task :diet:mergeProjectDexDebug
+> Task :diet:packageDebug
+> Task :diet:assembleDebug
+> Task :diet:createDebugApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411688461.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 31s
+91 actionable tasks: 51 executed, 40 from cache
+Configuration cache entry stored.

@@ -1,0 +1,119 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :workout:assembleRelease
+> Task :workout-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :workout-core:processResources NO-SOURCE
+> Task :feedback:preBuild UP-TO-DATE
+> Task :feedback:preReleaseBuild UP-TO-DATE
+> Task :feedback:mergeReleaseJniLibFolders
+> Task :feedback:mergeReleaseNativeLibs NO-SOURCE
+> Task :feedback:copyReleaseJniLibsProjectOnly
+> Task :workout:preBuild UP-TO-DATE
+> Task :workout:preReleaseBuild UP-TO-DATE
+> Task :workout:mergeReleaseJniLibFolders
+> Task :feedback:generateReleaseResources FROM-CACHE
+> Task :feedback:packageReleaseResources FROM-CACHE
+> Task :feedback:processReleaseNavigationResources FROM-CACHE
+> Task :feedback:parseReleaseLocalResources FROM-CACHE
+> Task :feedback:generateReleaseRFile FROM-CACHE
+> Task :feedback:compileReleaseKotlin FROM-CACHE
+> Task :feedback:javaPreCompileRelease FROM-CACHE
+> Task :feedback:compileReleaseJavaWithJavac NO-SOURCE
+> Task :feedback:bundleLibRuntimeToDirRelease
+> Task :workout:checkReleaseDuplicateClasses
+> Task :feedback:bundleLibCompileToJarRelease
+> Task :workout:generateReleaseBuildConfig
+> Task :workout:generateReleaseResources FROM-CACHE
+> Task :workout:packageReleaseResources FROM-CACHE
+> Task :workout:processReleaseNavigationResources FROM-CACHE
+> Task :workout:parseReleaseLocalResources FROM-CACHE
+> Task :workout:generateReleaseRFile FROM-CACHE
+> Task :workout:javaPreCompileRelease FROM-CACHE
+> Task :feedback:mapReleaseSourceSetPaths
+> Task :feedback:compileReleaseLibraryResources FROM-CACHE
+> Task :feedback:writeReleaseAarMetadata
+> Task :workout:checkReleaseAarMetadata
+> Task :workout:mapReleaseSourceSetPaths
+> Task :workout:compileReleaseNavigationResources FROM-CACHE
+> Task :workout:mergeReleaseResources FROM-CACHE
+> Task :workout:createReleaseCompatibleScreenManifests
+> Task :feedback:extractDeepLinksRelease FROM-CACHE
+> Task :feedback:processReleaseManifest FROM-CACHE
+> Task :workout:extractDeepLinksRelease FROM-CACHE
+> Task :workout:processReleaseMainManifest
+> Task :workout:processReleaseManifest
+> Task :workout:processReleaseManifestForPackage
+> Task :workout:processReleaseResources
+> Task :workout:desugarReleaseFileDependencies FROM-CACHE
+> Task :workout:mergeReleaseStartupProfile
+> Task :workout:mergeExtDexRelease FROM-CACHE
+> Task :feedback:prepareReleaseArtProfile
+> Task :workout:mergeReleaseArtProfile
+> Task :feedback:bundleLibRuntimeToJarRelease
+> Task :feedback:generateReleaseAssets UP-TO-DATE
+> Task :feedback:mergeReleaseAssets
+> Task :workout:generateReleaseAssets UP-TO-DATE
+> Task :workout:mergeReleaseAssets
+> Task :workout:compressReleaseAssets FROM-CACHE
+> Task :workout:extractReleaseVersionControlInfo
+> Task :feedback:extractProguardFiles
+> Task :feedback:generateReleaseLintVitalModel
+> Task :feedback:lintVitalAnalyzeRelease FROM-CACHE
+> Task :feedback:prepareLintJarForPublish
+> Task :feedback:processReleaseJavaRes
+> Task :feedback:createFullJarRelease
+> Task :feedback:generateReleaseLintModel
+> Task :workout:extractProguardFiles
+> Task :feedback:checkReleaseAarMetadata
+> Task :feedback:extractDeepLinksForAarRelease FROM-CACHE
+> Task :feedback:extractReleaseAnnotations FROM-CACHE
+> Task :feedback:mergeReleaseGeneratedProguardFiles
+> Task :feedback:mergeReleaseConsumerProguardFiles
+> Task :feedback:mergeReleaseJavaResource
+> Task :feedback:syncReleaseLibJars FROM-CACHE
+> Task :feedback:bundleReleaseLocalLintAar
+> Task :feedback:writeReleaseLintModelMetadata
+> Task :workout:optimizeReleaseResources
+> Task :workout:collectReleaseDependencies
+> Task :workout:sdkReleaseDependencyData
+> Task :workout:validateSigningRelease
+> Task :workout:writeReleaseAppMetadata
+> Task :workout:writeReleaseSigningConfigVersions
+> Task :workout-core:compileKotlin
+> Task :workout-core:compileJava NO-SOURCE
+> Task :workout-core:classes UP-TO-DATE
+> Task :workout-core:jar
+> Task :workout:mergeReleaseNativeLibs
+
+> Task :workout:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :workout:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :workout:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :workout:compileReleaseKotlin
+> Task :workout:processReleaseJavaRes
+> Task :workout:mergeReleaseJavaResource
+> Task :workout:compileReleaseJavaWithJavac
+> Task :workout:generateReleaseLintVitalReportModel
+> Task :workout:dexBuilderRelease
+> Task :workout:lintVitalAnalyzeRelease
+> Task :workout:mergeDexRelease
+> Task :workout:mergeReleaseGlobalSynthetics FROM-CACHE
+> Task :workout:lintVitalReportRelease
+> Task :workout:lintVitalRelease
+> Task :workout:compileReleaseArtProfile
+> Task :workout:packageRelease
+> Task :workout:assembleRelease
+> Task :workout:createReleaseApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411681146.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 19s
+87 actionable tasks: 59 executed, 28 from cache
+Configuration cache entry stored.

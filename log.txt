@@ -1,0 +1,145 @@
+yes: standard output: Broken pipe
+Loading package information...                                                  Loading local repository...                                                     [                                       ] 3% Loading local repository...        [                                       ] 3% Fetch remote repository...         [=                                      ] 3% Fetch remote repository...         [=                                      ] 4% Fetch remote repository...         [=                                      ] 5% Fetch remote repository...         [==                                     ] 5% Fetch remote repository...         [==                                     ] 6% Fetch remote repository...         [==                                     ] 7% Fetch remote repository...         [==                                     ] 7% Computing updates...               [===                                    ] 8% Computing updates...               [===                                    ] 10% Computing updates...              [===                                    ] 10% Installing Android Emulator       [===                                    ] 10% Downloading emulator-linux_x64-167[====                                   ] 10% Downloading emulator-linux_x64-167[====                                   ] 11% Downloading emulator-linux_x64-167[====                                   ] 12% Downloading emulator-linux_x64-167[=====                                  ] 13% Downloading emulator-linux_x64-167[=====                                  ] 14% Downloading emulator-linux_x64-167[=====                                  ] 15% Downloading emulator-linux_x64-167[======                                 ] 15% Downloading emulator-linux_x64-167[======                                 ] 16% Downloading emulator-linux_x64-167[======                                 ] 17% Downloading emulator-linux_x64-167[=======                                ] 18% Downloading emulator-linux_x64-167[=======                                ] 19% Downloading emulator-linux_x64-167[=======                                ] 20% Downloading emulator-linux_x64-167[========                               ] 20% Downloading emulator-linux_x64-167[========                               ] 21% Downloading emulator-linux_x64-167[========                               ] 21% Unzipping...                      [========                               ] 21% Unzipping... emulator/            [========                               ] 21% Unzipping... emulator/resources/  [========                               ] 21% Unzipping... emulator/qsn         [========                               ] 21% Unzipping... emulator/emulator    [========                               ] 21% Unzipping... emulator/netsimd     [========                               ] 22% Unzipping... emulator/netsimd     [========                               ] 22% Unzipping... emulator/bin64/      [========                               ] 22% Unzipping... emulator/qemu/       [========                               ] 22% Unzipping... emulator/NOTICE.txt  [========                               ] 22% Unzipping... emulator/crashpad_han[========                               ] 22% Unzipping... emulator/source.prope[========                               ] 22% Unzipping... emulator/nimble_bridg[========                               ] 22% Unzipping... emulator/LICENSE     [========                               ] 22% Unzipping... emulator/lib/        [========                               ] 22% Unzipping... emulator/qemu-img    [========                               ] 22% Unzipping... emulator/include/    [========                               ] 22% Unzipping... emulator/NOTICE.csv  [========                               ] 22% Unzipping... emulator/lib64/      [========                               ] 22% Unzipping... emulator/emulator-che[========                               ] 22% Unzipping... emulator/crashreport [========                               ] 22% Unzipping... emulator/mksdcard    [========                               ] 22% Unzipping... emulator/resources/To[========                               ] 22% Unzipping... emulator/resources/de[========                               ] 22% Unzipping... emulator/resources/To[========                               ] 22% Unzipping... emulator/resources/de[========                               ] 22% Unzipping... emulator/resources/To[========                               ] 22% Unzipping... emulator/resources/ma[========                               ] 22% Unzipping... emulator/resources/de[========                               ] 22% Unzipping... emulator/resources/sk[========                               ] 22% Unzipping... emulator/resources/de[========                               ] 22% Unzipping... emulator/resources/ma[========                               ] 22% Unzipping... emulator/resources/po[========                               ] 22% Unzipping... emulator/resources/ma[=========                              ] 23% Unzipping... emulator/resources/ma[=========                              ] 23% Unzipping... emulator/resources/sk[=========                              ] 23% Unzipping... emulator/resources/ma[=========                              ] 23% Unzipping... emulator/bin64/e2fsck[=========                              ] 23% Unzipping... emulator/bin64/fsck.e[=========                              ] 23% Unzipping... emulator/bin64/tune2f[=========                              ] 23% Unzipping... emulator/bin64/resize[=========                              ] 23% Unzipping... emulator/bin64/mkfs.e[=========                              ] 23% Unzipping... emulator/qemu/linux-x[=========                              ] 24% Unzipping... emulator/qemu/linux-x[=========                              ] 25% Unzipping... emulator/qemu/linux-x[==========                             ] 25% Unzipping... emulator/qemu/linux-x[==========                             ] 25% Unzipping... emulator/lib/emulator[==========                             ] 25% Unzipping... emulator/lib/rtc_serv[==========                             ] 25% Unzipping... emulator/lib/advanced[==========                             ] 25% Unzipping... emulator/lib/cmake/  [==========                             ] 25% Unzipping... emulator/lib/emulator[==========                             ] 25% Unzipping... emulator/lib/control_[==========                             ] 25% Unzipping... emulator/lib/emulated[==========                             ] 25% Unzipping... emulator/lib/rtc_serv[==========                             ] 25% Unzipping... emulator/lib/emu-orig[==========                             ] 25% Unzipping... emulator/lib/hardware[==========                             ] 25% Unzipping... emulator/lib/pkgconfi[==========                             ] 25% Unzipping... emulator/lib/pc-bios/[==========                             ] 25% Unzipping... emulator/lib/snapshot[==========                             ] 25% Unzipping... emulator/lib/adb_serv[==========                             ] 25% Unzipping... emulator/lib/hostapd.[==========                             ] 25% Unzipping... emulator/lib/grpc_end[==========                             ] 25% Unzipping... emulator/lib/ca-bundl[==========                             ] 25% Unzipping... emulator/lib/ui_contr[==========                             ] 25% Unzipping... emulator/lib/snapshot[==========                             ] 25% Unzipping... emulator/lib/ice_conf[==========                             ] 25% Unzipping... emulator/lib/libflatb[==========                             ] 26% Unzipping... emulator/lib/libflatb[==========                             ] 26% Unzipping... emulator/lib/emulator[==========                             ] 26% Unzipping... emulator/lib/waterfal[==========                             ] 26% Unzipping... emulator/lib/emulated[==========                             ] 26% Unzipping... emulator/lib/cmake/fl[==========                             ] 26% Unzipping... emulator/lib/pkgconfi[==========                             ] 26% Unzipping... emulator/lib/pc-bios/[==========                             ] 26% Unzipping... emulator/include/flat[==========                             ] 26% Unzipping... emulator/lib64/libgli[==========                             ] 26% Unzipping... emulator/lib64/libpro[==========                             ] 26% Unzipping... emulator/lib64/qt/   [==========                             ] 26% Unzipping... emulator/lib64/liband[==========                             ] 26% Unzipping... emulator/lib64/libgfx[==========                             ] 26% Unzipping... emulator/lib64/gles_l[==========                             ] 26% Unzipping... emulator/lib64/liband[==========                             ] 26% Unzipping... emulator/lib64/vulkan[==========                             ] 26% Unzipping... emulator/lib64/gles_s[==========                             ] 26% Unzipping... emulator/lib64/libemu[==========                             ] 26% Unzipping... emulator/lib64/libpro[==========                             ] 26% Unzipping... emulator/lib64/liband[==========                             ] 26% Unzipping... emulator/lib64/libtcm[==========                             ] 26% Unzipping... emulator/lib64/libima[==========                             ] 26% Unzipping... emulator/lib64/libc++[==========                             ] 26% Unzipping... emulator/lib64/liband[==========                             ] 26% Unzipping... emulator/lib64/libabs[==========                             ] 26% Unzipping... emulator/lib64/gles_a[==========                             ] 26% Unzipping... emulator/lib64/libsha[==========                             ] 26% Unzipping... emulator/lib64/libc++[==========                             ] 26% Unzipping... emulator/lib64/qt/res[==========                             ] 26% Unzipping... emulator/lib64/qt/lib[==========                             ] 26% Unzipping... emulator/lib64/qt/tra[==========                             ] 26% Unzipping... emulator/lib64/qt/plu[==========                             ] 26% Unzipping... emulator/lib64/qt/res[==========                             ] 27% Unzipping... emulator/lib64/qt/res[==========                             ] 27% Unzipping... emulator/lib64/qt/lib[===========                            ] 28% Unzipping... emulator/lib64/qt/lib[===========                            ] 29% Unzipping... emulator/lib64/qt/lib[===========                            ] 30% Unzipping... emulator/lib64/qt/lib[============                           ] 30% Unzipping... emulator/lib64/qt/lib[============                           ] 30% Unzipping... emulator/lib64/qt/tra[============                           ] 30% Unzipping... emulator/lib64/qt/plu[============                           ] 30% Unzipping... emulator/lib64/gles_l[============                           ] 31% Unzipping... emulator/lib64/gles_l[============                           ] 31% Unzipping... emulator/lib64/vulkan[============                           ] 32% Unzipping... emulator/lib64/vulkan[============                           ] 32% Unzipping... emulator/lib64/gles_s[============                           ] 32% Unzipping... emulator/lib64/gles_a[=============                          ] 33% Unzipping... emulator/lib64/gles_a[=====================                  ] 55% Unzipping... emulator/lib64/gles_a[=====================                  ] 55% Installing Google APIs Intel x86_6[=====================                  ] 55% Downloading x86_64-34_r14.zip... e[======================                 ] 55% Downloading x86_64-34_r14.zip... e[======================                 ] 56% Downloading x86_64-34_r14.zip... e[======================                 ] 57% Downloading x86_64-34_r14.zip... e[=======================                ] 58% Downloading x86_64-34_r14.zip... e[=======================                ] 59% Downloading x86_64-34_r14.zip... e[=======================                ] 60% Downloading x86_64-34_r14.zip... e[========================               ] 60% Downloading x86_64-34_r14.zip... e[========================               ] 61% Downloading x86_64-34_r14.zip... e[========================               ] 62% Downloading x86_64-34_r14.zip... e[=========================              ] 63% Downloading x86_64-34_r14.zip... e[=========================              ] 64% Downloading x86_64-34_r14.zip... e[=========================              ] 65% Downloading x86_64-34_r14.zip... e[==========================             ] 65% Downloading x86_64-34_r14.zip... e[==========================             ] 66% Downloading x86_64-34_r14.zip... e[==========================             ] 66% Unzipping... emulator/lib64/gles_a[==========================             ] 66% Unzipping... x86_64/NOTICE.txt    [==========================             ] 66% Unzipping... x86_64/VerifiedBootPa[==========================             ] 66% Unzipping... x86_64/advancedFeatur[==========================             ] 66% Unzipping... x86_64/build.prop    [==========================             ] 66% Unzipping... x86_64/encryptionkey.[==========================             ] 66% Unzipping... x86_64/kernel-ranchu [==========================             ] 66% Unzipping... x86_64/ramdisk.img   [==========================             ] 66% Unzipping... x86_64/source.propert[==========================             ] 66% Unzipping... x86_64/system.img    [==========================             ] 67% Unzipping... x86_64/system.img    [===========================            ] 68% Unzipping... x86_64/system.img    [===========================            ] 69% Unzipping... x86_64/system.img    [===========================            ] 70% Unzipping... x86_64/system.img    [============================           ] 70% Unzipping... x86_64/system.img    [============================           ] 71% Unzipping... x86_64/system.img    [============================           ] 72% Unzipping... x86_64/system.img    [=============================          ] 73% Unzipping... x86_64/system.img    [=============================          ] 74% Unzipping... x86_64/system.img    [=============================          ] 75% Unzipping... x86_64/system.img    [==============================         ] 75% Unzipping... x86_64/system.img    [==============================         ] 76% Unzipping... x86_64/system.img    [==============================         ] 77% Unzipping... x86_64/system.img    [==============================         ] 77% Unzipping... x86_64/userdata.img  [==============================         ] 77% Unzipping... x86_64/vendor.img    [==============================         ] 77% Unzipping... x86_64/data/local.pro[==============================         ] 77% Unzipping... x86_64/data/misc/Gold[==============================         ] 77% Unzipping... x86_64/data/misc/apns[==============================         ] 77% Unzipping... x86_64/data/misc/emul[==============================         ] 77% Unzipping... x86_64/data/misc/gcec[==============================         ] 77% Unzipping... x86_64/data/misc/mode[==============================         ] 77% Unzipping... x86_64/data/misc/pixe[==============================         ] 78% Unzipping... x86_64/data/misc/pixe[=======================================] 100% Unzipping... x86_64/data/misc/pix
+
+Loading local repository...                                                     [=========                              ] 25% Loading local repository...       [=========                              ] 25% Fetch remote repository...        [=======================================] 100% Fetch remote repository...       
+Auto-selecting single ABI x86_64
+== booted=1 after 50s
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :workout:connectedDebugAndroidTest
+> Task :workout-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :workout-core:processResources NO-SOURCE
+> Task :feedback:preBuild UP-TO-DATE
+> Task :feedback:preDebugBuild UP-TO-DATE
+> Task :feedback:generateDebugResources FROM-CACHE
+> Task :feedback:packageDebugResources FROM-CACHE
+> Task :feedback:processDebugNavigationResources FROM-CACHE
+> Task :feedback:parseDebugLocalResources FROM-CACHE
+> Task :feedback:generateDebugRFile FROM-CACHE
+> Task :feedback:compileDebugKotlin FROM-CACHE
+> Task :feedback:javaPreCompileDebug FROM-CACHE
+> Task :feedback:compileDebugJavaWithJavac NO-SOURCE
+> Task :feedback:bundleLibCompileToJarDebug
+> Task :workout:preBuild UP-TO-DATE
+> Task :workout:preDebugBuild UP-TO-DATE
+> Task :workout:generateDebugBuildConfig
+> Task :workout:generateDebugResources FROM-CACHE
+> Task :workout:packageDebugResources FROM-CACHE
+> Task :workout:processDebugNavigationResources FROM-CACHE
+> Task :workout:parseDebugLocalResources FROM-CACHE
+> Task :workout:generateDebugRFile FROM-CACHE
+> Task :workout:javaPreCompileDebug FROM-CACHE
+> Task :feedback:mapDebugSourceSetPaths
+> Task :feedback:compileDebugLibraryResources FROM-CACHE
+> Task :feedback:writeDebugAarMetadata
+> Task :workout:checkDebugAarMetadata
+> Task :workout:mapDebugSourceSetPaths
+> Task :workout:compileDebugNavigationResources FROM-CACHE
+> Task :workout:mergeDebugResources FROM-CACHE
+> Task :workout:createDebugCompatibleScreenManifests
+> Task :feedback:extractDeepLinksDebug FROM-CACHE
+> Task :feedback:processDebugManifest FROM-CACHE
+> Task :workout:extractDeepLinksDebug FROM-CACHE
+> Task :workout:processDebugMainManifest
+> Task :workout:processDebugManifest
+> Task :workout:processDebugManifestForPackage
+> Task :workout:processDebugResources
+> Task :workout:preDebugAndroidTestBuild SKIPPED
+> Task :workout:mergeDebugAndroidTestManifest
+> Task :workout:processDebugAndroidTestManifest
+> Task :workout:generateDebugAndroidTestBuildConfig FROM-CACHE
+> Task :workout:generateDebugAndroidTestResources FROM-CACHE
+> Task :workout:packageDebugAndroidTestResources FROM-CACHE
+> Task :workout:processDebugAndroidTestNavigationResources FROM-CACHE
+> Task :workout:parseDebugAndroidTestLocalResources FROM-CACHE
+> Task :workout:generateDebugAndroidTestRFile FROM-CACHE
+> Task :workout:javaPreCompileDebugAndroidTest FROM-CACHE
+> Task :feedback:generateDebugAssets UP-TO-DATE
+> Task :feedback:mergeDebugAssets
+> Task :workout:generateDebugAssets UP-TO-DATE
+> Task :workout:mergeDebugAssets
+> Task :workout:compressDebugAssets FROM-CACHE
+> Task :workout:generateDebugGlobalSynthetics FROM-CACHE
+> Task :feedback:processDebugJavaRes
+> Task :workout:checkDebugDuplicateClasses
+> Task :workout:desugarDebugFileDependencies FROM-CACHE
+> Task :workout:mergeExtDexDebug FROM-CACHE
+> Task :feedback:bundleLibRuntimeToDirDebug
+> Task :feedback:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugNativeLibs NO-SOURCE
+> Task :feedback:copyDebugJniLibsProjectOnly
+> Task :workout:mergeDebugJniLibFolders
+> Task :workout:validateSigningDebug
+> Task :workout:writeDebugAppMetadata
+> Task :workout:writeDebugSigningConfigVersions
+> Task :workout:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :workout:mergeDebugAndroidTestAssets
+> Task :workout:compressDebugAndroidTestAssets FROM-CACHE
+> Task :workout:generateDebugAndroidTestGlobalSynthetics FROM-CACHE
+> Task :workout:checkDebugAndroidTestDuplicateClasses
+> Task :workout:desugarDebugAndroidTestFileDependencies FROM-CACHE
+> Task :workout:mergeExtDexDebugAndroidTest FROM-CACHE
+> Task :workout:checkDebugAndroidTestAarMetadata
+> Task :workout:mapDebugAndroidTestSourceSetPaths
+> Task :workout:compileDebugAndroidTestNavigationResources FROM-CACHE
+> Task :workout:mergeDebugAndroidTestResources FROM-CACHE
+> Task :workout:processDebugAndroidTestResources FROM-CACHE
+> Task :workout:mergeDebugAndroidTestJniLibFolders
+> Task :workout:validateSigningDebugAndroidTest
+> Task :workout:writeDebugAndroidTestSigningConfigVersions
+> Task :workout-core:compileKotlin
+> Task :workout-core:compileJava NO-SOURCE
+> Task :workout-core:classes UP-TO-DATE
+> Task :workout-core:jar
+> Task :workout:mergeLibDexDebug
+> Task :workout:mergeDebugNativeLibs
+
+> Task :workout:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :workout:mergeLibDexDebugAndroidTest FROM-CACHE
+> Task :workout:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :workout:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :workout:compileDebugKotlin
+> Task :workout:processDebugJavaRes
+> Task :workout:mergeDebugJavaResource
+> Task :workout:compileDebugJavaWithJavac
+> Task :workout:bundleDebugClassesToCompileJar
+
+> Task :workout:compileDebugAndroidTestKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/workout/src/androidTest/java/com/maven/workout/SmokeTest.kt:34:16 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+
+> Task :workout:compileDebugAndroidTestJavaWithJavac
+> Task :workout:processDebugAndroidTestJavaRes
+> Task :workout:mergeDebugAndroidTestJavaResource
+> Task :workout:dexBuilderDebugAndroidTest FROM-CACHE
+> Task :workout:mergeProjectDexDebugAndroidTest FROM-CACHE
+> Task :workout:packageDebugAndroidTest
+> Task :workout:createDebugAndroidTestApkListingFileRedirect
+> Task :workout:dexBuilderDebug
+> Task :workout:mergeProjectDexDebug
+> Task :workout:packageDebug
+> Task :workout:createDebugApkListingFileRedirect
+
+> Task :workout:connectedDebugAndroidTest
+Running tests on devices: ci(AVD) - 14
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1794412541411.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 2s
+92 actionable tasks: 52 executed, 40 from cache
+Configuration cache entry stored.
+/sdcard/Android/data/com.maven.workout.dev/files/shots/: 11 files pulled, 0 skipped. 44.1 MB/s (1920009 bytes in 0.042s)
+--------- beginning of main
+11-11 15:58:27.378  6058  6258 I TestRunner: run started: 2 tests
+11-11 15:58:27.380  6058  6258 I TestRunner: started: everyScreenOpens(com.maven.workout.SmokeTest)
+11-11 15:59:09.339  6058  6258 I TestRunner: finished: everyScreenOpens(com.maven.workout.SmokeTest)
+11-11 15:59:09.383  6058  6258 I TestRunner: started: syncProviderAnswers(com.maven.workout.SmokeTest)
+11-11 15:59:20.820  6058  6258 I TestRunner: finished: syncProviderAnswers(com.maven.workout.SmokeTest)
+11-11 15:59:20.824  6058  6258 I TestRunner: run finished: 2 tests, 0 failed, 0 ignored

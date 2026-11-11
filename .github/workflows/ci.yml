@@ -42,10 +42,6 @@ jobs:
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: android, file: build.log }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: android/build/outputs/apk/debug/*.apk
 
   desktop:
     runs-on: windows-latest

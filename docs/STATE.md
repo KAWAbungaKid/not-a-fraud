@@ -636,3 +636,8 @@ half-size png), `FeedbackSettings` (switch, count, Share → zip notes.md + pngs
 `${applicationId}.feedback`, Clear). Maven shares the zip into chat (decided over pulling from the repo: no GitHub
 token on the phone). Pages: NaF tab id, Troglodyte/Twig route class name or tab. The library is where shared
 onboarding / tips / crash log should go next (PUBLIC.md).
+
+**2026-11-11:** GitHub warned Actions storage hit the 0.5 GB monthly allowance (private repo). It was 90 old build
+artifacts (1.8 GB: debug APKs from every CI run, release APK/MSI hand-offs). Deleted them all; CI no longer uploads
+the debug APK, release hand-off artifacts keep 1 day. Releases and `ci-logs/*` branches don't count toward it.
+Feedback share now sends notes .md + pngs as separate files (zip optional).

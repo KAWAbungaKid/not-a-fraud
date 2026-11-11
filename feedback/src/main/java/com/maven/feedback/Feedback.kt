@@ -113,26 +113,34 @@ object Feedback {
         this.version++
     }
 
-    /** Zip every note (one notes.md, newest last) and screenshot, then open the share sheet. */
-    fun share(ctx: Context, app: String): Boolean {
+    /**
+     * Share every note as plain files: one notes.md (all notes, oldest first) plus the screenshots, so they can be
+     * attached in a chat directly (no zip to unpack). Same files also go into one zip, offered as "Save as zip".
+     */
+    fun share(ctx: Context, app: String, asZip: Boolean = false): Boolean {
         val files = dir(ctx).listFiles()?.sortedBy { it.name }.orEmpty()
         val notes = files.filter { it.name.endsWith(".txt") }
         if (notes.isEmpty()) return false
         val out = File(ctx.cacheDir, "feedback-share").apply { mkdirs() }
         out.listFiles()?.forEach { it.delete() }
-        val zip = File(out, "${app.replace(' ', '-')}-feedback-${stamp(System.currentTimeMillis())}.zip")
-        ZipOutputStream(FileOutputStream(zip)).use { z ->
-            z.putNextEntry(ZipEntry("notes.md"))
-            z.write(("# $app feedback (${notes.size} notes)\n\n" + notes.joinToString("\n---\n\n") { it.readText() }).toByteArray())
-            z.closeEntry()
-            for (f in files.filter { it.name.endsWith(".png") }) {
-                z.putNextEntry(ZipEntry(f.name)); f.inputStream().use { it.copyTo(z) }; z.closeEntry()
+        val tag = "${app.replace(' ', '-')}-feedback-${stamp(System.currentTimeMillis())}"
+        val md = File(out, "$tag.md")
+        md.writeText("# $app feedback (${notes.size} notes)\n\n" + notes.joinToString("\n---\n\n") { it.readText() })
+        val pngs = files.filter { it.name.endsWith(".png") }.map { f -> File(out, f.name).also { f.copyTo(it, overwrite = true) } }
+        val uris = ArrayList<android.net.Uri>()
+        if (asZip) {
+            val zip = File(out, "$tag.zip")
+            ZipOutputStream(FileOutputStream(zip)).use { z ->
+                for (f in listOf(md) + pngs) { z.putNextEntry(ZipEntry(f.name)); f.inputStream().use { it.copyTo(z) }; z.closeEntry() }
             }
+            uris += FileProvider.getUriForFile(ctx, "${ctx.packageName}.feedback", zip)
+        } else {
+            for (f in listOf(md) + pngs) uris += FileProvider.getUriForFile(ctx, "${ctx.packageName}.feedback", f)
         }
-        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.feedback", zip)
-        val send = Intent(Intent.ACTION_SEND).setType("application/zip").putExtra(Intent.EXTRA_STREAM, uri)
-            .putExtra(Intent.EXTRA_SUBJECT, "$app feedback").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        send.clipData = ClipData.newRawUri("feedback", uri)
+        val send = if (uris.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.first())
+            else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        send.setType(if (asZip) "application/zip" else "*/*").putExtra(Intent.EXTRA_SUBJECT, "$app feedback").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        send.clipData = ClipData.newRawUri("feedback", uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
         ctx.startActivity(Intent.createChooser(send, "Share feedback").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return true
     }
@@ -213,6 +221,7 @@ fun FeedbackSettings(app: String) {
         Text(if (n == 0) "No notes yet." else "$n note${if (n == 1) "" else "s"} saved.", style = MaterialTheme.typography.bodySmall)
         if (n > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { Feedback.share(ctx, app) }) { Text("Share feedback") }
+            TextButton(onClick = { Feedback.share(ctx, app, asZip = true) }) { Text("As one zip") }
             TextButton(onClick = { confirmClear = true }) { Text("Clear") }
         }
     }

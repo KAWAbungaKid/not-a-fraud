@@ -10,6 +10,16 @@ import java.time.ZoneId
 object Diary {
     fun entries(d: DietData, date: LocalDate) = d.log.filter { it.date == date.toString() }
 
+    /** Quick meals still waiting for their foods. */
+    fun pendingQuick(d: DietData, date: LocalDate) = d.quick.filter { it.date == date.toString() && !it.resolved }
+
+    /** Slots with something eaten: logged food or a quick meal. */
+    fun slotsEaten(d: DietData, date: LocalDate): Set<String> =
+        (entries(d, date).map { it.slot } + d.quick.filter { it.date == date.toString() }.map { it.slot }).toSet()
+
+    /** Every time food was eaten (log entries + quick meals), for fasting. */
+    fun eatTimes(d: DietData): List<Pair<String, Long>> = d.log.map { it.date to it.at } + d.quick.map { it.date to it.at }
+
     fun macrosOf(d: DietData, e: LogEntry): Macros {
         val f = d.food(e.foodId) ?: return Macros.ZERO
         return Macros(f.kcal, f.protein, f.carbs, f.fat) * e.servings
@@ -87,23 +97,25 @@ object Fasting {
             if (m < 0) m += 24 * 60
             m
         }
-        val last = d.log.filter { it.at <= now && it.at > now - 48 * 3_600_000L }.maxOfOrNull { it.at }
-        val today = d.log.filter { it.date == dt.toLocalDate().toString() }
-        val outside = if (!s.fasting) 0 else today.count { e ->
-            val et = Instant.ofEpochMilli(e.at).atZone(zone).toLocalTime()
+        val times = Diary.eatTimes(d)
+        val last = times.map { it.second }.filter { it <= now && it > now - 48 * 3_600_000L }.maxOrNull()
+        val today = times.filter { it.first == dt.toLocalDate().toString() }.map { it.second }
+        val outside = if (!s.fasting) 0 else today.count { at ->
+            val et = Instant.ofEpochMilli(at).atZone(zone).toLocalTime()
             !(if (start <= end) et >= start && et < end else et >= start || et < end)
         }
         return Status(
             s.fasting, inWin, start, end,
             last?.let { (now - it) / 3_600_000.0 }, toChange,
-            today.minOfOrNull { it.at }, today.maxOfOrNull { it.at }, outside,
+            today.minOrNull(), today.maxOrNull(), outside,
         )
     }
 
     /** Overnight fast that ended on [date]: last food the day before → first food that day (hours). */
     fun overnightHours(d: DietData, date: LocalDate): Double? {
-        val first = d.log.filter { it.date == date.toString() }.minOfOrNull { it.at } ?: return null
-        val prev = d.log.filter { it.at < first && it.at > first - 48 * 3_600_000L }.maxOfOrNull { it.at } ?: return null
+        val times = Diary.eatTimes(d)
+        val first = times.filter { it.first == date.toString() }.minOfOrNull { it.second } ?: return null
+        val prev = times.map { it.second }.filter { it < first && it > first - 48 * 3_600_000L }.maxOrNull() ?: return null
         return (first - prev) / 3_600_000.0
     }
 }

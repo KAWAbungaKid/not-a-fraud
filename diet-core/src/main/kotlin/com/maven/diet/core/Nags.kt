@@ -35,7 +35,7 @@ object Nags {
         }
 
         // Meals
-        val logged = Diary.entries(d, today).map { it.slot }.toSet()
+        val logged = Diary.slotsEaten(d, today)
         for (slot in s.slots) {
             val by = slot.by?.let { Fasting.time(it) } ?: continue
             if (slot.name in logged || t < by) continue

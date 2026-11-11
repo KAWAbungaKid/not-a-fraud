@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.maven.diet.Graph
 import com.maven.diet.core.Actions
+import com.maven.diet.core.Breakdown
+import com.maven.diet.core.FillGap
 import com.maven.diet.core.Diary
 import com.maven.diet.core.DietData
 import com.maven.diet.core.Fasting
@@ -66,6 +68,7 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
     val eaten = Diary.totals(d, date)
     var why by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<LogEntry?>(null) }
+    var macro by remember { mutableStateOf<Breakdown.Macro?>(null) }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -103,9 +106,12 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
                     Text(if (left >= 0) "${left.roundToInt()} left" else "${(-left).roundToInt()} over", style = Mono,
                         color = if (left >= 0) MaterialTheme.colorScheme.onSurface else Palette.amber, modifier = Modifier.padding(bottom = 6.dp))
                 }
-                MacroBar("Protein", eaten.protein, t.macros.protein, "g", Palette.accent)
-                MacroBar("Carbs", eaten.carbs, t.macros.carbs, "g", Palette.green)
-                MacroBar("Fat", eaten.fat, t.macros.fat, "g", Palette.amber)
+                fun toggle(m: Breakdown.Macro) { macro = if (macro == m) null else m }
+                MacroBar("Protein", eaten.protein, t.macros.protein, "g", Palette.accent, Modifier.clickable { toggle(Breakdown.Macro.PROTEIN) })
+                MacroBar("Carbs", eaten.carbs, t.macros.carbs, "g", Palette.green, Modifier.clickable { toggle(Breakdown.Macro.CARBS) })
+                MacroBar("Fat", eaten.fat, t.macros.fat, "g", Palette.amber, Modifier.clickable { toggle(Breakdown.Macro.FAT) })
+                macro?.let { m -> MacroDetail(d, date, t.macros, m, isToday) }
+                if (macro == null) Dim("Tap a macro to see what it came from.")
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     FilterChip(t.training, { Graph.update { Actions.setTraining(it, date, true) } }, { Text("Training day") })
                     FilterChip(!t.training, { Graph.update { Actions.setTraining(it, date, false) } }, { Text("Rest day") })
@@ -132,6 +138,19 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
             }
         }
 
+        // Evening and a macro's well short: what you have that's mostly that macro.
+        if (isToday && java.time.LocalTime.now().hour >= 18) {
+            val short = listOf(Breakdown.Macro.PROTEIN, Breakdown.Macro.CARBS, Breakdown.Macro.FAT)
+                .map { it to (Breakdown.of(t.macros, it) - Breakdown.of(eaten, it)) / Breakdown.of(t.macros, it).coerceAtLeast(1.0) }
+                .filter { it.second > 0.15 }.maxByOrNull { it.second }?.first
+            if (short != null && macro == null) item {
+                Panel {
+                    SectionLabel("Short on ${short.label.lowercase()}")
+                    MacroDetail(d, date, t.macros, short, true, suggestOnly = true)
+                }
+            }
+        }
+
         if (isToday) item { CheckInPanel(d, now) }
         if (isToday) item { ExperimentToday(d) }
 
@@ -151,6 +170,16 @@ fun TodayScreen(d: DietData, onOpen: (Route) -> Unit) {
                         if (slot.by != null) Dim("by ${slot.by}")
                     }
                     Text("${st.kcal.roundToInt()} kcal · ${st.protein.roundToInt()} P", style = Mono, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                for (qm in d.quick.filter { it.date == date.toString() && it.slot == slot.name && !it.resolved }) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("\"${qm.text}\"", color = Palette.amber)
+                            Dim("eaten " + java.time.Instant.ofEpochMilli(qm.at).atZone(Graph.zone).format(DateTimeFormatter.ofPattern("h:mm a")) + " · from Not a Fraud · add the foods")
+                        }
+                        TextButton(onClick = { onOpen(Route.AddFood(date.toString(), slot.name)) }) { Text("Add") }
+                        TextButton(onClick = { Graph.update { com.maven.diet.core.Quick.remove(it, qm.id) } }) { Text("✕") }
+                    }
                 }
                 for (e in es) {
                     val f = d.food(e.foodId)
@@ -221,9 +250,9 @@ fun logTime(date: LocalDate): Long =
     if (date == Graph.today()) Graph.now() else date.atTime(12, 0).atZone(Graph.zone).toInstant().toEpochMilli()
 
 @Composable
-fun MacroBar(label: String, value: Double, target: Double, unit: String, color: Color) {
+fun MacroBar(label: String, value: Double, target: Double, unit: String, color: Color, modifier: Modifier = Modifier) {
     val frac = if (target <= 0) 0f else (value / target).toFloat().coerceIn(0f, 1f)
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row {
             Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             Text("${value.roundToInt()} / ${target.roundToInt()} $unit", style = Mono.copy(fontSize = 13.sp),
@@ -264,10 +293,38 @@ private fun CheckInPanel(d: DietData, now: Long) {
 
 @Composable
 private fun ScaleRow(value: Int?, low: String, high: String, onPick: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Dim(low, Modifier.width(48.dp))
-        for (i in 1..5) FilterChip(value == i, { onPick(i) }, { Text("$i") })
-        Dim(high)
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (i in 1..5) FilterChip(value == i, { onPick(i) }, { Text("$i", Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }, Modifier.weight(1f))
+        }
+        Row { Dim("1 = $low", Modifier.weight(1f)); Dim("5 = $high") }
+    }
+}
+
+/** What a macro came from today, and (if short) foods that fill the gap. */
+@Composable
+private fun MacroDetail(d: DietData, date: LocalDate, target: com.maven.diet.core.Macros, m: Breakdown.Macro, canLog: Boolean, suggestOnly: Boolean = false) {
+    if (!suggestOnly) {
+        val parts = remember(d, date, m) { Breakdown.contributors(d, date, m) }
+        SectionLabel("${m.label} came from")
+        if (parts.isEmpty()) Dim("Nothing logged yet.")
+        for (p in parts.take(8)) Row {
+            Text(p.name, Modifier.weight(1f), maxLines = 1)
+            Text("${p.pct}% · ${p.amount.roundToInt()} g", style = Mono)
+        }
+    }
+    val picks = remember(d, date, m) { FillGap.suggest(d, date, target, m) }
+    if (picks.isNotEmpty()) {
+        val gap = (Breakdown.of(target, m) - Breakdown.of(Diary.totals(d, date), m)).roundToInt()
+        SectionLabel("$gap g ${m.label.lowercase()} to go · try")
+        val slot = d.settings.slots.lastOrNull { it.by == null }?.name ?: d.settings.slots.last().name
+        for (p in picks) Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(p.food.name, maxLines = 1)
+                Dim("${Num.fmt(p.servings)} × ${p.food.serving} · ${p.gives.kcal.roundToInt()} kcal · ${p.why}")
+            }
+            if (canLog) TextButton(onClick = { Graph.update { Actions.logFood(it, date, slot, p.food.id, p.servings, Graph.now()) } }) { Text("Log") }
+        }
     }
 }
 
@@ -312,6 +369,7 @@ private fun EntryDialog(d: DietData, e: LogEntry, onDismiss: () -> Unit) {
     var unit by remember { mutableStateOf(options.firstOrNull { it.name == (e.unit ?: com.maven.diet.core.Units.SERVING) } ?: options.firstOrNull()) }
     var amount by remember { mutableStateOf(Num.fmt(e.amount ?: e.servings)) }
     var slot by remember { mutableStateOf(e.slot) }
+    var at by remember { mutableStateOf(e.at) }
     val a = amount.toDoubleOrNull() ?: 0.0
     val servings = a * (unit?.servingsPerUnit ?: 1.0)
     AlertDialog(
@@ -327,12 +385,13 @@ private fun EntryDialog(d: DietData, e: LogEntry, onDismiss: () -> Unit) {
                 }
                 SectionLabel("Meal")
                 ChipRow(d.settings.slots.map { it.name }, { it == slot }, { it }) { slot = it }
+                EatenAtRow(LocalDate.parse(e.date), at) { at = it }
                 f?.let { Text(macroLine(foodMacros(it) * servings), style = Mono) }
             }
         },
         confirmButton = {
             TextButton(enabled = servings > 0, onClick = {
-                Graph.update { Actions.editEntry(it, e.id, servings, slot, a, unit?.name) }; onDismiss()
+                Graph.update { Actions.setEntryAt(Actions.editEntry(it, e.id, servings, slot, a, unit?.name), e.id, at) }; onDismiss()
             }) { Text("Save") }
         },
         dismissButton = {

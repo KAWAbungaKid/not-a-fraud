@@ -41,7 +41,8 @@ object Volume {
             if (dt.isBefore(start) || !dt.isBefore(end)) continue
             for (e in s.entries) {
                 if (e.skipped) continue
-                val sets = e.sets.count { it.done && it.kind != SetKind.WARMUP }
+                // A drop set is part of the set before it, not a set of its own.
+                val sets = e.sets.count { it.done && it.kind != SetKind.WARMUP && it.kind != SetKind.DROP }
                 if (sets == 0) continue
                 for (m in d.exercise(e.exerciseId)?.muscles.orEmpty()) out[m] = (out[m] ?: 0) + sets
             }
@@ -156,5 +157,51 @@ object HevyImport {
         }
         x = x.copy(sessions = (x.sessions + sessions).sortedBy { it.startedAt })
         return Result(x, sessions.size, sets, created, skipped)
+    }
+}
+
+/** Either / or exercise slots in a program day (WORKOUT.md § 7). */
+object Options {
+    fun of(t: DayTemplate?, slotId: String): List<String> = listOf(slotId) + t?.alternatives?.get(slotId).orEmpty()
+
+    /** The option you did most recently on this day (any day if never on this one); the slot's first otherwise. */
+    fun lastPick(d: WorkoutData, t: DayTemplate, slotId: String): String {
+        val opts = of(t, slotId).toSet()
+        val sessions = d.finished().sortedByDescending { it.startedAt }
+        val onDay = sessions.filter { it.templateId == t.id }.firstNotNullOfOrNull { s -> s.entries.firstOrNull { it.slot == slotId && it.exerciseId in opts && !it.skipped }?.exerciseId }
+        return onDay ?: sessions.firstNotNullOfOrNull { s -> s.entries.firstOrNull { it.slot == slotId && it.exerciseId in opts }?.exerciseId } ?: slotId
+    }
+}
+
+/** Equipment: plates for barbells and plate-loaded machines, nothing for stacks (WORKOUT.md § 7). */
+object Equip {
+    private val STACK_WORDS = listOf("cable", "pulldown", "pushdown", "machine", "pec deck", "face pull", "lat pull", "stack", "smith")
+    private val DB_WORDS = listOf("dumbbell", "db ", "db-", "dbs")
+    private val BW_WORDS = listOf("pull-up", "pull up", "pullup", "chin", "dip", "push-up", "push up", "plank", "hang")
+
+    fun of(ex: Exercise): Equipment {
+        ex.equipment?.let { return it }
+        val n = ex.name.lowercase() + " "
+        return when {
+            ex.measure != Measure.WEIGHT_REPS -> Equipment.BODYWEIGHT
+            DB_WORDS.any { n.contains(it) } || n.startsWith("db") -> Equipment.DUMBBELL
+            STACK_WORDS.any { n.contains(it) } -> Equipment.STACK
+            BW_WORDS.any { n.contains(it) } -> Equipment.BODYWEIGHT
+            else -> Equipment.BARBELL
+        }
+    }
+
+    /** One line under the exercise for [w] (the felt weight you log), or null when there's nothing to load. */
+    fun loadText(d: WorkoutData, ex: Exercise, w: Double): String? = when (of(ex)) {
+        Equipment.BARBELL -> if (w > d.settings.barWeight) "Plates for ${Rpe.fmt(w)}: " + Plates.text(Plates.perSide(w, d.settings.barWeight, d.settings.plates)) else null
+        Equipment.PLATE_LOADED -> "Plates for ${Rpe.fmt(w)}: " + Plates.text(Plates.perSide(w, 0.0, d.settings.plates)).replace("just the bar", "empty")
+        Equipment.PULLEY -> {
+            val load = w * ex.pulleyRatio.coerceAtLeast(0.1)
+            val total = Plates.perSide(load * 2, 0.0, d.settings.plates)
+            "Load ${Rpe.fmt(load)} on the pin (${Rpe.fmt(ex.pulleyRatio)}:1 → ${Rpe.fmt(w)} at the handle): " +
+                total.perSide.groupBy { it }.entries.joinToString(" + ") { (p, xs) -> (if (xs.size > 1) "${xs.size}×" else "") + Rpe.fmt(p) }.ifEmpty { "no plates" }
+        }
+        Equipment.DUMBBELL -> "${Rpe.fmt(w)} each hand"
+        Equipment.STACK, Equipment.BODYWEIGHT, Equipment.OTHER -> null
     }
 }

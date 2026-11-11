@@ -205,6 +205,7 @@ fun DayEditScreen(d: WorkoutData, programId: String, dayId: String, onBack: () -
     }
     var name by remember(dayId) { mutableStateOf(t.name) }
     var picker by remember { mutableStateOf(false) }
+    var orFor by remember { mutableStateOf<String?>(null) }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             OutlinedTextField(name, { name = it; save { x -> x.copy(name = it) } }, label = { Text("Day name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -220,8 +221,15 @@ fun DayEditScreen(d: WorkoutData, programId: String, dayId: String, onBack: () -
                     }
                     IconButton(onClick = { save { it.copy(exerciseIds = swap(it.exerciseIds, i, i - 1)) } }) { Icon(Icons.Filled.ArrowUpward, "Up") }
                     IconButton(onClick = { save { it.copy(exerciseIds = swap(it.exerciseIds, i, i + 1)) } }) { Icon(Icons.Filled.ArrowDownward, "Down") }
-                    IconButton(onClick = { save { it.copy(exerciseIds = it.exerciseIds.filterIndexed { j, _ -> j != i }) } }) { Icon(Icons.Filled.Close, "Remove") }
+                    IconButton(onClick = { save { it.copy(exerciseIds = it.exerciseIds.filterIndexed { j, _ -> j != i }, alternatives = it.alternatives - exId) } }) { Icon(Icons.Filled.Close, "Remove") }
                 }
+                // Either / or: other exercises that can fill this slot; the workout lets you pick.
+                val alts = t.alternatives[exId].orEmpty()
+                for (a in alts) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("or " + (d.exercise(a)?.name ?: a), Modifier.weight(1f), color = Palette.accent)
+                    IconButton(onClick = { Graph.update { Actions.setAlternatives(it, programId, dayId, exId, alts - a) } }) { Icon(Icons.Filled.Close, "Remove option") }
+                }
+                TextButton(onClick = { orFor = exId }) { Text(if (alts.isEmpty()) "+ or another exercise" else "+ another option") }
             }
         }
         item {
@@ -235,6 +243,12 @@ fun DayEditScreen(d: WorkoutData, programId: String, dayId: String, onBack: () -
     if (picker) ExercisePicker(d, onDismiss = { picker = false }) { exId ->
         save { it.copy(exerciseIds = it.exerciseIds + exId) }
         picker = false
+    }
+    orFor?.let { slot ->
+        ExercisePicker(d, onDismiss = { orFor = null }) { exId ->
+            Graph.update { Actions.setAlternatives(it, programId, dayId, slot, t.alternatives[slot].orEmpty() + exId) }
+            orFor = null
+        }
     }
 }
 

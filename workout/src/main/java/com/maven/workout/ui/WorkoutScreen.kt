@@ -247,6 +247,14 @@ private fun EntryCard(
                     bestToday?.let { "today ${Rpe.fmt(Rpe.round(it.e1rm, 1.0))}" },
                 ).joinToString(" · "))
                 if (last.isNotEmpty()) Dim("Last: " + last.filter { it.kind != SetKind.WARMUP }.take(4).joinToString(", ") { setText(ex, it) })
+                // Either / or slot: pick which one today (until a set is done).
+                e.slot?.let { slotId ->
+                    val t = d.program(s.programId ?: d.activeProgramId)?.days?.firstOrNull { it.id == s.templateId }
+                    val opts = com.maven.workout.core.Options.of(t, slotId)
+                    if (opts.size > 1 && e.sets.none { it.done }) ChipRow(opts, { it == e.exerciseId }, { d.exercise(it)?.name ?: it }) { id ->
+                        Graph.update { Actions.chooseOption(it, ei, id, today) }
+                    }
+                }
             }
             Column {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Exercise menu") }
@@ -269,8 +277,8 @@ private fun EntryCard(
         }
         HeaderRow(ex)
         // Plate calculator for the heaviest set planned (top set or first working set).
-        if (ex.measure == Measure.WEIGHT_REPS) e.sets.filter { it.kind != SetKind.WARMUP }.mapNotNull { it.weight ?: it.targetWeight }.maxOrNull()?.let { w ->
-            if (w > d.settings.barWeight) Dim("Plates for ${Rpe.fmt(w)}: " + com.maven.workout.core.Plates.text(com.maven.workout.core.Plates.perSide(w, d.settings.barWeight, d.settings.plates)))
+        if (ex.measure == Measure.WEIGHT_REPS) e.sets.filter { it.kind != SetKind.WARMUP && it.kind != SetKind.DROP }.mapNotNull { it.weight ?: it.targetWeight }.maxOrNull()?.let { w ->
+            com.maven.workout.core.Equip.loadText(d, ex, w)?.let { Dim(it) }
         }
         var workNo = 0
         for ((si, set) in e.sets.withIndex()) {
@@ -314,13 +322,15 @@ private fun SetRow(
     fun tick() {
         val wasDone = set.done
         Graph.update { Actions.completeSet(it, ei, si, Graph.now()) }
-        if (!wasDone) onSetDone(set)
+        // Rest comes after the last drop, not between a set and its drops.
+        if (!wasDone && s.entries.getOrNull(ei)?.sets?.getOrNull(si + 1)?.kind != SetKind.DROP) onSetDone(set)
     }
     val labelColor = when (set.kind) {
         SetKind.TOP -> Palette.accent
         SetKind.TEST -> Palette.red
         SetKind.WARMUP -> MaterialTheme.colorScheme.onSurfaceVariant
         SetKind.WORK -> MaterialTheme.colorScheme.onSurface
+        SetKind.DROP -> Palette.amber
     }
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = Mono, color = labelColor, modifier = Modifier.width(34.dp), textAlign = TextAlign.Center)
@@ -365,6 +375,10 @@ private fun SetRow(
         ) { Icon(Icons.Filled.Check, "Done") }
         if (!set.done) IconButton(onClick = { Graph.update { Actions.removeSet(it, ei, si) } }, modifier = Modifier.size(28.dp)) {
             Icon(Icons.Filled.Close, "Remove set", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // Done set (not a warm-up): add a drop set under it.
+        else if (set.kind != SetKind.WARMUP && ex.measure != Measure.TIME) IconButton(onClick = { Graph.update { Actions.addDrop(it, ei, si) } }, modifier = Modifier.size(28.dp)) {
+            Text("↓", color = Palette.amber, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

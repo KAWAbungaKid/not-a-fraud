@@ -66,6 +66,40 @@ object Actions {
         e.copy(sets = e.sets + new)
     }
 
+    /**
+     * Drop set: a sub-set right after set [si] (after any drops it already has), ~20 % lighter, reps to failure.
+     * Rest starts after the last drop, not between them.
+     */
+    fun addDrop(d: WorkoutData, ei: Int, si: Int) = editEntry(d, ei) { e ->
+        val parent = e.sets.getOrNull(si) ?: return@editEntry e
+        var end = si + 1
+        while (end < e.sets.size && e.sets[end].kind == SetKind.DROP) end++
+        val prev = e.sets[end - 1]
+        val base = prev.weight ?: prev.targetWeight ?: parent.weight ?: parent.targetWeight
+        val ex = d.exercise(e.exerciseId)
+        val w = base?.let { Rpe.round(it * 0.8, ex?.roundTo ?: 5.0).coerceAtLeast(0.0) }
+        val drop = SetLog(kind = SetKind.DROP, targetWeight = w, targetRpe = 10.0)
+        e.copy(sets = e.sets.take(end) + drop + e.sets.drop(end))
+    }
+
+    /** Either / or: swap entry [ei] to another option of its slot (fresh sets for that exercise; nothing done yet). */
+    fun chooseOption(d: WorkoutData, ei: Int, exId: String, today: LocalDate) = editActive(d) { s ->
+        val e = s.entries.getOrNull(ei) ?: return@editActive s
+        val ex = d.exercise(exId) ?: return@editActive s
+        if (e.sets.any { it.done }) return@editActive s
+        val step = Prescriber.stepFor(d, ex, d.program(s.programId ?: d.activeProgramId), s.week, s.block)
+        s.copy(entries = s.entries.mapIndexed { i, x -> if (i == ei) x.copy(exerciseId = ex.id, sets = Prescriber.plan(d, ex, step, today)) else x })
+    }
+
+    /** Program editor: add / remove an "or" option on a day's slot. */
+    fun setAlternatives(d: WorkoutData, programId: String, dayId: String, slotId: String, alts: List<String>) = d.copy(
+        programs = d.programs.map { p ->
+            if (p.id != programId) p else p.copy(days = p.days.map { t ->
+                if (t.id != dayId) t else t.copy(alternatives = if (alts.isEmpty()) t.alternatives - slotId else t.alternatives + (slotId to alts.distinct().filter { it != slotId }))
+            })
+        },
+    )
+
     fun removeSet(d: WorkoutData, ei: Int, si: Int) = editEntry(d, ei) { e -> e.copy(sets = e.sets.filterIndexed { i, _ -> i != si }) }
 
     fun addExercise(d: WorkoutData, exId: String, today: LocalDate): WorkoutData = editActive(d) { s ->

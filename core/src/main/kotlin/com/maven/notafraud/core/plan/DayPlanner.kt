@@ -164,15 +164,6 @@ class DayPlanner(
     private val roughChunkMin: Int = 50,
     private val roughFocusCapMin: Int = 240,
 ) {
-    companion object {
-        /** Key for ending a fixed block early (DayContext.endedEarly): anchor, routine block or calendar event. */
-        fun endKey(b: PlanBlock): String = when {
-            b.anchorId != null -> "anchor:${b.anchorId}"
-            b.routineId != null -> "routine:${b.routineId}"
-            b.taskId != null -> "task:${b.taskId}"
-            else -> "event:${b.title}"
-        }
-    }
 
     fun plan(date: LocalDate, data: AppData, now: Long, carried: Map<String, Int> = emptyMap()): DayPlan {
         val s = data.settings
@@ -543,6 +534,14 @@ class DayPlanner(
     private fun roundDown5(m: Int) = (m / 5) * 5
 
     companion object {
+        /** Key for ending a fixed block early (DayContext.endedEarly): anchor, routine block or calendar event. */
+        fun endKey(b: PlanBlock): String = when {
+            b.anchorId != null -> "anchor:${b.anchorId}"
+            b.routineId != null -> "routine:${b.routineId}"
+            b.taskId != null -> "task:${b.taskId}"
+            else -> "event:${b.title}"
+        }
+
         fun merge(intervals: List<Pair<Long, Long>>): List<Pair<Long, Long>> {
             if (intervals.isEmpty()) return emptyList()
             val sorted = intervals.filter { it.second > it.first }.sortedBy { it.first }

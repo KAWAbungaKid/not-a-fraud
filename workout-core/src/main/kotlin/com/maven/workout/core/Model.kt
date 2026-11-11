@@ -66,7 +66,22 @@ data class Exercise(
     val roundTo: Double = 5.0,
     val notes: String = "",
     val archived: Boolean = false,
+    /** What it's done on; null = guessed from the name (Equip.of). Decides plates vs a stack. */
+    val equipment: Equipment? = null,
+    /** Plate-loaded pulley: plates on the pin ÷ this = what the handle feels (2.0 for a 2:1). You log the felt weight. */
+    val pulleyRatio: Double = 1.0,
 )
+
+@Serializable
+enum class Equipment(val label: String) {
+    BARBELL("Barbell"),
+    DUMBBELL("Dumbbells"),
+    STACK("Weight stack / cable"),
+    PLATE_LOADED("Plate-loaded machine"),
+    PULLEY("Plate-loaded pulley"),
+    BODYWEIGHT("Bodyweight"),
+    OTHER("Other"),
+}
 
 /**
  * A progression "type" (REFERENCE sheet rows RPE<type> / REPS<type>): one [Step] per week of the cycle,
@@ -120,6 +135,8 @@ data class DayTemplate(
     val id: String,
     val name: String,
     val exerciseIds: List<String> = emptyList(),
+    /** Either / or slots: slot exercise id → the others you might do instead ("pull-ups or lat pulldown"). */
+    val alternatives: Map<String, List<String>> = emptyMap(),
 )
 
 /** Where we are in the program cycle. Week and block are 1-based. */
@@ -140,7 +157,7 @@ enum class Mode(val label: String) {
 }
 
 @Serializable
-enum class SetKind(val short: String) { WARMUP("W"), TOP("T"), WORK(""), TEST("MAX") }
+enum class SetKind(val short: String) { WARMUP("W"), TOP("T"), WORK(""), TEST("MAX"), DROP("↓") }
 
 @Serializable
 data class SetLog(
@@ -168,6 +185,8 @@ data class Entry(
     val skipReason: String = "",
     /** Entries sharing a group are a superset: rest comes after the last one of the group. */
     val superset: Int? = null,
+    /** Either / or slot this entry fills (the template's slot exercise id); null = not a choice. */
+    val slot: String? = null,
 )
 
 @Serializable

@@ -641,3 +641,41 @@ onboarding / tips / crash log should go next (PUBLIC.md).
 artifacts (1.8 GB: debug APKs from every CI run, release APK/MSI hand-offs). Deleted them all; CI no longer uploads
 the debug APK, release hand-off artifacts keep 1 day. Releases and `ci-logs/*` branches don't count toward it.
 Feedback share now sends notes .md + pngs as separate files (zip optional).
+
+## 27. v0.14.0 (2026-11-11): day feedback and the unlock check-in
+
+From the first feedback-mode notes (2026-11-10): "I am done with my lab… hit done and it says 'you can fill in that
+extra time with ___'"; "I went over on trading… reschedule other things, get rid of some of the fun stuff";
+"a popup when my phone unlocks… a way to say what I've been working on"; "there's a lot of black, I should feel
+more guilty… and rewarded"; "I need to study for my test Thursday… the app should say 'you need to work on this'";
+"is Start starting supper?"; lock screen should show routine to log, next thing, missed things. From Twig's notes:
+bricking should revolve around weigh-in / eating / Bible, with inputs on the unlock screen, so things get entered
+when they happen instead of a pile at night.
+
+Decisions (Maven, 2026-11-11): check-in on **every unlock while something's overdue, Later = 20 min, 3 Laters in a
+row = 1 ladder point**; when you go over, **least important first** (fun / low-importance move to coming days;
+hot deadlines and exams never; protected time only if you say so); day feedback = **all four** (plan shows planned
+vs actual, day score on Now, priority nag, end-of-day summary).
+
+- `core/plan/DayReview.kt`: `mark(block)` DONE / OTHER / PARTIAL / MISSED / EXCUSED; `missed()` (now the ladder's
+  "slipped" count, via `DayAdvisor.skippedBlocks`); `totals`; `score(date)` 0–100 = work 50 % (worked ÷ planned task
+  minutes; past days use `DayContext.plannedTaskMin`), routine 30 %, blocked apps 20 % (2 h = 0), parts with nothing to
+  measure drop out; `goodStreak` (Settings.goodDayScore 70); `priorityNag` (HIGH / hot / importance ≥ 4 / exam study,
+  due ≤ 4 days, < 30 min in 3 days; shown after an hour elsewhere or after noon); `summary` / `summaryDate`
+  (evening from dayEnd − 1 h; yesterday's until noon, until `DayContext.summarySeen`); `fill` (best task for freed
+  minutes); `squeeze` (hot / exam work due ≤ 36 h not placed today + protected blocks still ahead).
+- `core/guard/UnlockCheckIn.kt`: prompts ROUTINE (late / angry; Open it for `openPkg`), MEAL and WEIGH (only when
+  Twig says `acceptsQuick`), BLOCK (missed in the last 6 h, max 3), PRIORITY. `AppData.checkIn` (`CheckInState`:
+  snoozeUntil, laters, laterDate, handled keys per date). `due()` false at bedtime, when switched off
+  (`Settings.checkInOnUnlock`, Medium-lock protected via ChangeKind.CHECKIN), or nothing to ask. Ladder +1 point
+  "check-in put off N times" while `ignoring()`.
+- Excuses: `DayContext.excused` (`Excuse(start, end, reason, counts)`); "Nothing, honestly" is `counts = false`
+  (answered, still missed); a reason marks the block EXCUSED.
+- Backlog: `Actions.logPast(taskId | title, start, end)` (trims against logged sessions, earns credits, counts sport).
+  Ending a fixed block early: `DayContext.endedEarly[DayPlanner.endKey(block)]`, planner trims that block, re-plan.
+- Android: `ui/DayFeedback.kt` (LogTimeDialog, DayScoreCard, SummaryCard, SqueezeCard, CheckInSheet); Now buttons
+  relabelled by block kind; Plan colours past task blocks and taps open "what did you do?"; GuardService on
+  USER_PRESENT opens MainActivity with `EXTRA_CHECKIN` (after the routine-app open, before ladder → Now); lock
+  wallpaper adds to-log routine, missed blocks and next.
+- Twig 0.4 provider writes: `/weigh` (lb, at), `/quickmeal` (slot, text, at, usual). DietStatus adds `usual`
+  (slot → label) and `acceptsQuick`.

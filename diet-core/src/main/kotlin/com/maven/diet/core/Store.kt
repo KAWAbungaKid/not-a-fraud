@@ -91,6 +91,10 @@ data class DietStatus(
     val slots: List<Slot> = emptyList(),
     val windowStart: String? = null,
     val windowEnd: String? = null,
+    /** Slot → what you usually eat there, for one-tap logging from Not a Fraud's check-in. */
+    val usual: Map<String, String> = emptyMap(),
+    /** This Twig takes weigh-ins and quick meals from Not a Fraud (/weigh, /quickmeal). */
+    val acceptsQuick: Boolean = true,
 )
 
 /**
@@ -135,13 +139,14 @@ object Sync {
             trendLb = Trend.latest(d, today),
             ratePerWeekLb = Trend.ratePerWeek(d, today),
             fasting = fast.enabled, inEatingWindow = fast.inWindow, hoursSinceFood = fast.hoursSinceFood,
-            slotsLogged = Diary.entries(d, today).map { it.slot }.distinct(),
+            slotsLogged = Diary.slotsEaten(d, today).toList(),
             nags = Nags.due(d, now, zone, t.training).sortedByDescending { it.level }
                 .map { SyncNag(it.kind.name, it.key, it.title, it.text, it.level) },
             clarity = c?.clarity, energy = c?.energy,
             slots = d.settings.slots,
             windowStart = d.settings.windowStart.takeIf { d.settings.fasting },
             windowEnd = d.settings.windowEnd.takeIf { d.settings.fasting },
+            usual = d.settings.slots.mapNotNull { sl -> Quick.usual(d, sl.name, today)?.let { sl.name to it.label } }.toMap(),
         )
     }
 }

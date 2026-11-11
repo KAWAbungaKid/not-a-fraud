@@ -36,7 +36,7 @@ object Strength {
     fun best(s: Session, exerciseId: String): E1rmPoint? {
         var top: E1rmPoint? = null
         for (en in s.entries) if (en.exerciseId == exerciseId && !en.skipped) for (set in en.sets) {
-            if (!set.done) continue
+            if (!set.done || set.kind == SetKind.DROP) continue
             val w = set.weight ?: continue
             val r = set.reps ?: continue
             val e = Rpe.e1rm(w, r, set.rpe) ?: continue

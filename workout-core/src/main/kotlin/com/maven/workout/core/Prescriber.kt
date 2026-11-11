@@ -21,7 +21,7 @@ object Prescriber {
         val tm = if (ex.measure == Measure.WEIGHT_REPS) Strength.trainingMax(d, ex.id, today) else null
         if (step == null) {
             // No type: repeat what was done last time, or three empty sets.
-            val last = Strength.lastSets(d, ex.id).filter { it.kind != SetKind.WARMUP }
+            val last = Strength.lastSets(d, ex.id).filter { it.kind != SetKind.WARMUP && it.kind != SetKind.DROP }
             if (last.isNotEmpty()) return last.map {
                 SetLog(kind = it.kind, targetWeight = it.weight, targetReps = it.reps, targetSeconds = it.seconds, targetRpe = it.rpe)
             }
@@ -62,14 +62,18 @@ object Prescriber {
         val hurt = Injuries.activeJoints(d)
         var minutesLeft = d.settings.shortMinutes.toDouble()
         val entries = ArrayList<Entry>()
-        for ((i, exId) in (template?.exerciseIds ?: emptyList()).withIndex()) {
+        for ((i, slotId) in (template?.exerciseIds ?: emptyList()).withIndex()) {
+            // Either / or: whichever of the slot's options you did last time on this day.
+            val options = Options.of(template, slotId)
+            val exId = if (options.size > 1) Options.lastPick(d, template!!, slotId) else slotId
+            val slot = if (options.size > 1) slotId else null
             val ex = d.exercise(exId) ?: continue
             val step = stepFor(d, ex, p, cyc.week, cyc.block)
             var sets = plan(d, ex, step, today)
             if (mode == Mode.INJURED) {
                 val hits = ex.joints.intersect(hurt)
                 if (hits.isNotEmpty()) {
-                    entries += Entry(ex.id, sets, skipped = true, skipReason = hits.joinToString { it.label.lowercase() })
+                    entries += Entry(ex.id, sets, skipped = true, skipReason = hits.joinToString { it.label.lowercase() }, slot = slot)
                     continue
                 }
             }
@@ -83,7 +87,7 @@ object Prescriber {
                 if (i > 0 && cost > minutesLeft) continue
                 minutesLeft -= cost
             }
-            entries += Entry(ex.id, sets)
+            entries += Entry(ex.id, sets, slot = slot)
         }
         return Session(
             id = id, name = name, templateId = template?.id, programId = p?.id,

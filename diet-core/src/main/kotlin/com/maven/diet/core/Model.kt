@@ -25,6 +25,8 @@ data class DietData(
     val settings: Settings = Settings(),
     /** Self-experiments (§ 5 step 5): one question, two conditions, alternating days. */
     val experiments: List<Experiment> = emptyList(),
+    /** Meals said in a hurry (Not a Fraud's unlock check-in): "chicken and rice at 12:30". Count for fasting and the slot until the foods are added. */
+    val quick: List<QuickMeal> = emptyList(),
 ) {
     fun food(id: String) = foods.firstOrNull { it.id == id }
     fun meal(id: String) = meals.firstOrNull { it.id == id }
@@ -126,6 +128,10 @@ data class SavedMeal(
 )
 
 @Serializable data class WaterEntry(val date: String, val at: Long, val oz: Double)
+/** "Ate lunch at 12:30: chicken and rice" — the foods get added later in Twig ([resolved] once they are). */
+@Serializable
+data class QuickMeal(val id: String, val date: String, val slot: String, val at: Long, val text: String, val resolved: Boolean = false)
+
 @Serializable data class WeightEntry(val date: String, val at: Long, val lb: Double)
 
 /** Daily 2-tap check-in: the two things Maven cares about. 1 = bad, 5 = great. */

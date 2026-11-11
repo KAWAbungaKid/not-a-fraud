@@ -20,6 +20,8 @@ import com.maven.diet.link.WorkoutLink
  * Data for Not a Fraud, guarded by signature permission com.maven.permission.SYNC (read and write).
  *   query  content://com.maven.diet.sync/status → one row, column "json" = DietStatus   (debug: com.maven.diet.dev.sync)
  *   update content://com.maven.diet.sync/meal   values old / name / by / remove → change one meal slot (MealSync)
+ *   update content://com.maven.diet.sync/weigh  values lb / at → today's weigh-in
+ *   update content://com.maven.diet.sync/quickmeal values slot / text / at / usual → the usual for that slot, or a quick meal
  */
 class SyncProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
@@ -37,8 +39,34 @@ class SyncProvider : ContentProvider() {
     override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int = 0
     override fun update(uri: Uri, values: ContentValues?, selection: String?, args: Array<out String>?): Int {
         val ctx = context ?: return 0
-        if (uri.lastPathSegment != "meal" || values == null) return 0
+        if (values == null) return 0
         Graph.init(ctx)
+        when (uri.lastPathSegment) {
+            // Weigh-in typed on Not a Fraud's check-in.
+            "weigh" -> {
+                val lb = values.getAsDouble("lb") ?: return 0
+                val at = values.getAsLong("at") ?: Graph.now()
+                val date = java.time.Instant.ofEpochMilli(at).atZone(Graph.zone).toLocalDate()
+                val before = Graph.data.weights.size to Graph.data.weights.lastOrNull()
+                Graph.update { Actions.setWeight(it, date, lb, at) }
+                return if ((Graph.data.weights.size to Graph.data.weights.lastOrNull()) != before) 1 else 0
+            }
+            // "What did you eat?" from the check-in: the usual for that slot, or a quick note filled in later.
+            "quickmeal" -> {
+                val slot = values.getAsString("slot") ?: return 0
+                val at = values.getAsLong("at") ?: Graph.now()
+                val date = java.time.Instant.ofEpochMilli(at).atZone(Graph.zone).toLocalDate()
+                val text = values.getAsString("text").orEmpty()
+                val usual = values.getAsBoolean("usual") == true
+                val before = Graph.data
+                Graph.update { d ->
+                    val x = if (usual) com.maven.diet.core.Quick.logUsual(d, slot, date, at) else d
+                    if (x === d) com.maven.diet.core.Quick.add(d, slot, text.ifBlank { "the usual" }, date, at) else x
+                }
+                return if (Graph.data != before) 1 else 0
+            }
+        }
+        if (uri.lastPathSegment != "meal") return 0
         val before = Graph.data.settings
         Graph.update { d ->
             Actions.settings(d) {

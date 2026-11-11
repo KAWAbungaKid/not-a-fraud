@@ -125,6 +125,14 @@ fun ExerciseEditScreen(d: WorkoutData, id: String, onBack: () -> Unit) {
                 if (ex.measure != Measure.TIME) {
                     SectionLabel("Round weights to")
                     ChipRow(listOf(1.0, 2.5, 5.0, 10.0), { it == ex.roundTo }, { Rpe.fmt(it) }) { r -> save { it.copy(roundTo = r) } }
+                    SectionLabel("Equipment" + if (ex.equipment == null) " (guessed: ${com.maven.workout.core.Equip.of(ex).label.lowercase()})" else "")
+                    ChipRow(com.maven.workout.core.Equipment.entries, { it == ex.equipment }, { it.label }) { q -> save { it.copy(equipment = if (it.equipment == q) null else q) } }
+                    if (com.maven.workout.core.Equip.of(ex) == com.maven.workout.core.Equipment.PULLEY) {
+                        SectionLabel("Pulley ratio (plates on the pin ÷ what the handle feels)")
+                        ChipRow(listOf(1.0, 1.5, 2.0, 3.0, 4.0), { it == ex.pulleyRatio }, { Rpe.fmt(it) + ":1" }) { r -> save { it.copy(pulleyRatio = r) } }
+                        Dim("Log what the handle feels; the app says what to load. Not sure? Hang a known plate on the pin and weigh the handle with a luggage scale.")
+                    }
+                    if (com.maven.workout.core.Equip.of(ex) == com.maven.workout.core.Equipment.STACK) Dim("Weight stack: no plate math. Stacks differ between gyms, so a separate exercise per gym keeps the numbers honest.")
                 }
                 SectionLabel("Muscles")
                 ChipRow(Muscle.entries, { it in ex.muscles }, { it.label }) { m -> save { it.copy(muscles = if (m in it.muscles) it.muscles - m else it.muscles + m) } }

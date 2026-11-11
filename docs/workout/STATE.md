@@ -198,3 +198,15 @@ exercises mainly shoulders / arms / grip) for another when tomorrow is a sport d
 - ~~Edit a finished workout's sets~~ (0.2.0).
 - ~~Supersets; per-muscle weekly volume~~ (0.2.0); diet app is Not a Twig.
 - Onboarding with neutral presets for other people (only Maven's preset exists).
+
+## 7. v0.3.0 (2026-11-11): drop sets, either / or, equipment
+
+From feedback mode: "a drop set button by a set that gives sub sets"; "in my program, do either _ or _ exercise, and
+choose"; "cable has no plates… weight stacks at the gym vs my plate-loaded pulley home gym".
+- `SetKind.DROP` ("↓"): `Actions.addDrop(ei, si)` inserts after the set and its drops, 80 % of the previous weight,
+  RPE 10, reps open. Not counted by `Volume` or `Strength.best`; rest timer waits for the last drop.
+- `DayTemplate.alternatives` (slot id → other ids), `Entry.slot`; `Options.lastPick` (last choice on that day, then
+  any day); `Actions.chooseOption` (until a set is done), `Actions.setAlternatives`.
+- `Exercise.equipment` (null = `Equip.of` guesses from the name) and `pulleyRatio`; `Equip.loadText`: barbell plates
+  per side, plate-loaded per side (no bar), pulley "load X on the pin (2:1 → Y at the handle)", dumbbells "each hand",
+  nothing for stacks / bodyweight. You log the felt weight. Stacks differ between gyms: one exercise per gym.

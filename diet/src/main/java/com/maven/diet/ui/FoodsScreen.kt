@@ -107,9 +107,15 @@ fun AddFoodScreen(d: DietData, date: String, slot: String, onOpen: (Route) -> Un
     var picked by remember { mutableStateOf<Food?>(null) }
     var pickedMeal by remember { mutableStateOf<SavedMeal?>(null) }
     val recent = Diary.recentFoods(d)
+    // When you ate (fasting runs on it): now by default, or a quick meal's time from Not a Fraud.
+    val pending = remember(d.quick, date, slot) { com.maven.diet.core.Quick.pendingFor(d, day, slot) }
+    var at by remember { mutableStateOf(pending?.at ?: logTime(day)) }
+    fun logged(x: DietData) = pending?.let { com.maven.diet.core.Quick.resolve(x, it.id) } ?: x
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                pending?.let { Dim("From Not a Fraud: \"${it.text}\". Add what it was; the time is already set.") }
+                EatenAtRow(day, at) { at = it }
                 OutlinedTextField(q, { q = it }, label = { Text("Search foods and meals") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedButton(onClick = { onOpen(Route.FoodEdit(null)) }) { Text("+ New food from a label") }
             }
@@ -135,7 +141,7 @@ fun AddFoodScreen(d: DietData, date: String, slot: String, onOpen: (Route) -> Un
     }
     picked?.let { f ->
         AmountDialog(d, f, onDismiss = { picked = null }) { servings, amount, unit ->
-            Graph.update { Actions.logFood(it, day, slot, f.id, servings, logTime(day), amount, unit) }
+            Graph.update { logged(Actions.logFood(it, day, slot, f.id, servings, at, amount, unit)) }
             picked = null; onDone()
         }
     }
@@ -153,12 +159,26 @@ fun AddFoodScreen(d: DietData, date: String, slot: String, onOpen: (Route) -> Un
             },
             confirmButton = {
                 TextButton(enabled = (portions.toDoubleOrNull() ?: 0.0) > 0, onClick = {
-                    Graph.update { Actions.logMeal(it, day, slot, m.id, portions.toDouble(), logTime(day)) }
+                    Graph.update { logged(Actions.logMeal(it, day, slot, m.id, portions.toDouble(), at)) }
                     pickedMeal = null; onDone()
                 }) { Text("Log") }
             },
             dismissButton = { TextButton(onClick = { pickedMeal = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** "Eaten at 12:30 PM": now, or nudge back for a meal you're logging late. */
+@Composable
+fun EatenAtRow(day: LocalDate, at: Long, onChange: (Long) -> Unit) {
+    val fmt = java.time.format.DateTimeFormatter.ofPattern("h:mm a")
+    val dayStart = day.atStartOfDay(Graph.zone).toInstant().toEpochMilli()
+    val max = if (day == Graph.today()) Graph.now() else dayStart + 86_400_000L - 60_000L
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Eaten at " + java.time.Instant.ofEpochMilli(at).atZone(Graph.zone).format(fmt), Modifier.weight(1f))
+        for (m in listOf(-60, -15, 15)) TextButton(onClick = { onChange((at + m * 60_000L).coerceIn(dayStart, max)) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)) { Text(if (m > 0) "+$m" else "$m") }
+        if (day == Graph.today()) TextButton(onClick = { onChange(Graph.now()) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp)) { Text("now") }
     }
 }
 

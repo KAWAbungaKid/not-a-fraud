@@ -151,3 +151,17 @@ Body stats; pass **sleep hours** to Twig later so bad-day remedies and the insig
 6. **Cross-app bad-day help** through Not a Fraud (sleep, screen time, workouts, food, water together);
    remedies ranked by what actually helped him (follow-up rating 2 h later).
 7. Later: blood work entry (vitamin D, iron…), digestion notes per food, carb tolerance experiments.
+
+## 6. v0.4.0 (2026-11-11): quick logging, macro breakdown, fill the gap
+
+From feedback mode: tap protein and see "30 % chicken, 5 % chocolate milk"; a suggested food when carbs are short at
+night; fasting is off because meals can't be backlogged; the unlock screen (Not a Fraud) should ask "what did you
+eat?" and take the weigh-in.
+- `QuickMeal` (`DietData.quick`): a meal said in a few words from Not a Fraud, with the time eaten. Counts for
+  fasting (`Diary.eatTimes`), the slot's reminder and `slotsLogged` (`Diary.slotsEaten`) until resolved; adding
+  food to that slot uses its time and resolves it.
+- `Quick.usual(slot)`: last day in 21 with that slot logged → "the usual" (copied at the time eaten).
+- `Breakdown.contributors(date, macro)`, `FillGap.suggest(date, target, macro)` (foods ≥ 55 % of kcal from that
+  macro, servings to fill the gap within the calorie room, recent foods first).
+- Logging at an earlier time: AddFood "Eaten at", EntryDialog moves time (`Actions.setEntryAt`).
+- Provider: update `/weigh` (lb, at) and `/quickmeal` (slot, text, at, usual); status adds `usual`, `acceptsQuick`.

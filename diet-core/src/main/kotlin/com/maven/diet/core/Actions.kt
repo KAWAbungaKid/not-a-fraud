@@ -40,6 +40,9 @@ object Actions {
         )
     })
 
+    /** Move when it was eaten (fasting uses it). */
+    fun setEntryAt(d: DietData, id: String, at: Long) = d.copy(log = d.log.map { if (it.id == id) it.copy(at = at) else it })
+
     fun removeEntry(d: DietData, id: String) = d.copy(log = d.log.filter { it.id != id })
 
     /** Log a saved meal / recipe: every item × (portions / recipe servings). */

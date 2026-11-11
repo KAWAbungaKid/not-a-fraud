@@ -18,6 +18,23 @@ data class GuardDecision(val action: GuardAction, val unlockedUntil: Long = 0L, 
 
 object GuardPolicy {
 
+    /**
+     * Android's own pickers that open on top of whatever app asked: the photo picker ("Photos & videos"), the file
+     * picker, the share sheet. They're part of the app you're using (attaching homework photos at bedtime), never
+     * blocked or counted as their own app.
+     */
+    val SYSTEM_PICKERS: Set<String> = setOf(
+        "com.google.android.providers.media.module",
+        "com.android.providers.media.module",
+        "com.google.android.photopicker",
+        "com.android.providers.media",
+        "com.google.android.documentsui",
+        "com.android.documentsui",
+        "com.android.intentresolver",
+        "com.google.android.intentresolver",
+        "com.samsung.android.app.sharelive",
+    )
+
     /** Never blocked, never counted: system UI, launchers, phone, settings, input methods. */
     val SAFE: Set<String> = setOf(
         "android",
@@ -40,22 +57,6 @@ object GuardPolicy {
         "com.google.android.packageinstaller",
     ) + SYSTEM_PICKERS
 
-    /**
-     * Android's own pickers that open on top of whatever app asked: the photo picker ("Photos & videos"), the file
-     * picker, the share sheet. They're part of the app you're using (attaching homework photos at bedtime), never
-     * blocked or counted as their own app.
-     */
-    val SYSTEM_PICKERS: Set<String> = setOf(
-        "com.google.android.providers.media.module",
-        "com.android.providers.media.module",
-        "com.google.android.photopicker",
-        "com.android.providers.media",
-        "com.google.android.documentsui",
-        "com.android.documentsui",
-        "com.android.intentresolver",
-        "com.google.android.intentresolver",
-        "com.samsung.android.app.sharelive",
-    )
 
     fun decide(pkg: String, data: AppData, now: Long, ownPackagePrefix: String = "com.maven.notafraud"): GuardDecision {
         val rules = data.rules

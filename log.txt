@@ -1,0 +1,119 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :diet:assembleRelease
+> Task :diet-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :diet-core:processResources NO-SOURCE
+> Task :diet:preBuild UP-TO-DATE
+> Task :diet:preReleaseBuild UP-TO-DATE
+> Task :diet:mergeReleaseJniLibFolders
+> Task :feedback:preBuild UP-TO-DATE
+> Task :feedback:preReleaseBuild UP-TO-DATE
+> Task :feedback:mergeReleaseJniLibFolders
+> Task :feedback:mergeReleaseNativeLibs NO-SOURCE
+> Task :feedback:copyReleaseJniLibsProjectOnly
+> Task :feedback:generateReleaseResources FROM-CACHE
+> Task :feedback:packageReleaseResources FROM-CACHE
+> Task :feedback:processReleaseNavigationResources FROM-CACHE
+> Task :feedback:parseReleaseLocalResources FROM-CACHE
+> Task :feedback:generateReleaseRFile FROM-CACHE
+> Task :feedback:compileReleaseKotlin FROM-CACHE
+> Task :feedback:javaPreCompileRelease FROM-CACHE
+> Task :feedback:compileReleaseJavaWithJavac NO-SOURCE
+> Task :feedback:bundleLibRuntimeToDirRelease
+> Task :diet:checkReleaseDuplicateClasses
+> Task :diet:generateReleaseBuildConfig
+> Task :diet:generateReleaseResources FROM-CACHE
+> Task :diet:packageReleaseResources FROM-CACHE
+> Task :diet:processReleaseNavigationResources FROM-CACHE
+> Task :diet:parseReleaseLocalResources FROM-CACHE
+> Task :diet:generateReleaseRFile FROM-CACHE
+> Task :feedback:bundleLibCompileToJarRelease
+> Task :diet:javaPreCompileRelease FROM-CACHE
+> Task :feedback:writeReleaseAarMetadata
+> Task :diet:checkReleaseAarMetadata
+> Task :diet:mapReleaseSourceSetPaths
+> Task :diet:compileReleaseNavigationResources FROM-CACHE
+> Task :diet:mergeReleaseResources FROM-CACHE
+> Task :diet:createReleaseCompatibleScreenManifests
+> Task :diet:extractDeepLinksRelease FROM-CACHE
+> Task :feedback:extractDeepLinksRelease FROM-CACHE
+> Task :feedback:processReleaseManifest FROM-CACHE
+> Task :diet:processReleaseMainManifest
+> Task :diet:processReleaseManifest
+> Task :diet:processReleaseManifestForPackage
+> Task :feedback:mapReleaseSourceSetPaths
+> Task :feedback:compileReleaseLibraryResources FROM-CACHE
+> Task :diet:processReleaseResources
+> Task :diet:desugarReleaseFileDependencies FROM-CACHE
+> Task :diet:mergeReleaseStartupProfile
+> Task :diet:mergeExtDexRelease FROM-CACHE
+> Task :feedback:prepareReleaseArtProfile
+> Task :diet:mergeReleaseArtProfile
+> Task :feedback:bundleLibRuntimeToJarRelease
+> Task :diet:generateReleaseAssets UP-TO-DATE
+> Task :feedback:generateReleaseAssets UP-TO-DATE
+> Task :feedback:mergeReleaseAssets
+> Task :diet:mergeReleaseAssets
+> Task :diet:compressReleaseAssets FROM-CACHE
+> Task :diet:extractReleaseVersionControlInfo
+> Task :diet:extractProguardFiles
+> Task :feedback:processReleaseJavaRes
+> Task :feedback:createFullJarRelease
+> Task :feedback:extractProguardFiles
+> Task :feedback:generateReleaseLintModel
+> Task :feedback:prepareLintJarForPublish
+> Task :feedback:checkReleaseAarMetadata
+> Task :feedback:extractDeepLinksForAarRelease FROM-CACHE
+> Task :feedback:extractReleaseAnnotations FROM-CACHE
+> Task :feedback:mergeReleaseGeneratedProguardFiles
+> Task :feedback:mergeReleaseConsumerProguardFiles
+> Task :feedback:mergeReleaseJavaResource
+> Task :feedback:syncReleaseLibJars FROM-CACHE
+> Task :feedback:bundleReleaseLocalLintAar
+> Task :feedback:lintVitalAnalyzeRelease FROM-CACHE
+> Task :feedback:writeReleaseLintModelMetadata
+> Task :feedback:generateReleaseLintVitalModel
+> Task :diet:optimizeReleaseResources
+> Task :diet:collectReleaseDependencies
+> Task :diet:sdkReleaseDependencyData
+> Task :diet:validateSigningRelease
+> Task :diet:writeReleaseAppMetadata
+> Task :diet:writeReleaseSigningConfigVersions
+> Task :diet-core:compileKotlin
+> Task :diet-core:compileJava NO-SOURCE
+> Task :diet-core:classes UP-TO-DATE
+> Task :diet-core:jar
+> Task :diet:mergeReleaseNativeLibs
+
+> Task :diet:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libbarhopper_v3.so, libmlkit_google_ocr_pipeline.so. Run with --info option to learn more.
+
+> Task :diet:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :diet:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :diet:compileReleaseKotlin
+> Task :diet:processReleaseJavaRes
+> Task :diet:mergeReleaseJavaResource
+> Task :diet:compileReleaseJavaWithJavac
+> Task :diet:generateReleaseLintVitalReportModel
+> Task :diet:dexBuilderRelease
+> Task :diet:lintVitalAnalyzeRelease
+> Task :diet:mergeDexRelease
+> Task :diet:mergeReleaseGlobalSynthetics FROM-CACHE
+> Task :diet:lintVitalReportRelease
+> Task :diet:lintVitalRelease
+> Task :diet:compileReleaseArtProfile
+> Task :diet:packageRelease
+> Task :diet:assembleRelease
+> Task :diet:createReleaseApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411674698.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 24s
+87 actionable tasks: 59 executed, 28 from cache
+Configuration cache entry stored.

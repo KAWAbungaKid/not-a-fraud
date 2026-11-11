@@ -1,0 +1,26 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :diet-core:test
+> Task :diet-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :diet-core:processResources NO-SOURCE
+> Task :diet-core:processTestResources NO-SOURCE
+> Task :diet-core:compileKotlin
+> Task :diet-core:compileJava NO-SOURCE
+> Task :diet-core:classes UP-TO-DATE
+> Task :diet-core:jar
+> Task :diet-core:compileTestKotlin
+> Task :diet-core:compileTestJava NO-SOURCE
+> Task :diet-core:testClasses UP-TO-DATE
+> Task :diet-core:test
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411678011.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 45s
+4 actionable tasks: 4 executed
+Configuration cache entry stored.

@@ -23,8 +23,23 @@ jobs:
       - run: |
           v=$(grep appVersionName gradle.properties | cut -d= -f2)
           cp android/build/outputs/apk/release/android-release.apk not-a-fraud-$v.apk
-      - uses: actions/upload-artifact@v4
-        with: { name: apk, path: "not-a-fraud-*.apk", retention-days: 1 }
+      # Publish straight from this job: no artifact hand-off (Actions storage is capped on the free plan).
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(grep appVersionName gradle.properties | cut -d= -f2)
+          tag="${GITHUB_REF_NAME}"
+          [[ "$tag" == v* ]] || tag="v$v"
+          notes="docs/releases/$tag.md"
+          [ -f "$notes" ] || notes=/dev/null
+          gh release create "$tag" not-a-fraud-$v.apk --title "Not a Fraud $v" --notes-file "$notes" || gh release upload "$tag" not-a-fraud-$v.apk --clobber
+      - name: Mirror the APK to a git branch (readable from the Claude sandbox)
+        run: |
+          mkdir dist && cp not-a-fraud-*.apk dist/ && cd dist
+          git init -q -b main
+          git config user.name ci; git config user.email ci@localhost
+          git add -A; git commit -qm "binaries ${GITHUB_REF_NAME}"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/dist || true
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: release-apk, file: build.log }
@@ -43,8 +58,6 @@ jobs:
       - run: |
           v=$(grep appVersionName gradle.properties | cut -d= -f2)
           cp desktop/build/compose/binaries/main-release/msi/*.msi not-a-fraud-windows-$v.msi
-      - uses: actions/upload-artifact@v4
-        with: { name: msi, path: "not-a-fraud-windows-*.msi", retention-days: 1 }
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -54,28 +67,3 @@ jobs:
       - if: always()
         uses: ./.github/actions/push-log
         with: { name: release-msi, file: build.log }
-
-  # The phone APK publishes as soon as it's built; the Windows MSI (slow, has hung) adds itself to the release later.
-  publish:
-    needs: [apk]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { path: dist, merge-multiple: true }
-      - env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          v=$(grep appVersionName gradle.properties | cut -d= -f2)
-          tag="${GITHUB_REF_NAME}"
-          [[ "$tag" == v* ]] || tag="v$v"
-          notes="docs/releases/$tag.md"
-          [ -f "$notes" ] || notes=/dev/null
-          gh release create "$tag" dist/* --title "Not a Fraud $v" --notes-file "$notes" || gh release upload "$tag" dist/* --clobber
-      - name: Mirror binaries to a git branch (readable from the Claude sandbox)
-        run: |
-          cd dist
-          git init -q -b main
-          git config user.name ci; git config user.email ci@localhost
-          git add -A; git commit -qm "binaries ${GITHUB_REF_NAME}"
-          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:refs/heads/ci-logs/dist

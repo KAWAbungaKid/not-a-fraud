@@ -1,0 +1,31 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :workout-core:test
+> Task :workout-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :workout-core:processResources NO-SOURCE
+> Task :workout-core:processTestResources NO-SOURCE
+> Task :workout-core:compileKotlin
+> Task :workout-core:compileJava NO-SOURCE
+> Task :workout-core:classes UP-TO-DATE
+> Task :workout-core:jar
+
+> Task :workout-core:compileTestKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/workout-core/src/test/kotlin/com/maven/workout/core/OptionsTest.kt:26:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Session'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/workout-core/src/test/kotlin/com/maven/workout/core/WorkoutTest.kt:165:26 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Suggest.Pick'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/workout-core/src/test/kotlin/com/maven/workout/core/WorkoutTest.kt:218:26 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Session'.
+
+> Task :workout-core:compileTestJava NO-SOURCE
+> Task :workout-core:testClasses UP-TO-DATE
+> Task :workout-core:test
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411680920.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 52s
+4 actionable tasks: 4 executed
+Configuration cache entry stored.

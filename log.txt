@@ -1,0 +1,131 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :workout:assembleDebug :workout:assembleDebugAndroidTest
+> Task :workout-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :workout:preBuild UP-TO-DATE
+> Task :workout:preDebugBuild UP-TO-DATE
+> Task :workout:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :workout-core:processResources NO-SOURCE
+> Task :feedback:preBuild UP-TO-DATE
+> Task :feedback:preDebugBuild UP-TO-DATE
+> Task :feedback:generateDebugResources FROM-CACHE
+> Task :feedback:packageDebugResources FROM-CACHE
+> Task :feedback:processDebugNavigationResources FROM-CACHE
+> Task :feedback:parseDebugLocalResources FROM-CACHE
+> Task :feedback:generateDebugRFile FROM-CACHE
+> Task :feedback:compileDebugKotlin FROM-CACHE
+> Task :feedback:javaPreCompileDebug FROM-CACHE
+> Task :feedback:compileDebugJavaWithJavac NO-SOURCE
+> Task :feedback:bundleLibCompileToJarDebug
+> Task :workout:generateDebugBuildConfig
+> Task :workout:generateDebugResources FROM-CACHE
+> Task :workout:packageDebugResources FROM-CACHE
+> Task :workout:processDebugNavigationResources FROM-CACHE
+> Task :workout:parseDebugLocalResources FROM-CACHE
+> Task :workout:generateDebugRFile FROM-CACHE
+> Task :workout:javaPreCompileDebug FROM-CACHE
+> Task :feedback:generateDebugAssets UP-TO-DATE
+> Task :feedback:mergeDebugAssets
+> Task :workout:generateDebugAssets UP-TO-DATE
+> Task :workout:mergeDebugAssets
+> Task :workout:compressDebugAssets FROM-CACHE
+> Task :workout:generateDebugGlobalSynthetics FROM-CACHE
+> Task :feedback:processDebugJavaRes
+> Task :workout:checkDebugDuplicateClasses
+> Task :workout:desugarDebugFileDependencies FROM-CACHE
+> Task :workout:mergeExtDexDebug FROM-CACHE
+> Task :feedback:bundleLibRuntimeToDirDebug
+> Task :feedback:mapDebugSourceSetPaths
+> Task :feedback:compileDebugLibraryResources FROM-CACHE
+> Task :feedback:writeDebugAarMetadata
+> Task :workout:checkDebugAarMetadata
+> Task :workout:mapDebugSourceSetPaths
+> Task :workout:compileDebugNavigationResources FROM-CACHE
+> Task :workout:mergeDebugResources FROM-CACHE
+> Task :workout:createDebugCompatibleScreenManifests
+> Task :feedback:extractDeepLinksDebug FROM-CACHE
+> Task :feedback:processDebugManifest FROM-CACHE
+> Task :workout:extractDeepLinksDebug FROM-CACHE
+> Task :workout:processDebugMainManifest
+> Task :workout:processDebugManifest
+> Task :workout:processDebugManifestForPackage
+> Task :workout:processDebugResources
+> Task :feedback:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugNativeLibs NO-SOURCE
+> Task :feedback:copyDebugJniLibsProjectOnly
+> Task :workout:mergeDebugJniLibFolders
+> Task :workout:validateSigningDebug
+> Task :workout:writeDebugAppMetadata
+> Task :workout:writeDebugSigningConfigVersions
+> Task :workout:preDebugAndroidTestBuild SKIPPED
+> Task :workout:mergeDebugAndroidTestManifest
+> Task :workout:processDebugAndroidTestManifest
+> Task :workout:generateDebugAndroidTestBuildConfig FROM-CACHE
+> Task :workout:generateDebugAndroidTestResources FROM-CACHE
+> Task :workout:packageDebugAndroidTestResources FROM-CACHE
+> Task :workout:processDebugAndroidTestNavigationResources FROM-CACHE
+> Task :workout:parseDebugAndroidTestLocalResources FROM-CACHE
+> Task :workout:generateDebugAndroidTestRFile FROM-CACHE
+> Task :workout:javaPreCompileDebugAndroidTest FROM-CACHE
+> Task :workout:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :workout:mergeDebugAndroidTestAssets
+> Task :workout:compressDebugAndroidTestAssets FROM-CACHE
+> Task :workout:generateDebugAndroidTestGlobalSynthetics FROM-CACHE
+> Task :workout:checkDebugAndroidTestDuplicateClasses
+> Task :workout:desugarDebugAndroidTestFileDependencies FROM-CACHE
+> Task :workout:mergeExtDexDebugAndroidTest FROM-CACHE
+> Task :workout:checkDebugAndroidTestAarMetadata
+> Task :workout:mapDebugAndroidTestSourceSetPaths
+> Task :workout:compileDebugAndroidTestNavigationResources FROM-CACHE
+> Task :workout:mergeDebugAndroidTestResources FROM-CACHE
+> Task :workout:processDebugAndroidTestResources FROM-CACHE
+> Task :workout:mergeDebugAndroidTestJniLibFolders
+> Task :workout:validateSigningDebugAndroidTest
+> Task :workout:writeDebugAndroidTestSigningConfigVersions
+> Task :workout-core:compileKotlin
+> Task :workout-core:compileJava NO-SOURCE
+> Task :workout-core:classes UP-TO-DATE
+> Task :workout-core:jar
+> Task :workout:mergeLibDexDebug
+> Task :workout:mergeDebugNativeLibs
+
+> Task :workout:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :workout:mergeLibDexDebugAndroidTest FROM-CACHE
+> Task :workout:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :workout:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :workout:compileDebugKotlin
+> Task :workout:processDebugJavaRes
+> Task :workout:mergeDebugJavaResource
+> Task :workout:compileDebugJavaWithJavac
+> Task :workout:bundleDebugClassesToCompileJar
+
+> Task :workout:compileDebugAndroidTestKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/workout/src/androidTest/java/com/maven/workout/SmokeTest.kt:34:16 'fun <reified A : ComponentActivity> createAndroidComposeRule(effectContext: CoroutineContext = ...): AndroidComposeTestRule<ActivityScenarioRule<A>, A>' is deprecated. Use `androidx.compose.ui.test.junit4.v2.createAndroidComposeRule` instead. The v2 APIs use StandardTestDispatcher instead of UnconfinedTestDispatcher, which aligns with standard coroutine behavior by queuing tasks rather than executing them immediately. Tests relying on immediate execution may require explicit synchronization. Please refer to the migration guide for more details.
+
+> Task :workout:compileDebugAndroidTestJavaWithJavac
+> Task :workout:processDebugAndroidTestJavaRes
+> Task :workout:mergeDebugAndroidTestJavaResource
+> Task :workout:dexBuilderDebugAndroidTest FROM-CACHE
+> Task :workout:mergeProjectDexDebugAndroidTest FROM-CACHE
+> Task :workout:packageDebugAndroidTest
+> Task :workout:createDebugAndroidTestApkListingFileRedirect
+> Task :workout:assembleDebugAndroidTest
+> Task :workout:dexBuilderDebug
+> Task :workout:mergeProjectDexDebug
+> Task :workout:packageDebug
+> Task :workout:assembleDebug
+> Task :workout:createDebugApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794411679923.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 37s
+91 actionable tasks: 51 executed, 40 from cache
+Configuration cache entry stored.

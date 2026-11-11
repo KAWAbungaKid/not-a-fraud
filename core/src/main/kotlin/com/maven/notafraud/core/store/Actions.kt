@@ -53,6 +53,47 @@ object Actions {
         )
     }
 
+    /**
+     * Backlog: "I worked on X from 2:00 to 3:15" (off the phone, or forgot to press Start). Logged like a session,
+     * earns credits the same way. A running session is left alone; minutes overlapping other logged sessions
+     * aren't counted twice.
+     */
+    fun logPast(d: AppData, taskId: String?, title: String?, start: Long, end: Long, now: Long): AppData {
+        val e = minOf(end, now)
+        if (e - start < Time.MIN) return d
+        val task = taskId?.let { id -> d.tasks.firstOrNull { it.id == id } }
+        // Trim against what's already logged.
+        var s0 = start
+        for (o in d.sessions.sortedBy { it.start }) if (o.start <= s0 && o.end > s0) s0 = o.end
+        var e0 = e
+        for (o in d.sessions) if (o.start in (s0 + 1) until e0) e0 = o.start
+        val minutes = ((e0 - s0) / Time.MIN).toInt()
+        if (minutes < 1) return d
+        val label = task?.title ?: title?.trim()?.ifBlank { null } ?: "Work"
+        val session = WorkSession(taskId = task?.id, projectId = task?.projectId, title = label, start = s0, end = e0, minutes = minutes)
+        val tasks = d.tasks.map { if (it.id == task?.id) it.copy(loggedMin = it.loggedMin + minutes, lastWorkedAt = maxOf(it.lastWorkedAt ?: 0, e0)) else it }
+        val ledger = Credits.earn(d.ledger, d.settings, minutes.toDouble(), d.settings.earnPerSessionMin, "Logged: $label", now)
+        return sportCountsAsWorkout(d.copy(sessions = d.sessions + session, tasks = tasks, ledger = ledger), task?.id, minutes, e0)
+    }
+
+    /** "Lab's done" / "class let out early": the fixed block ends now and the planner fills what's left (re-plan after). */
+    fun endBlockEarly(d: AppData, key: String, now: Long): AppData {
+        val date = Time.dateOf(now, Time.zone(d.settings.zoneId)).toString()
+        val ctx = d.days.firstOrNull { it.date == date } ?: DayContext(date)
+        return d.copy(days = d.days.filterNot { it.date == date } + ctx.copy(endedEarly = ctx.endedEarly + (key to now)))
+    }
+
+    fun undoEndEarly(d: AppData, key: String, now: Long): AppData {
+        val date = Time.dateOf(now, Time.zone(d.settings.zoneId)).toString()
+        val ctx = d.days.firstOrNull { it.date == date } ?: return d
+        return d.copy(days = d.days.map { if (it.date == date) ctx.copy(endedEarly = ctx.endedEarly - key) else it })
+    }
+
+    fun summarySeen(d: AppData, date: LocalDate): AppData {
+        val ctx = d.days.firstOrNull { it.date == date.toString() } ?: DayContext(date.toString())
+        return d.copy(days = d.days.filterNot { it.date == date.toString() } + ctx.copy(summarySeen = true))
+    }
+
     /** Ends the running session, logs time on the task and earns credits. */
     fun stopSession(d: AppData, now: Long): AppData {
         val a = d.active ?: return d

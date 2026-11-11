@@ -164,6 +164,15 @@ class DayPlanner(
     private val roughChunkMin: Int = 50,
     private val roughFocusCapMin: Int = 240,
 ) {
+    companion object {
+        /** Key for ending a fixed block early (DayContext.endedEarly): anchor, routine block or calendar event. */
+        fun endKey(b: PlanBlock): String = when {
+            b.anchorId != null -> "anchor:${b.anchorId}"
+            b.routineId != null -> "routine:${b.routineId}"
+            b.taskId != null -> "task:${b.taskId}"
+            else -> "event:${b.title}"
+        }
+    }
 
     fun plan(date: LocalDate, data: AppData, now: Long, carried: Map<String, Int> = emptyMap()): DayPlan {
         val s = data.settings
@@ -260,6 +269,15 @@ class DayPlanner(
                 kind = BlockKind.EVENT,
                 title = e.title,
             )
+        }
+        // "Lab's done" / "class let out early": the block ends when you said, and the freed time gets planned.
+        val ended = ctx?.endedEarly.orEmpty()
+        if (ended.isNotEmpty()) {
+            val trimmed = fixed.mapNotNull { b ->
+                val e = ended[DayPlanner.endKey(b)] ?: return@mapNotNull b
+                if (e <= b.start) null else b.copy(end = min(b.end, e))
+            }
+            fixed.clear(); fixed += trimmed
         }
         fixed.sortBy { it.start }
 

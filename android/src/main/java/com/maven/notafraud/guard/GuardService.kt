@@ -68,6 +68,13 @@ class GuardService : AccessibilityService() {
                         Graph.update { d -> Actions.markOpened(d, routineApp.id, n) }
                         GuardLog.add(label(routineApp.openPkg!!), "opened for routine: ${routineApp.title}")
                         runCatching { startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)) }
+                    } else if (!inCall() && com.maven.notafraud.core.guard.UnlockCheckIn.due(Graph.data, n)) {
+                        // Something's overdue: the check-in, every unlock until answered or "Later" (STATE.md § 27).
+                        runCatching {
+                            startActivity(Intent(this@GuardService, com.maven.notafraud.ui.MainActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                .putExtra(com.maven.notafraud.ui.MainActivity.EXTRA_CHECKIN, true))
+                        }
                     } else if (lad.level >= Graph.data.settings.ladder.unlockToNowFrom && lad.level > 0 && !inCall()) {
                         // Ladder Level 2+: unlocking lands on Now first (what to do, and why the phone is dull).
                         runCatching {

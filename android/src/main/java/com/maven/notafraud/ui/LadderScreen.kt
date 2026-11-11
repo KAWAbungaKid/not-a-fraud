@@ -110,6 +110,15 @@ fun LadderScreen(data: AppData, now: Long) {
                     }
                     Switch(l.lockWallpaper, { v -> Confirm.switch("Lock screen wallpaper", v) { set(l.copy(lockWallpaper = v), "Lock screen wallpaper") } })
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Check-in on unlock")
+                        Text("While something's overdue (routine, a missed block, Twig weigh-in or meal), unlocking shows it with quick answers. Later hides it ${data.settings.checkInLaterMin} min; 3 Laters in a row add a ladder point.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(data.settings.checkInOnUnlock, { v ->
+                        Confirm.switch("Check-in on unlock", v) { Graph.update { Lock.setSwitch(it, ChangeKind.CHECKIN, v, "Turn the unlock check-in off", Graph.now()) } }
+                    })
+                }
                 Text("Home screen widget: long-press the home screen → Widgets → Not a Fraud.", color = Palette.textDim, style = MaterialTheme.typography.bodySmall)
             }
         }

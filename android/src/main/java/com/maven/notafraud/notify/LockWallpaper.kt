@@ -15,9 +15,13 @@ import com.maven.notafraud.core.plan.NowState
  * and today's 3. Redrawn only when that text changes (a few times a day). The home screen wallpaper is untouched.
  */
 object LockWallpaper {
-    fun update(ctx: Context, st: NowState, lad: Ladder.State, picks: List<String>) {
+    fun update(
+        ctx: Context, st: NowState, lad: Ladder.State, picks: List<String>,
+        owed: List<String> = emptyList(), missed: List<String> = emptyList(), next: String? = null,
+    ) {
         val prefs = ctx.getSharedPreferences("ladder", Context.MODE_PRIVATE)
-        val key = listOf(lad.level, lad.bedtime, st.headline, picks.joinToString("|")).joinToString("#")
+        // Minutes-late text changes every minute; key on the item names so it redraws only when the list changes.
+        val key = listOf(lad.level, lad.bedtime, st.headline, picks.joinToString("|"), owed.joinToString("|") { it.substringBefore(" · ") }, missed.joinToString("|"), next).joinToString("#")
         if (prefs.getString("wallKey", null) == key) return
         val dm = ctx.resources.displayMetrics
         val w = dm.widthPixels.coerceAtLeast(720)
@@ -30,11 +34,24 @@ object LockWallpaper {
         val big = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = w * 0.075f; typeface = Typeface.DEFAULT_BOLD }
         val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(184, 192, 200); textSize = w * 0.045f }
         val x = w * 0.08f
-        var y = h * 0.52f
+        var y = h * (if (owed.isEmpty() && missed.isEmpty()) 0.52f else 0.40f)
         c.drawText("LEVEL ${lad.level} · ${Ladder.NAMES[lad.level].uppercase()}" + if (lad.bedtime) " · BEDTIME" else "", x, y, small)
         y += big.textSize * 1.4f
         for (line in wrap(st.headline, big, w - 2 * x).take(3)) { c.drawText(line, x, y, big); y += big.textSize * 1.2f }
+        next?.let { y += body.textSize * 0.4f; for (line in wrap("Next: $it", body, w - 2 * x).take(2)) { c.drawText(line, x, y, body); y += body.textSize * 1.35f } }
         y += body.textSize
+        val warn = Paint(body).apply { color = Color.rgb(255, 200, 87) }
+        val bad = Paint(body).apply { color = Color.rgb(255, 107, 107) }
+        if (owed.isNotEmpty()) {
+            c.drawText("TO LOG / DO NOW", x, y, small); y += body.textSize * 1.5f
+            for (o in owed.take(4)) for (line in wrap("· $o", warn, w - 2 * x).take(1)) { c.drawText(line, x, y, warn); y += body.textSize * 1.35f }
+            y += body.textSize * 0.5f
+        }
+        if (missed.isNotEmpty()) {
+            c.drawText("MISSED TODAY", x, y, small); y += body.textSize * 1.5f
+            for (m in missed.take(3)) for (line in wrap("· $m", bad, w - 2 * x).take(1)) { c.drawText(line, x, y, bad); y += body.textSize * 1.35f }
+            y += body.textSize * 0.5f
+        }
         if (picks.isNotEmpty()) {
             c.drawText("TODAY'S 3", x, y, small); y += body.textSize * 1.5f
             for (p in picks.take(3)) for (line in wrap("· $p", body, w - 2 * x).take(2)) { c.drawText(line, x, y, body); y += body.textSize * 1.35f }

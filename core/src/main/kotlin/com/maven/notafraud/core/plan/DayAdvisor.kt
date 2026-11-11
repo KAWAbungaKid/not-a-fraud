@@ -25,15 +25,8 @@ object DayAdvisor {
         return n
     }
 
-    /** Task blocks in today's plan that ended without any logged session overlapping them. */
-    fun skippedBlocks(d: AppData, now: Long): Int {
-        val plan = d.todayPlan ?: return 0
-        return plan.blocks.count { b ->
-            b.kind == BlockKind.TASK && b.end <= now &&
-                d.sessions.none { s -> s.start < b.end && b.start < s.end } &&
-                d.tasks.firstOrNull { it.id == b.taskId }?.status != com.maven.notafraud.core.model.TaskStatus.DONE
-        }
-    }
+    /** Task blocks in today's plan that ended with no work logged and no reason given (DayReview.missed). */
+    fun skippedBlocks(d: AppData, now: Long): Int = DayReview.missed(d, now).size
 
     fun suggest(d: AppData, now: Long): Advice {
         val zone = Time.zone(d.settings.zoneId)

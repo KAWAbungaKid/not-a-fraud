@@ -104,7 +104,13 @@ object Graph {
         runCatching { com.maven.notafraud.ui.NowWidget.push(ctx) }
         if (l.lockWallpaper) {
             val picks = d.picks[today().toString()].orEmpty().mapNotNull { id -> d.tasks.firstOrNull { it.id == id }?.title }
-            Thread { runCatching { com.maven.notafraud.notify.LockWallpaper.update(ctx, st, lad, picks) } }.start()
+            val zone = Time.zone(d.settings.zoneId)
+            val owed = com.maven.notafraud.core.routine.RoutinePolicy.statuses(d, n)
+                .filter { it.mood == com.maven.notafraud.core.routine.Mood.LATE || it.mood == com.maven.notafraud.core.routine.Mood.ANGRY || it.mood == com.maven.notafraud.core.routine.Mood.DUE }
+                .map { if (it.mood == com.maven.notafraud.core.routine.Mood.DUE) "${it.item.title} · now" else "${it.item.title} · ${Time.durationText(it.minutesLate)} late" }
+            val missed = com.maven.notafraud.core.plan.DayReview.missed(d, n).map { it.title.substringBefore(" [") }
+            val next = st.next?.let { "${Time.clock(it.start, zone)} ${it.title.substringBefore(" [")}" }
+            Thread { runCatching { com.maven.notafraud.notify.LockWallpaper.update(ctx, st, lad, picks, owed, missed, next) } }.start()
         }
     }
 

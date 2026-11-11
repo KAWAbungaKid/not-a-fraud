@@ -60,6 +60,13 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
     val guardOk = remember(now / 60_000) { com.maven.notafraud.guard.GuardHealth.state(ctx) == com.maven.notafraud.guard.GuardHealth.State.RUNNING }
     val hidden = data.settings.nowHidden
     fun act(fn: (AppData) -> AppData) { Graph.update(fn); Graph.refresh(ctx) }
+    var freed by remember { mutableStateOf<String?>(null) }
+    var freedTask by remember { mutableStateOf<String?>(null) }
+    var logWhat by remember { mutableStateOf<Triple<Long, String?, String>?>(null) }
+    var showCheckIn by remember { mutableStateOf(false) }
+    val checkIns = remember(data, now / 60_000) { com.maven.notafraud.core.guard.UnlockCheckIn.prompts(withPlan, now) }
+    logWhat?.let { (start, task, heading) -> LogTimeDialog(withPlan, now, start, now, task, heading) { logWhat = null } }
+    if (showCheckIn) CheckInSheet(withPlan, now) { showCheckIn = false }
 
     LazyColumn(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -91,23 +98,71 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                     }
                 } else if (!state.protected) {
                     val t = state.suggested
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { act { Actions.startSession(it, t?.id, null, Graph.now()) } }) {
-                            Text(if (t != null) "Start" else "Start session")
+                    val cur = state.current
+                    fun short(x: String) = x.substringBefore(" [").substringBefore(" - ").take(28).trim()
+                    when {
+                        cur != null && cur.kind == com.maven.notafraud.core.plan.BlockKind.TASK -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { act { Actions.startSession(it, t?.id, cur.title, Graph.now()) } }) { Text("Start working") }
+                            if (t != null) OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) } }) { Text("Finished it") }
                         }
-                        if (t != null) OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) } }) { Text("Done") }
+                        cur != null && cur.routineId == null && (cur.kind == com.maven.notafraud.core.plan.BlockKind.ANCHOR || cur.kind == com.maven.notafraud.core.plan.BlockKind.EVENT) -> {
+                            // A class, lab or trading: say it's over early and the plan fills the time.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = {
+                                    val left = ((cur.end - Graph.now()) / Time.MIN).toInt()
+                                    Graph.changeAndReplan(ctx) { Actions.endBlockEarly(it, com.maven.notafraud.core.plan.DayPlanner.endKey(cur), Graph.now()) }
+                                    val fill = com.maven.notafraud.core.plan.DayReview.fill(Graph.data, Graph.now(), left)
+                                    freed = "${short(cur.title)} ended ${Time.durationText(left)} early." + (fill?.let { " Fill it with: ${it.title}" } ?: "")
+                                    freedTask = fill?.id
+                                }) { Text("${short(cur.title)} is done") }
+                                if (t != null) TextButton(onClick = { act { Actions.startSession(it, t.id, null, Graph.now()) } }) { Text("Work on ${short(t.title)}") }
+                            }
+                        }
+                        cur != null -> {}
+                        t != null -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { act { Actions.startSession(it, t.id, null, Graph.now()) } }) { Text("Start ${short(t.title)}") }
+                            OutlinedButton(onClick = { Graph.changeAndReplan(ctx) { Actions.setDone(it, t.id, true, Graph.now()) } }) { Text("Already done") }
+                        }
+                        else -> Button(onClick = { act { Actions.startSession(it, null, null, Graph.now()) } }) { Text("Start a session") }
                     }
+                }
+                freed?.let { f ->
+                    Text(f, color = Palette.green, style = MaterialTheme.typography.bodyMedium)
+                    freedTask?.let { id ->
+                        Row {
+                            Button(onClick = { act { Actions.startSession(it, id, null, Graph.now()) }; freed = null }) { Text("Start it") }
+                            TextButton(onClick = { freed = null }) { Text("OK") }
+                        }
+                    }
+                }
+                // Backlog: worked off the phone, or kept going past the block.
+                val prev = withPlan.todayPlan?.blocks.orEmpty()
+                    .filter { it.end <= now && it.end > now - 3 * Time.HOUR && (it.kind == com.maven.notafraud.core.plan.BlockKind.TASK || it.anchorKind == com.maven.notafraud.core.model.AnchorKind.MARKET) }
+                    .maxByOrNull { it.end }
+                Row {
+                    if (data.active == null && prev != null && (state.current == null || state.current?.start?.let { it >= prev.end } == true))
+                        TextButton(onClick = { logWhat = Triple(prev.end, prev.taskId, "Went over on ${prev.title.substringBefore(" [")}?") }) { Text("I went over") }
+                    TextButton(onClick = { logWhat = Triple(now - 30 * Time.MIN, null, "What did you work on?") }) { Text("I worked on…") }
                 }
                 state.routine?.let { r ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Routine: $r", color = Palette.amber, modifier = Modifier.weight(1f))
+                        Text("Routine overdue: $r", color = Palette.amber, modifier = Modifier.weight(1f))
                         state.routineId?.let { id ->
-                            TextButton(onClick = { act { Actions.checkRoutine(it, id, Graph.now()) } }) { Text("Done") }
+                            TextButton(onClick = { act { Actions.checkRoutine(it, id, Graph.now()) } }) { Text("✓ Did it") }
                         }
                     }
                 }
             }
         }
+        if (checkIns.isNotEmpty()) item {
+            Panel(Modifier.clickable { showCheckIn = true }) {
+                Text("Check in · ${checkIns.size} thing${if (checkIns.size == 1) "" else "s"}", style = MaterialTheme.typography.titleMedium, color = Palette.amber)
+                Text(checkIns.take(3).joinToString(" · ") { it.title }, style = MaterialTheme.typography.bodySmall, color = Palette.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        item { SummaryCard(data, now) }
+        if ("score" !in hidden) item { DayScoreCard(data, now) { logWhat = Triple(now - 60 * Time.MIN, com.maven.notafraud.core.plan.DayReview.priorityNag(data, now)?.task?.id, "Log time on it") } }
+        item { SqueezeCard(withPlan, now) }
 
         val wk = com.maven.notafraud.core.workout.WorkoutLink.today(data, now)
         if (wk != null && "workout" !in hidden) item {

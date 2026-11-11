@@ -53,6 +53,8 @@ fun PlanScreen(data: AppData, now: Long) {
     var offset by rememberSaveable { mutableIntStateOf(0) }
     var acting by remember { mutableStateOf<PlanBlock?>(null) }
     var sizing by remember { mutableStateOf<com.maven.notafraud.core.model.Task?>(null) }
+    var logFor by remember { mutableStateOf<PlanBlock?>(null) }
+    var logOpen by remember { mutableStateOf(false) }
     val date = today.plusDays(offset.toLong())
     val plan = remember(data, offset, now / 60_000) {
         val withPlan = Planning.ensureToday(data, now)
@@ -95,18 +97,37 @@ fun PlanScreen(data: AppData, now: Long) {
             }
             item { Spacer(Modifier.height(4.dp)) }
         }
+        if (offset == 0) item {
+            val t = remember(data, now / 60_000) { com.maven.notafraud.core.plan.DayReview.totals(Planning.ensureToday(data, now), now) }
+            if (t.plannedMin > 0 || t.workedMin > 0) Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Planned so far ${Time.durationText(t.plannedMin)} · on plan ${Time.durationText(t.onPlanMin)} · worked ${Time.durationText(t.workedMin)}",
+                    style = MaterialTheme.typography.bodySmall, color = if (t.missed > 0) Palette.amber else Palette.green, modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { logFor = null; logOpen = true }) { Text("Log time") }
+            }
+        }
         items(plan.blocks, key = { "${it.start}-${it.kind}-${it.title}-${it.stepId}" }) { b ->
+            val mark = if (offset == 0 && b.start < now) com.maven.notafraud.core.plan.DayReview.mark(data, b, now) else null
             BlockRow(
                 b, zone,
                 isCurrent = b == current,
                 isPast = offset == 0 && b.end <= now,
-                onTap = { acting = b },
+                mark = mark,
+                onTap = { if (mark != null && b.end <= now) { logFor = b; logOpen = true } else acting = b },
             )
         }
         if (plan.blocks.isEmpty()) item { Text("Nothing planned.", color = Palette.textDim) }
         item { Spacer(Modifier.height(24.dp)) }
     }
 
+    if (logOpen) {
+        val b = logFor
+        LogTimeDialog(
+            Planning.ensureToday(data, now), now, b?.start ?: (now - 30 * Time.MIN), b?.end ?: now, b?.taskId,
+            if (b == null) "Log time" else "${Time.clock(b.start, zone)}–${Time.clock(b.end, zone)}: what did you do?",
+        ) { logOpen = false; logFor = null }
+    }
     acting?.let { b -> BlockActions(b, data, java.time.LocalDate.parse(plan.date), today, onDismiss = { acting = null }) }
     sizing?.let { t -> HowLong(t) { sizing = null } }
 }
@@ -256,19 +277,22 @@ fun blockColor(b: PlanBlock): Color = when {
 }
 
 @Composable
-private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, isPast: Boolean, onTap: () -> Unit) {
-    val alpha = if (isPast) 0.45f else 1f
+private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, isPast: Boolean, mark: com.maven.notafraud.core.plan.DayReview.BlockMark? = null, onTap: () -> Unit) {
+    // Graded blocks keep full colour: done is something to see, missed is something to feel.
+    val graded = mark != null && mark.mark != com.maven.notafraud.core.plan.DayReview.Mark.NOW && mark.mark != com.maven.notafraud.core.plan.DayReview.Mark.LATER
+    val alpha = if (isPast && !graded) 0.45f else 1f
+    val tint = if (graded) markColor(mark!!.mark).copy(alpha = 0.13f) else null
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else if (b.kind == BlockKind.BACKGROUND) Color.Transparent else MaterialTheme.colorScheme.surface)
+            .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else tint ?: if (b.kind == BlockKind.BACKGROUND) Color.Transparent else MaterialTheme.colorScheme.surface)
             .clickable(onClick = onTap)
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
             .heightIn(min = 52.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(5.dp).fillMaxHeight().background(blockColor(b).copy(alpha = alpha)))
+        Box(Modifier.width(5.dp).fillMaxHeight().background(if (graded) markColor(mark!!.mark) else blockColor(b).copy(alpha = alpha)))
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).weight(1f)) {
             Text(
                 "${Time.clock(b.start, zone)}–${Time.clock(b.end, zone)}  ·  ${Time.durationText(b.minutes)}",
@@ -284,6 +308,7 @@ private fun BlockRow(b: PlanBlock, zone: java.time.ZoneId, isCurrent: Boolean, i
                 },
             )
             if (tag.isNotEmpty()) Text(tag.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = if (b.hot) Palette.red else Palette.textDim.copy(alpha = alpha))
+            if (graded) Text(markText(mark!!, b.minutes), style = MaterialTheme.typography.labelMedium, color = markColor(mark.mark))
         }
 
     }

@@ -323,6 +323,7 @@ enum class ChangeKind {
     SETTINGS_WINDOW,
     /** Switch off the guard on Not a Fraud's Settings pages. */
     SETTINGS_GUARD,
+    CHECKIN,
     /** Looser ladder (off, lower top level, bedtime brick off / shorter). [profile] unused; [ladder] holds it. */
     LADDER,
     /** More apps allowed at Level 3 / bedtime. */
@@ -591,6 +592,11 @@ data class Settings(
     val bedMin: Int = 22 * 60,
     /** Pages whose first-visit tip was dismissed. */
     val tipsSeen: Set<String> = emptySet(),
+    /** Unlock check-in: shown on every unlock while something's overdue (STATE.md § 27). */
+    val checkInOnUnlock: Boolean = true,
+    val checkInLaterMin: Int = 20,
+    /** Day score (0–100) at or above this counts as a good day. */
+    val goodDayScore: Int = 70,
     /** Secondary text: 0 normal, 1 brighter, 2 brightest. */
     val textContrast: Int = 0,
     /** Medium lock: the guard also covers the phone's Settings pages that would switch Not a Fraud off or remove it. */
@@ -672,6 +678,29 @@ data class DayContext(
     val plannedTaskMin: Int? = null,
     /** When the burnout prompt was shown (once a day). */
     val promptedAt: Long? = null,
+    /** Fixed blocks that ended early today ("Lab's done"): DayPlanner.endKey → when. */
+    val endedEarly: Map<String, Long> = emptyMap(),
+    /** Missed blocks you explained ("what did you do instead?"): not counted as slipped. */
+    val excused: List<Excuse> = emptyList(),
+    /** End-of-day summary dismissed. */
+    val summarySeen: Boolean = false,
+)
+
+/** A stretch of a day you said was spent on something that isn't a task ("helped a friend move", "nothing"). */
+@Serializable
+data class Excuse(val start: Long, val end: Long, val reason: String, val counts: Boolean = true)
+
+/**
+ * The unlock check-in (STATE.md § 27): shown on every unlock while something is overdue. "Later" hides it for
+ * [Settings.checkInLaterMin]; three Laters in a row add a ladder point until you answer one.
+ */
+@Serializable
+data class CheckInState(
+    val snoozeUntil: Long = 0,
+    val laters: Int = 0,
+    val laterDate: String = "",
+    /** Prompts answered or waved off today ("block:<start>", "routine:<id>", "priority:<taskId>"), keyed by date. */
+    val handled: Map<String, Set<String>> = emptyMap(),
 )
 
 @Serializable
@@ -720,6 +749,7 @@ data class AppData(
     val pending: List<PendingChange> = emptyList(),
     /** Until then, the phone's Settings pages for Not a Fraud open normally (granted in the morning). */
     val settingsWindowUntil: Long = 0,
+    val checkIn: CheckInState = CheckInState(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),

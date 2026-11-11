@@ -40,6 +40,10 @@ data class DietStatus(
     /** Eating window when fasting is on ("HH:mm"), else null. */
     val windowStart: String? = null,
     val windowEnd: String? = null,
+    /** Slot → what you usually eat there ("Chicken & rice · 650 kcal"), for one-tap logging from Not a Fraud. */
+    val usual: Map<String, String> = emptyMap(),
+    /** Twig accepts weigh-ins and quick meals from Not a Fraud (Twig 0.4+). */
+    val acceptsQuick: Boolean = false,
 )
 
 /** One Twig meal slot; [by] "HH:mm" = late after this, null = untimed (Snacks). */

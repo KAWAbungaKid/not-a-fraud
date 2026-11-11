@@ -75,6 +75,8 @@ object Ladder {
             why += "today's workout keeps the weekly minimum"
         }
 
+        if (UnlockCheckIn.ignoring(d, now)) { pts += 1; why += "check-in put off ${d.checkIn.laters} times" }
+
         // Recent work buys points back: 25+ minutes logged in the last 90 minutes.
         val recent = d.sessions.filter { it.end > now - 90 * Time.MIN }.sumOf { it.minutes }
         if (recent >= 25 && pts > 0) { pts = (pts - 2).coerceAtLeast(0); why += "−2 for ${Time.durationText(recent)} of work just now" }
@@ -86,6 +88,7 @@ object Ladder {
         val down = buildList {
             if (slipped > 0 || pts > 0) add("start a task (any running session drops it to Normal)")
             if (angry.isNotEmpty()) add("do " + angry.first().item.title.lowercase())
+            if (UnlockCheckIn.ignoring(d, now)) add("answer the check-in")
             if (WorkoutLink.mustToday(d, now)) add("start today's workout")
         }.joinToString("; ")
         return State(level, pts, why, false, down)

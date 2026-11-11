@@ -65,6 +65,21 @@ object DietSync {
         ctx.contentResolver.update(Uri.parse("content://${dietPackage(ctx)}.sync/meal"), values, null, null) > 0
     }.getOrDefault(false)
 
+    /** Weigh-in typed on the check-in (Twig 0.4+). */
+    fun pushWeigh(ctx: Context, lb: Double): Boolean = runCatching {
+        val values = android.content.ContentValues().apply { put("lb", lb); put("at", System.currentTimeMillis()) }
+        ctx.contentResolver.update(Uri.parse("content://${dietPackage(ctx)}.sync/weigh"), values, null, null) > 0
+    }.getOrDefault(false)
+
+    /**
+     * A meal from the check-in (Twig 0.4+): [usual] logs what you usually eat in [slot]; otherwise [text] is kept as a
+     * quick note Twig asks you to fill in. [at] = when you ate (fasting uses it).
+     */
+    fun pushQuickMeal(ctx: Context, slot: String, text: String, at: Long, usual: Boolean): Boolean = runCatching {
+        val values = android.content.ContentValues().apply { put("slot", slot); put("text", text); put("at", at); put("usual", usual) }
+        ctx.contentResolver.update(Uri.parse("content://${dietPackage(ctx)}.sync/quickmeal"), values, null, null) > 0
+    }.getOrDefault(false)
+
     fun open(ctx: Context): Boolean {
         val i = ctx.packageManager.getLaunchIntentForPackage(dietPackage(ctx)) ?: return false
         ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

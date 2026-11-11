@@ -48,6 +48,8 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private var tab by mutableStateOf(TAB_NOW)
+    /** Opened by the guard on unlock: show the check-in over whatever tab. */
+    private var checkIn by mutableStateOf(false)
     /** Bumped on every resume so screens re-read permission state. */
     private var resumes by mutableLongStateOf(0L)
 
@@ -57,6 +59,7 @@ class MainActivity : ComponentActivity() {
         Graph.init(this)
         intent?.getStringExtra(EXTRA_TAB)?.let { tab = it }
         if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
+        if (intent?.getBooleanExtra(EXTRA_CHECKIN, false) == true) checkIn = true
         setContent {
             val d by Graph.store.state.collectAsState()
             NafTheme(d.settings.accent, d.settings.textContrast) {
@@ -72,6 +75,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         intent.getStringExtra(EXTRA_TAB)?.let { tab = it }
         if (tab == "todo") { Graph.openTodo = true; tab = TAB_TASKS }
+        if (intent.getBooleanExtra(EXTRA_CHECKIN, false)) checkIn = true
     }
 
     override fun onResume() {
@@ -152,12 +156,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (checkIn) CheckInSheet(data, now) { checkIn = false }
         ConfirmHost()
         ReasonHost(data, now)
     }
 
     companion object {
         const val EXTRA_TAB = "tab"
+        const val EXTRA_CHECKIN = "checkin"
         const val TAB_NOW = "now"
         const val TAB_PLAN = "plan"
         const val TAB_TASKS = "tasks"

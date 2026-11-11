@@ -198,4 +198,12 @@ class V10Test {
         d = Lock.setModule(d, com.maven.notafraud.core.model.Module.STATS, false, at(12))
         assertFalse(com.maven.notafraud.core.model.Module.STATS in d.settings.modules)
     }
+
+    @Test
+    fun `system photo and file pickers open at bedtime`() {
+        val d = base().copy(settings = base().settings.copy(ladder = base().settings.ladder.copy(allowlist = setOf("com.google.android.apps.photos"), allowlistConfirmed = true)))
+        assertEquals(3, Ladder.state(d, at(23)).level)
+        for (p in listOf("com.google.android.providers.media.module", "com.google.android.documentsui", "com.android.intentresolver"))
+            assertEquals(GuardAction.IGNORE, GuardPolicy.decide(p, d, at(23)).action, p)
+    }
 }

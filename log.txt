@@ -1,0 +1,152 @@
+
+Welcome to Gradle 9.8.2!
+
+Here are the highlights of this release:
+ - Java 27 support
+ - Maven mirror settings reuse
+ - Linked problem locations in build output
+
+For more details see https://docs.gradle.org/9.8.2/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :desktop:packageReleaseMsi
+
+> Configure project :desktop
+w: file:///D:/a/not-a-fraud/not-a-fraud/desktop/build.gradle.kts:23:28: 'val material3: String' is deprecated. Specify dependency directly.
+
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :desktop:prepareAppResources NO-SOURCE
+> Task :core:processResources NO-SOURCE
+> Task :desktop:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :desktop:convertXmlValueResourcesForMain NO-SOURCE
+> Task :desktop:copyNonXmlValueResourcesForMain NO-SOURCE
+> Task :desktop:prepareComposeResourcesTaskForMain NO-SOURCE
+> Task :desktop:generateResourceAccessorsForMain SKIPPED
+> Task :desktop:generateActualResourceCollectorsForMain SKIPPED
+> Task :desktop:generateComposeResClass SKIPPED
+> Task :desktop:assembleMainResources
+> Task :desktop:processResources
+> Task :desktop:unpackDefaultComposeDesktopJvmApplicationResources
+
+> Task :downloadWix
+Download https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+
+> Task :unzipWix
+> Task :desktop:checkRuntime
+> Task :core:compileKotlin
+> Task :desktop:createRuntimeImage
+
+> Task :core:compileKotlin
+w: file:///D:/a/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:57:152 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///D:/a/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:69:135 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///D:/a/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:241:76 Unnecessary safe call on a non-null receiver of type 'WorkoutStatus'.
+w: file:///D:/a/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:292:96 Condition is always 'true'.
+w: file:///D:/a/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/Planning.kt:59:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayPlan'.
+
+> Task :core:compileJava NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:jar
+
+> Task :desktop:compileKotlin
+w: file:///D:/a/not-a-fraud/not-a-fraud/desktop/src/main/kotlin/com/maven/notafraud/desktop/Main.kt:160:9 'fun TabRow(selectedTabIndex: Int, modifier: Modifier = ..., containerColor: Color = ..., contentColor: Color = ..., indicator: ComposableFunction1<List<TabPosition>, Unit> = ..., divider: ComposableFunction0<Unit> = ..., tabs: ComposableFunction0<Unit>): Unit' is deprecated. Replaced with PrimaryTabRow and SecondaryTabRow.
+
+> Task :desktop:compileJava NO-SOURCE
+> Task :desktop:classes
+> Task :desktop:jar
+
+> Task :desktop:proguardReleaseJars
+ProGuard, version 7.8.0
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/savedstate-compose.kotlin_module]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/navigationevent-compose.kotlin_module]
+Note: duplicate definition of resource file [META-INF/androidx/navigationevent/navigationevent-compose/LICENSE.txt]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/runtime-saveable.kotlin_module]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/lifecycle-runtime-compose.kotlin_module]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/runtime.kotlin_module]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/AL2.0]
+Note: duplicate definition of resource file [META-INF/LGPL2.1]
+Note: duplicate definition of resource file [META-INF/LICENSE]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: duplicate definition of resource file [META-INF/MANIFEST.MF]
+Note: there were 62 duplicate class definitions.
+      (https://www.guardsquare.com/proguard/manual/troubleshooting#duplicateclass)
+Note: com.sun.jna.Native calls 'Field.getType'
+Note: com.sun.jna.Structure calls 'Field.getType'
+Note: com.sun.jna.StructureReadContext calls 'Field.getType'
+Note: com.sun.jna.Native calls 'Class.getDeclaringClass'
+Note: com.sun.jna.Klass accesses a declared constructor '<init>()' dynamically
+Note: com.sun.jna.Native accesses a method 'walk(java.util.function.Function)' dynamically
+Note: com.sun.jna.Native accesses a declared constructor '<init>()' dynamically
+Note: com.sun.jna.Native accesses a declared method 'getClassContext()' dynamically
+Note: com.sun.jna.Structure accesses a constructor '<init>()' dynamically
+Note: com.sun.jna.platform.WindowUtils$MacWindowUtils$1 accesses a method 'getPeer()' dynamically
+Note: com.sun.jna.platform.WindowUtils$MacWindowUtils$1 accesses a method 'setAlpha(float)' dynamically
+Note: com.sun.jna.platform.WindowUtils$X11WindowUtils accesses a method 'getVisual()' dynamically
+Note: com.sun.jna.platform.win32.COM.util.Convert accesses a method 'values()' dynamically
+Note: com.sun.jna.ptr.ByReference accesses a method 'getValue()' dynamically
+
+> Task :desktop:packageReleaseMsi
+The distribution is written to D:\a\not-a-fraud\not-a-fraud\desktop\build\compose\binaries\main-release\msi\NotAFraud-1.0.20.msi
+gradle/actions: Writing build results to D:\a\_temp\.gradle-actions\build-results\__run-1795126947485.json
+
+[Incubating] Problems report is available at: file:///D:/a/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 11s
+13 actionable tasks: 13 executed
+Configuration cache entry stored.

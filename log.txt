@@ -1,0 +1,129 @@
+
+Welcome to Gradle 9.8.2!
+
+Here are the highlights of this release:
+ - Java 27 support
+ - Maven mirror settings reuse
+ - Linked problem locations in build output
+
+For more details see https://docs.gradle.org/9.8.2/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :android:assembleDebug :android:testDebugUnitTest
+
+> Configure project :desktop
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/desktop/build.gradle.kts:23:28: 'val material3: String' is deprecated. Specify dependency directly.
+
+> Task :feedback:preBuild UP-TO-DATE
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :android:preBuild UP-TO-DATE
+> Task :android:preDebugBuild UP-TO-DATE
+> Task :android:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :core:processResources NO-SOURCE
+> Task :feedback:preDebugBuild UP-TO-DATE
+> Task :android:generateDebugResources
+> Task :android:generateDebugBuildConfig
+> Task :feedback:processDebugNavigationResources
+> Task :feedback:generateDebugResources
+> Task :feedback:packageDebugResources
+> Task :android:packageDebugResources
+> Task :feedback:javaPreCompileDebug
+> Task :android:javaPreCompileDebug FROM-CACHE
+> Task :android:generateDebugAssets UP-TO-DATE
+> Task :feedback:generateDebugAssets UP-TO-DATE
+> Task :feedback:parseDebugLocalResources
+> Task :feedback:mergeDebugAssets
+> Task :feedback:generateDebugRFile
+> Task :android:processDebugNavigationResources
+> Task :android:mergeDebugAssets
+> Task :android:compressDebugAssets
+> Task :android:parseDebugLocalResources
+> Task :android:generateDebugRFile
+> Task :android:generateDebugGlobalSynthetics
+> Task :android:desugarDebugFileDependencies
+> Task :feedback:writeDebugAarMetadata
+> Task :android:checkDebugAarMetadata
+> Task :android:mapDebugSourceSetPaths
+> Task :android:checkDebugDuplicateClasses
+> Task :core:compileKotlin
+> Task :feedback:compileDebugKotlin
+> Task :feedback:compileDebugJavaWithJavac NO-SOURCE
+> Task :android:compileDebugNavigationResources
+> Task :android:mergeExtDexDebug
+> Task :feedback:bundleLibCompileToJarDebug
+
+> Task :core:compileKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:57:152 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:69:135 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:241:76 Unnecessary safe call on a non-null receiver of type 'WorkoutStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:292:96 Condition is always 'true'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/Planning.kt:59:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayPlan'.
+
+> Task :core:compileJava NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:jar
+> Task :feedback:processDebugJavaRes
+> Task :feedback:bundleLibRuntimeToDirDebug
+> Task :android:mergeLibDexDebug
+> Task :android:createDebugCompatibleScreenManifests
+> Task :android:extractDeepLinksDebug
+> Task :feedback:extractDeepLinksDebug
+> Task :feedback:processDebugManifest
+> Task :android:compileDebugKotlin
+> Task :android:mergeDebugResources
+
+> Task :android:compileDebugKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/guard/GuardService.kt:238:104 'var isChecked: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/sense/Sensors.kt:269:24 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:284:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:295:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:311:43 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+
+> Task :android:processDebugMainManifest
+> Task :android:compileDebugJavaWithJavac
+> Task :android:processDebugJavaRes
+> Task :android:mergeDebugJavaResource
+> Task :feedback:mapDebugSourceSetPaths
+> Task :feedback:compileDebugLibraryResources
+> Task :android:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugJniLibFolders
+> Task :feedback:mergeDebugNativeLibs NO-SOURCE
+> Task :feedback:copyDebugJniLibsProjectOnly
+> Task :android:mergeDebugNativeLibs
+
+> Task :android:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :android:validateSigningDebug
+> Task :android:writeDebugAppMetadata
+> Task :android:writeDebugSigningConfigVersions
+> Task :android:preDebugUnitTestBuild UP-TO-DATE
+> Task :android:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :feedback:bundleLibRuntimeToJarDebug
+> Task :android:processDebugManifest
+> Task :android:processDebugManifestForPackage
+> Task :android:processDebugResources
+> Task :android:bundleDebugClassesToCompileJar
+> Task :android:bundleDebugClassesToRuntimeJar
+> Task :android:compileDebugUnitTestKotlin NO-SOURCE
+> Task :android:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :android:processDebugUnitTestJavaRes NO-SOURCE
+> Task :android:testDebugUnitTest NO-SOURCE
+> Task :android:dexBuilderDebug
+> Task :android:mergeProjectDexDebug
+> Task :android:packageDebug
+> Task :android:assembleDebug
+> Task :android:createDebugApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1795126445877.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 2s
+62 actionable tasks: 60 executed, 2 from cache
+Configuration cache entry stored.

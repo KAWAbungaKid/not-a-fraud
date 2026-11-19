@@ -1,0 +1,133 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :android:assembleRelease
+> Task :feedback:preBuild UP-TO-DATE
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :android:preBuild UP-TO-DATE
+> Task :feedback:preReleaseBuild UP-TO-DATE
+> Task :android:preReleaseBuild UP-TO-DATE
+> Task :core:processResources NO-SOURCE
+> Task :android:mergeReleaseJniLibFolders
+> Task :feedback:mergeReleaseJniLibFolders
+> Task :feedback:generateReleaseResources
+> Task :feedback:mergeReleaseNativeLibs NO-SOURCE
+> Task :feedback:processReleaseNavigationResources
+> Task :feedback:copyReleaseJniLibsProjectOnly
+> Task :feedback:javaPreCompileRelease
+> Task :android:generateReleaseBuildConfig
+> Task :android:generateReleaseResources
+> Task :feedback:packageReleaseResources
+> Task :android:packageReleaseResources
+> Task :android:processReleaseNavigationResources
+> Task :android:checkReleaseDuplicateClasses
+> Task :android:javaPreCompileRelease FROM-CACHE
+> Task :feedback:writeReleaseAarMetadata
+> Task :feedback:parseReleaseLocalResources
+> Task :android:checkReleaseAarMetadata
+> Task :feedback:generateReleaseRFile
+> Task :android:mapReleaseSourceSetPaths
+> Task :android:compileReleaseNavigationResources
+> Task :android:parseReleaseLocalResources
+> Task :android:generateReleaseRFile
+> Task :android:createReleaseCompatibleScreenManifests
+> Task :android:extractDeepLinksRelease
+> Task :feedback:extractDeepLinksRelease
+> Task :feedback:processReleaseManifest
+> Task :android:processReleaseMainManifest
+> Task :android:processReleaseManifest
+> Task :android:processReleaseManifestForPackage
+> Task :feedback:mapReleaseSourceSetPaths
+> Task :feedback:compileReleaseLibraryResources
+> Task :android:desugarReleaseFileDependencies
+> Task :android:mergeReleaseStartupProfile
+> Task :android:mergeReleaseResources
+> Task :feedback:compileReleaseKotlin
+> Task :feedback:compileReleaseJavaWithJavac NO-SOURCE
+> Task :core:compileKotlin
+> Task :android:mergeExtDexRelease
+> Task :android:processReleaseResources
+> Task :feedback:bundleLibRuntimeToDirRelease
+
+> Task :core:compileKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:57:152 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/guard/UnlockCheckIn.kt:69:135 Unnecessary safe call on a non-null receiver of type 'DietStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:241:76 Unnecessary safe call on a non-null receiver of type 'WorkoutStatus'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/DayPlanner.kt:292:96 Condition is always 'true'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/core/src/main/kotlin/com/maven/notafraud/core/plan/Planning.kt:59:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayPlan'.
+
+> Task :core:compileJava NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:jar
+> Task :feedback:bundleLibCompileToJarRelease
+> Task :feedback:prepareReleaseArtProfile
+> Task :android:mergeReleaseArtProfile
+> Task :feedback:bundleLibRuntimeToJarRelease
+> Task :android:generateReleaseAssets UP-TO-DATE
+> Task :feedback:generateReleaseAssets UP-TO-DATE
+> Task :feedback:mergeReleaseAssets
+> Task :android:mergeReleaseAssets
+> Task :android:compressReleaseAssets
+> Task :android:extractReleaseVersionControlInfo
+> Task :android:extractProguardFiles
+> Task :feedback:processReleaseJavaRes
+> Task :feedback:createFullJarRelease
+> Task :feedback:extractProguardFiles
+> Task :feedback:generateReleaseLintModel
+> Task :feedback:prepareLintJarForPublish
+> Task :feedback:checkReleaseAarMetadata
+> Task :feedback:extractDeepLinksForAarRelease
+> Task :feedback:extractReleaseAnnotations
+> Task :feedback:mergeReleaseGeneratedProguardFiles
+> Task :feedback:mergeReleaseConsumerProguardFiles
+> Task :feedback:mergeReleaseJavaResource
+> Task :feedback:syncReleaseLibJars
+> Task :feedback:bundleReleaseLocalLintAar
+> Task :android:mergeReleaseNativeLibs
+
+> Task :android:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :android:extractReleaseNativeSymbolTables
+> Task :android:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :feedback:writeReleaseLintModelMetadata
+> Task :feedback:generateReleaseLintVitalModel
+> Task :android:optimizeReleaseResources
+> Task :android:collectReleaseDependencies
+> Task :android:sdkReleaseDependencyData
+> Task :android:validateSigningRelease
+> Task :android:writeReleaseAppMetadata
+> Task :android:writeReleaseSigningConfigVersions
+> Task :android:compileReleaseKotlin
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/guard/GuardService.kt:238:104 'var isChecked: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/sense/Sensors.kt:269:24 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:284:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:295:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+w: file:///home/runner/work/not-a-fraud/not-a-fraud/android/src/main/java/com/maven/notafraud/ui/PlanScreen.kt:311:43 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DayReview.BlockMark'.
+
+> Task :feedback:lintVitalAnalyzeRelease
+> Task :android:processReleaseJavaRes
+> Task :android:mergeReleaseJavaResource
+> Task :android:compileReleaseJavaWithJavac
+> Task :android:generateReleaseLintVitalReportModel
+> Task :android:dexBuilderRelease
+> Task :android:mergeReleaseGlobalSynthetics
+> Task :android:mergeDexRelease
+> Task :android:compileReleaseArtProfile
+> Task :android:lintVitalAnalyzeRelease
+> Task :android:lintVitalReportRelease
+> Task :android:lintVitalRelease
+> Task :android:packageRelease
+> Task :android:assembleRelease
+> Task :android:createReleaseApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1795126933575.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/not-a-fraud/not-a-fraud/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 29s
+87 actionable tasks: 86 executed, 1 from cache
+Configuration cache entry stored.

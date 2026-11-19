@@ -679,3 +679,20 @@ vs actual, day score on Now, priority nag, end-of-day summary).
   wallpaper adds to-log routine, missed blocks and next.
 - Twig 0.4 provider writes: `/weigh` (lb, at), `/quickmeal` (slot, text, at, usual). DietStatus adds `usual`
   (slot → label) and `acceptsQuick`.
+
+## 28. v0.15.0 (2026-11-19): planned unlock
+
+Maven, before a trip: new apps kept getting kicked out mid-login (Level 3 brick: only the Level 3 list opens) and
+list changes wait until morning. Asked for "unlock from now until December 3rd at 5:15 PM" that can't be switched
+on in a weak moment. Decisions: friction = a long typed phrase like the emergency one but longer; what switches off
+= chosen each time.
+- `Pause(start, end, covers, reason, createdAt, endedAt)` in `AppData.pauses`; `PauseCover` BRICK (Ladder.state → 0,
+  bedtime too), BLOCKED (GuardPolicy ignores the blocked list and sites), CHECKIN (UnlockCheckIn.due false), NAGS
+  (RoutinePolicy alerts, ladder routine / workout points, missed blocks, priority nag, check-in routine prompts).
+- `guard/Pauses.kt`: `create` needs ≥ 1 cover, end after start, ≤ 31 days, a reason (10+ chars) and
+  `Settings.pausePhrase` typed (Credits.phraseMatches); `end` instant. Phrase changes go through Lock
+  (ChangeKind.PAUSE_PHRASE, min 40 chars).
+- UI `ui/PauseDialog.kt`: start now or later, end via date + time picker, covers, reason, phrase field with no
+  text toolbar and multi-character jumps ignored (no paste). PauseBanner on Now and the ladder page; link on the
+  app block screen.
+- Immediate workaround that already existed: any running session drops the ladder to Normal.

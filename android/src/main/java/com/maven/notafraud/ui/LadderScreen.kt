@@ -59,6 +59,7 @@ fun LadderScreen(data: AppData, now: Long) {
 
     LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Spacer(Modifier.height(4.dp)) }
+        item { PauseBanner(data, now, showSetUp = true) }
         item {
             Panel(highlight = lad.level > 0) {
                 SectionLabel("Right now")

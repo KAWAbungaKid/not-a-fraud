@@ -270,6 +270,12 @@ fun SetupScreen(data: AppData, resumes: Long, section: String = "setup") {
                     phrase, { phrase = it }, label = { Text("Emergency unlock phrase") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                var pPhrase by remember(data.settings.pausePhrase) { mutableStateOf(data.settings.pausePhrase) }
+                OutlinedTextField(pPhrase, { pPhrase = it }, label = { Text("Planned-unlock phrase (40+ characters; a change waits until morning)") }, modifier = Modifier.fillMaxWidth())
+                TextButton(enabled = pPhrase.trim().length >= 40 && pPhrase.trim() != data.settings.pausePhrase, onClick = {
+                    val n = Graph.now()
+                    Graph.update { com.maven.notafraud.core.store.Lock.request(it, com.maven.notafraud.core.model.PendingChange(kind = com.maven.notafraud.core.model.ChangeKind.PAUSE_PHRASE, label = "New planned-unlock phrase", createdAt = n, applyAfter = n, text = pPhrase.trim()), n) }
+                }) { Text("Change planned-unlock phrase") }
                 var creed by remember(data.settings.creed) { mutableStateOf(data.settings.creed) }
                 OutlinedTextField(creed, { creed = it }, label = { Text("Creed (shown on the block screen)") }, modifier = Modifier.fillMaxWidth())
                 TextButton(

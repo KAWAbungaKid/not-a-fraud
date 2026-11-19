@@ -45,6 +45,7 @@ object Ladder {
     fun state(d: AppData, now: Long): State {
         val l = d.settings.ladder
         if (!l.enabled || com.maven.notafraud.core.model.Module.BLOCKING !in d.settings.modules) return State(0, 0, emptyList(), false, "")
+        if (Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.BRICK)) return State(0, 0, listOf("Planned unlock"), false, "")
         val top = if (l.allowlistConfirmed) l.maxLevel.coerceIn(0, 3) else l.maxLevel.coerceIn(0, 2)
         if (isBedtime(d, now)) {
             val lvl = minOf(3, if (l.allowlistConfirmed) 3 else 2)
@@ -62,7 +63,8 @@ object Ladder {
         val slipped = DayAdvisor.skippedBlocks(d, now).coerceAtMost(3)
         if (slipped > 0) { pts += slipped; why += "$slipped planned block" + (if (slipped == 1) "" else "s") + " slipped" }
 
-        val angry = RoutinePolicy.statuses(d, now).filter { it.mood == Mood.ANGRY }
+        val nagsPaused = Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.NAGS)
+        val angry = if (nagsPaused) emptyList() else RoutinePolicy.statuses(d, now).filter { it.mood == Mood.ANGRY }
         if (angry.isNotEmpty()) { pts += angry.size.coerceAtMost(2); why += "overdue: " + angry.take(3).joinToString { it.item.title.lowercase() } }
 
         val usage = d.usage.firstOrNull { it.date == today.toString() && it.device == "phone" }
@@ -70,7 +72,7 @@ object Ladder {
         val wastePts = when { wasted >= 150 -> 3; wasted >= 90 -> 2; wasted >= 45 -> 1; else -> 0 }
         if (wastePts > 0) { pts += wastePts; why += "${Time.durationText(wasted)} in blocked apps today" }
 
-        if (WorkoutLink.mustToday(d, now) && m >= d.settings.workoutNagFromMin) {
+        if (!nagsPaused && WorkoutLink.mustToday(d, now) && m >= d.settings.workoutNagFromMin) {
             pts += if (m >= 18 * 60) 2 else 1
             why += "today's workout keeps the weekly minimum"
         }

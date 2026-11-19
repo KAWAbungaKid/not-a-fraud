@@ -154,6 +154,7 @@ fun NowScreen(data: AppData, now: Long, onOpenTab: (String) -> Unit) {
                 }
             }
         }
+        item { PauseBanner(data, now) }
         if (checkIns.isNotEmpty()) item {
             Panel(Modifier.clickable { showCheckIn = true }) {
                 Text("Check in · ${checkIns.size} thing${if (checkIns.size == 1) "" else "s"}", style = MaterialTheme.typography.titleMedium, color = Palette.amber)

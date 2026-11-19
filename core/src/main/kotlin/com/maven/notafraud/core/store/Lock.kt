@@ -99,6 +99,7 @@ object Lock {
         ChangeKind.SETTINGS_WINDOW -> d.copy(settingsWindowUntil = System.currentTimeMillis() + SETTINGS_WINDOW_MIN * Time.MIN)
         ChangeKind.SETTINGS_GUARD -> d.copy(settings = d.settings.copy(guardSettingsPages = c.flag ?: true))
         ChangeKind.CHECKIN -> d.copy(settings = d.settings.copy(checkInOnUnlock = c.flag ?: true))
+        ChangeKind.PAUSE_PHRASE -> d.copy(settings = d.settings.copy(pausePhrase = c.text?.takeIf { it.length >= 40 } ?: d.settings.pausePhrase))
         ChangeKind.LADDER -> c.text?.let { runCatching { LADDER_JSON.decodeFromString(com.maven.notafraud.core.model.LadderSettings.serializer(), it) }.getOrNull() }
             ?.let { d.copy(settings = d.settings.copy(ladder = it)) } ?: d
         ChangeKind.LADDER_ALLOW -> d.copy(settings = d.settings.copy(ladder = d.settings.ladder.copy(allowlist = d.settings.ladder.allowlist + c.items)))

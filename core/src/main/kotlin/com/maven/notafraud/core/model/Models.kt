@@ -324,6 +324,7 @@ enum class ChangeKind {
     /** Switch off the guard on Not a Fraud's Settings pages. */
     SETTINGS_GUARD,
     CHECKIN,
+    PAUSE_PHRASE,
     /** Looser ladder (off, lower top level, bedtime brick off / shorter). [profile] unused; [ladder] holds it. */
     LADDER,
     /** More apps allowed at Level 3 / bedtime. */
@@ -597,6 +598,8 @@ data class Settings(
     val checkInLaterMin: Int = 20,
     /** Day score (0–100) at or above this counts as a good day. */
     val goodDayScore: Int = 70,
+    /** Typed out (no pasting) to set up a planned unlock. Changing it waits until the next morning. */
+    val pausePhrase: String = DEFAULT_PAUSE_PHRASE,
     /** Secondary text: 0 normal, 1 brighter, 2 brightest. */
     val textContrast: Int = 0,
     /** Medium lock: the guard also covers the phone's Settings pages that would switch Not a Fraud off or remove it. */
@@ -686,6 +689,30 @@ data class DayContext(
     val summarySeen: Boolean = false,
 )
 
+const val DEFAULT_PAUSE_PHRASE =
+    "I am choosing to switch off my own limits on purpose. I know exactly why I need this, I am not doing it to escape something I should be doing, and I will own whatever I do with this time."
+
+/** What a planned unlock switches off. */
+@Serializable
+enum class PauseCover(val label: String, val blurb: String) {
+    BRICK("Brick ladder & bedtime", "No Level 3 / bedtime: any app opens (new ones too)."),
+    BLOCKED("Blocked apps & sites", "Your blocked list opens without credits."),
+    CHECKIN("Unlock check-in", "No check-in screen when you unlock."),
+    NAGS("Routine & plan nags", "No routine reminders, no slipped-block points, no day score."),
+}
+
+/** A planned unlock: from [start] to [end] (to the minute), switching off [covers]. Ended early = [endedAt]. */
+@Serializable
+data class Pause(
+    val id: String = newId(),
+    val start: Long,
+    val end: Long,
+    val covers: Set<PauseCover>,
+    val reason: String,
+    val createdAt: Long,
+    val endedAt: Long? = null,
+)
+
 /** A stretch of a day you said was spent on something that isn't a task ("helped a friend move", "nothing"). */
 @Serializable
 data class Excuse(val start: Long, val end: Long, val reason: String, val counts: Boolean = true)
@@ -750,6 +777,8 @@ data class AppData(
     /** Until then, the phone's Settings pages for Not a Fraud open normally (granted in the morning). */
     val settingsWindowUntil: Long = 0,
     val checkIn: CheckInState = CheckInState(),
+    /** Planned unlocks ("now until Dec 3, 5:15 PM"), past ones kept for the record (STATE.md § 28). */
+    val pauses: List<Pause> = emptyList(),
     /** Draft plans for the next 6 days (today is [todayPlan]). */
     val weekPlan: List<com.maven.notafraud.core.plan.DayPlan> = emptyList(),
     val projects: List<Project> = emptyList(),

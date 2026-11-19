@@ -147,3 +147,43 @@ class V11Test {
         @Suppress("UNUSED_VARIABLE") val unused = WorkSession(title = "x", start = 0, end = 0, minutes = 0)
     }
 }
+
+/** v0.15: planned unlocks. */
+class PauseTest {
+    private val zone = java.time.ZoneId.of("America/Chicago")
+    private val day = java.time.LocalDate.parse("2026-11-19")
+    private fun at(h: Int, m: Int = 0, date: java.time.LocalDate = day) = com.maven.notafraud.core.plan.Time.at(date, h * 60 + m, zone)
+    private val base = Seed.data(at(4)).let { it.copy(settings = it.settings.copy(ladder = it.settings.ladder.copy(enabled = true, bedtimeBrick = true, allowlistConfirmed = true, bedMin = 22 * 60, wakeMin = 6 * 60))) }
+    private val phrase = com.maven.notafraud.core.model.DEFAULT_PAUSE_PHRASE
+
+    @kotlin.test.Test
+    fun `needs the whole phrase and a reason`() {
+        val p = com.maven.notafraud.core.guard.Pauses
+        val c = setOf(com.maven.notafraud.core.model.PauseCover.BRICK)
+        assertTrue(p.create(base, at(15), at(17, 15, day.plusDays(14)), c, "vacation apps", "I am choosing this on purpose", at(15)) is com.maven.notafraud.core.guard.Pauses.Result.No)
+        assertTrue(p.create(base, at(15), at(17, 15, day.plusDays(14)), c, "x", phrase, at(15)) is com.maven.notafraud.core.guard.Pauses.Result.No)
+        assertTrue(p.create(base, at(15), at(17, 15, day.plusDays(60)), c, "vacation apps", phrase, at(15)) is com.maven.notafraud.core.guard.Pauses.Result.No)
+        val ok = p.create(base, at(15), at(17, 15, day.plusDays(14)), c, "Logging into vacation apps", phrase.uppercase(), at(15))
+        assertTrue(ok is com.maven.notafraud.core.guard.Pauses.Result.Ok)
+    }
+
+    @kotlin.test.Test
+    fun `covers switch off only what was picked, and ending is instant`() {
+        val p = com.maven.notafraud.core.guard.Pauses
+        val r = p.create(base, at(15), at(17, 15, day.plusDays(14)), setOf(com.maven.notafraud.core.model.PauseCover.BRICK, com.maven.notafraud.core.model.PauseCover.CHECKIN), "Logging into vacation apps", phrase, at(15))
+            as com.maven.notafraud.core.guard.Pauses.Result.Ok
+        var d = r.data
+        val night = at(23, 0)
+        assertTrue(Ladder.isBedtime(base, night))
+        assertEquals(3, Ladder.state(base, night).level)
+        assertEquals(0, Ladder.state(d, night).level)
+        assertTrue(!UnlockCheckIn.due(d, at(16)))
+        // Blocked list still applies.
+        val blocked = d.rules.blocked.firstOrNull()
+        if (blocked != null) assertEquals(com.maven.notafraud.core.guard.GuardAction.BLOCK, com.maven.notafraud.core.guard.GuardPolicy.decide(blocked, d, at(16)).action)
+        // After the end, back to normal.
+        assertEquals(3, Ladder.state(d, at(23, 0, day.plusDays(15))).level)
+        d = p.end(d, r.pause.id, at(16))
+        assertEquals(3, Ladder.state(d, night).level)
+    }
+}

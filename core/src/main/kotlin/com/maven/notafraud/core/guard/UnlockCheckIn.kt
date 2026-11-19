@@ -47,7 +47,8 @@ object UnlockCheckIn {
         val diet = DietLink.today(d, now)
         val quick = diet?.acceptsQuick == true
 
-        if (Module.ROUTINE in d.settings.modules) for (st in RoutinePolicy.statuses(d, now)) {
+        val nagsPaused = Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.NAGS)
+        if (Module.ROUTINE in d.settings.modules && !nagsPaused) for (st in RoutinePolicy.statuses(d, now)) {
             if (st.mood != Mood.LATE && st.mood != Mood.ANGRY) continue
             val it = st.item
             if ("routine:${it.id}" in done) continue
@@ -88,6 +89,7 @@ object UnlockCheckIn {
     fun due(d: AppData, now: Long): Boolean {
         if (!d.settings.checkInOnUnlock) return false
         if (now < d.checkIn.snoozeUntil) return false
+        if (Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.CHECKIN)) return false
         if (Ladder.isBedtime(d, now)) return false
         return prompts(d, now).isNotEmpty()
     }

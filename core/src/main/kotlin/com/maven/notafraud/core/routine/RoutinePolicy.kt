@@ -229,6 +229,7 @@ object RoutinePolicy {
 
     private fun allDue(d: AppData, now: Long, bedtimeSignal: Boolean): List<RoutineAlert> {
         if (!d.settings.routineNagsEnabled || com.maven.notafraud.core.model.Module.ROUTINE !in d.settings.modules) return emptyList()
+        if (com.maven.notafraud.core.guard.Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.NAGS)) return emptyList()
         val zone = Time.zone(d.settings.zoneId)
         val m = Time.minuteOfDay(now, zone)
         if (m >= QUIET_AFTER_MIN) return emptyList()

@@ -55,6 +55,7 @@ object DayReview {
     /** Task blocks that ended unworked and unexplained (the ladder's "slipped", the check-in's "what happened?"). */
     fun missed(d: AppData, now: Long): List<PlanBlock> {
         val plan = d.todayPlan ?: return emptyList()
+        if (com.maven.notafraud.core.guard.Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.NAGS)) return emptyList()
         return plan.blocks.filter { it.kind == BlockKind.TASK && it.end <= now && mark(d, it, now)?.mark == Mark.MISSED }
     }
 
@@ -146,6 +147,7 @@ object DayReview {
      * today, or after noon. "3h on trading today · Thursday's test: 0 so far, ~3h left."
      */
     fun priorityNag(d: AppData, now: Long): Nag? {
+        if (com.maven.notafraud.core.guard.Pauses.covers(d, now, com.maven.notafraud.core.model.PauseCover.NAGS)) return null
         val zone = Time.zone(d.settings.zoneId)
         val today = Time.dateOf(now, zone)
         val dayStart = Time.at(today, 0, zone)

@@ -62,7 +62,9 @@ object GuardPolicy {
         val rules = data.rules
         // Blocking switched off as a module: the guard only watches (calls, usage), never blocks.
         if (com.maven.notafraud.core.model.Module.BLOCKING !in data.settings.modules) return GuardDecision(GuardAction.IGNORE)
+        val pausedBlocked = Pauses.covers(data, now, com.maven.notafraud.core.model.PauseCover.BLOCKED)
         if (pkg.startsWith(Sites.PREFIX)) {
+            if (pausedBlocked) return GuardDecision(GuardAction.IGNORE)
             if (!rules.blockingEnabled || Sites.label(pkg) !in rules.blockedSites) return GuardDecision(GuardAction.IGNORE)
             return if (Credits.isUnlocked(data.ledger, pkg, now)) GuardDecision(GuardAction.UNLOCKED, Credits.unlockedUntil(data.ledger, pkg))
             else GuardDecision(GuardAction.BLOCK)
@@ -77,7 +79,7 @@ object GuardPolicy {
             }
         }
         if (pkg in rules.focus) return GuardDecision(GuardAction.EARN)
-        if (!rules.blockingEnabled || pkg !in rules.blocked) return GuardDecision(GuardAction.IGNORE)
+        if (!rules.blockingEnabled || pkg !in rules.blocked || pausedBlocked) return GuardDecision(GuardAction.IGNORE)
         return if (Credits.isUnlocked(data.ledger, pkg, now)) {
             GuardDecision(GuardAction.UNLOCKED, Credits.unlockedUntil(data.ledger, pkg))
         } else {

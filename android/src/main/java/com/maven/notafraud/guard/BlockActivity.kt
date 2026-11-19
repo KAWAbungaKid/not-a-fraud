@@ -259,6 +259,9 @@ class BlockActivity : ComponentActivity() {
                     openTarget()
                 }, enabled = ok, modifier = Modifier.fillMaxWidth()) { Text("Open for ${data.settings.emergencyUnlockMin} min") }
             } else Text("No emergency unlocks left today.", color = Palette.textDim)
+            var planned by remember { mutableStateOf(false) }
+            TextButton(onClick = { planned = true }) { Text("Planned unlock (trip, new apps)…") }
+            if (planned) com.maven.notafraud.ui.PauseDialog(Graph.data, Graph.now()) { planned = false; if (com.maven.notafraud.core.guard.Pauses.active(Graph.data, Graph.now()).isNotEmpty()) openTarget() }
             TextButton(onClick = { goHome() }) { Text("Go home") }
         }
     }
